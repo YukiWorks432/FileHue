@@ -42,7 +42,7 @@ pwsh -NoProfile -File scripts/smoke-gui.ps1
 ```
 
 
-GitHubのWindows標準ランナーは[管理者権限・UAC無効](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#administrative-privileges)で動作し、通常のユーザー単位COMとは条件が異なる（[Microsoftの説明](https://learn.microsoft.com/en-us/windows/win32/sysinfo/hkey-classes-root-key)）。Windows検証と配布候補のジョブでは、新規作成する`target/`と`work/`だけに子へ継承するMedium整合性ラベルを付け、試験EXEとその子プロセスを通常のユーザーと同じ整合性レベルで実行する。関連付けの登録先は引き続き試験専用キーへ分離する。Windows CIでは監査後にShellの隔離試験を先に実行し、GPUIを含む全体ビルドより前に登録経路の失敗を確認する。保護対象外のアイコン照会に失敗した場合は、実際の関連付け、同じDLLへの直接呼び出し、試験プロセスのトークンをログへ記録する。
+Shell試験は、実在するProgIDを共有する種類と、ProgIDが未登録の拡張子を分けて準備する。存在しないProgIDへの別名に依存せず、元アイコンの画素、パックの適用先、復元後の全登録を照合する。保護対象外のアイコン照会に失敗した場合は、実際の関連付け、同じDLLへの直接呼び出し、試験プロセスのトークンをログへ記録する。
 
 同じPCで負荷の高い試験・性能測定を同時に実行しない。個人環境の共通CPU排他を使う場合はその手順に従う。ビルド単独は排他対象としない。
 
@@ -140,6 +140,8 @@ just audit
 ライセンスの選択は`about.toml`とcargo-aboutで管理し、配布に必要な原文・通知・提供ソースも照合する。`just audit`の依存監査と、`just licenses`による権利表示の生成は両方確認する。設定が存在しない状態の `cargo deny --locked check licenses` は既定の拒否で失敗し得るため、その結果だけで違反とも配布可能とも判断しない。
 
 ## Windows向けCI
+
+Windows検証では監査後にShellの隔離試験を先に実行し、GPUIを含む全体ビルドより前に登録経路を確認する。固定版ツールはソースの外で導入し、導入成功時点でツールの保存先だけをキャッシュする。以降の試験に失敗した場合も、再実行で同じツールを再構築せずに復元できる。キャッシュの識別子にはRustと各ツールの版を含める。
 
 [Windows検証](../.github/workflows/windows.yml)はPRとmainへの変更、および手動実行で動く。固定版のツールとActionを使い、`just verify`、文書のリンク、測定結果の集計、最適化ZIPと同梱DLLを検証する。公式パックの実取得は手動実行の`verify_downloads`で選ぶ。検証の成功は実Explorerの受け入れやリリース公開を意味しない。
 

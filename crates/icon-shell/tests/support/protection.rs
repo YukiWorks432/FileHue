@@ -85,9 +85,9 @@ pub(super) fn verify(
         !report.iter().any(|e| e.extension == "wfi-shared"),
         "extension protection leaked to a sibling"
     );
-    // まだ照会していない種類で比較し、同一プロセスの関連付けキャッシュを混ぜない。
-    write(classes, ".wfi-own", "", "WfiProbe.Own")?;
-    write(classes, ".wfi-own-peer", "", "WfiProbe.Own")?;
+    // 未登録の種類で比較し、存在しないProgIDへの別名をShellへ渡さない。
+    // 既知の共有クラスは上の計画照合で、拡張子自身の指定は実アイコンで検証する。
+    classes.create_subkey(".wfi-own-peer")?;
     write(
         classes,
         ".wfi-own\\DefaultIcon",
