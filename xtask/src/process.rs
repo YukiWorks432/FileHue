@@ -14,6 +14,7 @@ use std::{
 use windows::{
     Win32::{
         Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT},
+        Security::{AppLocker::*, *},
         System::{JobObjects::*, Threading::*},
     },
     core::{PCWSTR, PWSTR},
@@ -163,11 +164,105 @@ fn stop(job: HANDLE) -> Result<()> {
 }
 
 pub fn run(command: &mut Command, timeout: Duration, label: &str, logs: &Path) -> Result<Report> {
-    run_inner(command, timeout, label, logs)
+    run_inner(command, timeout, label, logs, None)
         .with_context(|| format!("検証プロセスの制御失敗: {label}, logs={}", logs.display()))
 }
 
-fn run_inner(command: &mut Command, timeout: Duration, label: &str, logs: &Path) -> Result<Report> {
+/// 管理者からの試験起動だけを、同じユーザーの標準権限へ制限する。
+pub fn run_as_standard_user(
+    command: &mut Command,
+    timeout: Duration,
+    label: &str,
+    logs: &Path,
+) -> Result<Report> {
+    let token = standard_user_token().context("試験用の標準ユーザートークンを用意できません")?;
+    run_inner(
+        command,
+        timeout,
+        label,
+        logs,
+        token.as_ref().map(|token| token.0),
+    )
+    .with_context(|| {
+        format!(
+            "標準ユーザーの試験制御失敗: {label}, logs={}",
+            logs.display()
+        )
+    })
+}
+
+fn standard_user_token() -> Result<Option<Handle>> {
+    unsafe {
+        let mut current = HANDLE::default();
+        OpenProcessToken(
+            GetCurrentProcess(),
+            TOKEN_QUERY | TOKEN_DUPLICATE,
+            &mut current,
+        )?;
+        let current = Handle(current);
+        let mut elevation = TOKEN_ELEVATION::default();
+        let mut size = 0;
+        GetTokenInformation(
+            current.0,
+            TokenElevation,
+            Some((&mut elevation as *mut TOKEN_ELEVATION).cast()),
+            size_of_val(&elevation) as u32,
+            &mut size,
+        )?;
+        if elevation.TokenIsElevated == 0 {
+            return Ok(None);
+        }
+
+        let mut level = SAFER_LEVEL_HANDLE::default();
+        SaferCreateLevel(
+            SAFER_SCOPEID_USER,
+            SAFER_LEVELID_NORMALUSER,
+            SAFER_LEVEL_OPEN,
+            &mut level,
+            None,
+        )
+        .context("SAFERの標準ユーザーレベルを開けません")?;
+        let mut token = HANDLE::default();
+        let computed = SaferComputeTokenFromLevel(
+            level,
+            Some(current.0),
+            &mut token,
+            SAFER_COMPUTE_TOKEN_FROM_LEVEL_FLAGS(0),
+            None,
+        );
+        let _ = SaferCloseLevel(level);
+        computed.context("SAFERの制限トークンを作成できません")?;
+        let token = Handle(token);
+
+        // 整合性ラベルだけでは管理者グループを除去できないため、SAFERと併用する。
+        let mut sid_storage = [0u32; SECURITY_MAX_SID_SIZE as usize / size_of::<u32>()];
+        let mut sid_size = size_of_val(&sid_storage) as u32;
+        let sid = PSID(sid_storage.as_mut_ptr().cast());
+        CreateWellKnownSid(WinMediumLabelSid, None, Some(sid), &mut sid_size)?;
+        let label = TOKEN_MANDATORY_LABEL {
+            Label: SID_AND_ATTRIBUTES {
+                Sid: sid,
+                Attributes: windows::Win32::System::SystemServices::SE_GROUP_INTEGRITY as u32,
+            },
+        };
+        SetTokenInformation(
+            token.0,
+            TokenIntegrityLevel,
+            (&label as *const TOKEN_MANDATORY_LABEL).cast(),
+            size_of_val(&label) as u32 + sid_size,
+        )
+        .context("試験トークンをMedium整合性へ設定できません")?;
+        Ok(Some(token))
+    }
+}
+
+fn run_inner(
+    command: &mut Command,
+    timeout: Duration,
+    label: &str,
+    logs: &Path,
+    token: Option<HANDLE>,
+) -> Result<Report> {
     ensure!(
         !timeout.is_zero() && timeout.as_millis() < u32::MAX as u128,
         "待機期限は正の秒数で指定してください"
@@ -273,21 +368,41 @@ fn run_inner(command: &mut Command, timeout: Duration, label: &str, logs: &Path)
             lpAttributeList: attributes.list,
         };
         let mut info = PROCESS_INFORMATION::default();
-        CreateProcessW(
-            PCWSTR(application.as_ptr()),
-            Some(PWSTR(line.as_mut_ptr())),
-            None,
-            None,
-            true,
-            CREATE_SUSPENDED
-                | CREATE_NO_WINDOW
-                | CREATE_UNICODE_ENVIRONMENT
-                | EXTENDED_STARTUPINFO_PRESENT,
-            Some(block.as_ptr().cast()),
-            cwd.as_ref().map_or(PCWSTR::null(), |v| PCWSTR(v.as_ptr())),
-            &startup.StartupInfo,
-            &mut info,
-        )?;
+        if let Some(token) = token {
+            CreateProcessAsUserW(
+                Some(token),
+                PCWSTR(application.as_ptr()),
+                Some(PWSTR(line.as_mut_ptr())),
+                None,
+                None,
+                true,
+                CREATE_SUSPENDED
+                    | CREATE_NO_WINDOW
+                    | CREATE_UNICODE_ENVIRONMENT
+                    | EXTENDED_STARTUPINFO_PRESENT,
+                Some(block.as_ptr().cast()),
+                cwd.as_ref().map_or(PCWSTR::null(), |v| PCWSTR(v.as_ptr())),
+                &startup.StartupInfo,
+                &mut info,
+            )
+            .context("制限トークンで試験プロセスを生成できません")?;
+        } else {
+            CreateProcessW(
+                PCWSTR(application.as_ptr()),
+                Some(PWSTR(line.as_mut_ptr())),
+                None,
+                None,
+                true,
+                CREATE_SUSPENDED
+                    | CREATE_NO_WINDOW
+                    | CREATE_UNICODE_ENVIRONMENT
+                    | EXTENDED_STARTUPINFO_PRESENT,
+                Some(block.as_ptr().cast()),
+                cwd.as_ref().map_or(PCWSTR::null(), |v| PCWSTR(v.as_ptr())),
+                &startup.StartupInfo,
+                &mut info,
+            )?;
+        }
         let process = Handle(info.hProcess);
         let thread = Handle(info.hThread);
         // 対象の命令を一つも実行させる前に所有ジョブへ割り当てる。

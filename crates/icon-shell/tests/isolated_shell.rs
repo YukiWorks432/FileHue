@@ -615,6 +615,27 @@ fn isolated_restore_scope() -> Result<()> {
 
 #[test]
 fn isolated_shell_registration_probe() -> Result<()> {
+    if std::env::var_os("WFI_STANDARD_USER_PROBE").is_none() {
+        let result = Command::new(std::env::current_exe()?)
+            .args([
+                "--exact",
+                "isolated_shell_registration_probe",
+                "--nocapture",
+            ])
+            .env("WFI_STANDARD_USER_PROBE", "1")
+            .test_output_as_standard_user(std::time::Duration::from_secs(420))?;
+        println!("標準ユーザー: {}", String::from_utf8_lossy(&result.stdout));
+        ensure!(
+            result.status.success(),
+            "標準ユーザーの子試験に失敗しました: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        return Ok(());
+    }
+    ensure!(
+        !unsafe { IsUserAnAdmin().as_bool() },
+        "Shell結合試験には管理者でないトークンが必要です"
+    );
     if let Ok(namespace) = std::env::var("WFI_SHARED_RESTORED_READER") {
         let _redirect = Redirect::attach(namespace)?;
         initialize_com()?;

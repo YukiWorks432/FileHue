@@ -164,3 +164,50 @@ fn successful_parent_also_reaps_lingering_descendants() {
     assert!(ready.exists());
     unlocked(&held);
 }
+
+#[test]
+fn standard_user_keeps_identity_and_drops_administrator_rights() {
+    let root = tempfile::tempdir().unwrap();
+    let mut baseline = fixture("identity", Path::new("unused"), Path::new("unused"));
+    let result = process::run(
+        &mut baseline,
+        Duration::from_secs(20),
+        "元のユーザー",
+        &root.path().join("before"),
+    )
+    .unwrap();
+    assert_eq!(result.returncode, 0, "{}", process::detail(&result));
+    let before: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.path().join("before/stdout.log")).unwrap()).unwrap();
+
+    let result = process::run_as_standard_user(
+        &mut fixture("identity", Path::new("unused"), Path::new("unused")),
+        Duration::from_secs(20),
+        "標準ユーザー",
+        &root.path().join("normal"),
+    )
+    .unwrap();
+    assert_eq!(result.returncode, 0, "{}", process::detail(&result));
+    assert!(!result.timed_out);
+    let after: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.path().join("normal/stdout.log")).unwrap()).unwrap();
+    assert_eq!(after["user"], before["user"]);
+    assert_eq!(after["administrator"], false);
+}
+
+#[test]
+fn standard_user_timeout_reaps_owned_descendants() {
+    let root = tempfile::tempdir().unwrap();
+    let held = root.path().join("held");
+    let ready = root.path().join("ready");
+    let result = process::run_as_standard_user(
+        &mut fixture("timeout", &held, &ready),
+        Duration::from_secs(4),
+        "標準ユーザーの期限",
+        &root.path().join("logs"),
+    )
+    .unwrap();
+    assert!(result.timed_out, "{}", process::detail(&result));
+    assert!(ready.exists());
+    unlocked(&held);
+}
