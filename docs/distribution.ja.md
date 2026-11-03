@@ -6,7 +6,7 @@ FileHue 0.1.0のWindows x64向け配布物を作る。検証用と公開候補�
 
 配布候補を作る前に、[依存の更新と監査](dependency-security.ja.md)に従って`just audit`を実行する。監査の成功と権利表示の最終確認は別々に判断する。
 
-PowerShell 7、RustのMSVCツールチェーン、cargo-about 0.9.2を使う。cargo-aboutは`cargo install cargo-about --version 0.9.2 --locked`で導入する。必要な依存パッケージを取得済みの環境で、ソースをコミットしてから次を実行する。ビルドと、その後の試験の実行条件は[開発手順](development.ja.md)に従う。
+PowerShell 7、RustのMSVCツールチェーン、cargo-about 0.9.2を使う。cargo-aboutは`cargo install cargo-about --version 0.9.2 --features cli --locked`で導入する。必要な依存パッケージを取得済みの環境で、ソースをコミットしてから次を実行する。ビルドと、その後の試験の実行条件は[開発手順](development.ja.md)に従う。
 
 ```powershell
 just package

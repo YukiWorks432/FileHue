@@ -41,7 +41,7 @@ Launching the GUI does not change Shell registration. Normal GUI and CLI command
 
 ## License
 
-Notice generation uses cargo-about 0.9.2. Install it with `cargo install cargo-about --version 0.9.2 --locked`. The Japanese [distribution guide](docs/distribution.ja.md#権利表示の収集範囲) describes the scope of generated information, original notices, and source archives.
+Notice generation uses cargo-about 0.9.2. Install it with `cargo install cargo-about --version 0.9.2 --features cli --locked`. The Japanese [distribution guide](docs/distribution.ja.md#権利表示の収集範囲) describes the scope of generated information, original notices, and source archives.
 
 The application uses the [MIT License](LICENSE). External packs, dependencies, and language mappings retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.en.md). Icon-pack artwork is not bundled in the source repository. The application's MIT license does not grant blanket redistribution rights for external assets.
 

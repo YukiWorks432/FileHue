@@ -112,7 +112,7 @@ cargo test -p file-icons-cli --test cli shared_categories_drive_bulk_edits_in_bo
 
 ### 権利表示の生成
 
-`cargo install cargo-about --version 0.9.2 --locked`で固定版を導入する。依存を取得済みの環境で`just licenses`を実行すると、一意な`work/licenses-*`フォルダーへ生成する。保存先は`--output`でも指定できるが、既存のフォルダーは上書きしない。配布ZIPも同じ生成処理を必須で実行する。異なるツール版、許可一覧にないライセンス、生成失敗、補完元のハッシュ不一致では成功成果物を作らない。
+`cargo install cargo-about --version 0.9.2 --features cli --locked`で固定版を導入する。依存を取得済みの環境で`just licenses`を実行すると、一意な`work/licenses-*`フォルダーへ生成する。保存先は`--output`でも指定できるが、既存のフォルダーは上書きしない。配布ZIPも同じ生成処理を必須で実行する。異なるツール版、許可一覧にないライセンス、生成失敗、補完元のハッシュ不一致では成功成果物を作らない。
 
 `just run`でアプリ情報画面からライセンスを開くには、先に`just build-release`を実行し、次をリポジトリのルートから実行する。`LICENSE`や`licenses`が出力先に既にある場合は上書きせず停止する。デバッグ構成では`release`を`debug`に置き換え、先に`just build`を実行する。
 
