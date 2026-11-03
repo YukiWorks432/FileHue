@@ -52,9 +52,14 @@ fmt-check:
 clippy:
     cargo clippy --workspace --all-targets --features file-icons-manager/test-support --locked -- -D warnings
 
-# GPUIの操作試験と隔離したShell結合試験を実行する
+# 既存のモック・契約試験とGPUI操作試験を実行する
 test: build
     cargo test --workspace --features file-icons-manager/test-support --locked
+
+# Windows 11の通常権限で、実DLLとShellの隔離結合試験を実行する
+test-shell:
+    cargo build -p file-icons-shell --locked
+    cargo test -p file-icons-shell --features shell-integration --test isolated_shell --locked -- --nocapture
 
 # 配布・プロセス制御・更新処理のRust試験を実行する
 test-tools:
@@ -67,14 +72,14 @@ test-scripts: test-tools
 smoke: build
     & ./scripts/smoke-gui.ps1
 
-# 日常の一括検証（実Explorer受け入れと外部パックの実取得は別途実施）
+# 日常の一括検証（実Shell・Explorer受け入れと外部パックの実取得は別途実施）
 verify: audit test-policy fmt-check clippy test test-scripts smoke
 
 # 検証用ZIPを作成する（公開先からは--public-candidateで公開候補を指定）
 package *args:
     $forward = @($args | Select-Object -Skip 1); cargo xtask package @forward; exit $LASTEXITCODE
 
-# 同じ完成ZIPの整合・文書・隔離DLL・GUI・CLIを検証する
+# 同じ完成ZIPを検証する（CIは--skip-shell、Windows 11での最終確認は既定で実Shellも実行）
 verify-release *args:
     $forward = @($args | Select-Object -Skip 1); cargo xtask verify-release @forward; exit $LASTEXITCODE
 

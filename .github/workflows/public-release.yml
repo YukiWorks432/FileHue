@@ -91,7 +91,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          ./.github/scripts/run-as-standard-user.ps1 -Command @'
           just verify
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           just check-docs
@@ -102,11 +101,10 @@ jobs:
           if ($folders.Count -ne 1) { throw '公開候補を一意に特定できません' }
           $folder = $folders[0].FullName
           $zip = Join-Path $folder ($folders[0].Name + '.zip')
-          just verify-release --public-candidate --archive $zip --report work/public-candidate-verification.json
+          just verify-release --skip-shell --public-candidate --archive $zip --report work/public-candidate-verification.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "CANDIDATE_DIR=$folder" >> $env:GITHUB_ENV
           "CANDIDATE_ZIP=$zip" >> $env:GITHUB_ENV
-          '@
 
       - name: 完成ZIPのビルド来歴を証明する
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
@@ -172,5 +170,5 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $remote.sha -cne $env:GITHUB_SHA) { throw '公開先のタグが変更されています' }
           $assets = @($zip, "$folder/SHA256SUMS.txt", "$folder/manifest.json", $reportFile[0].FullName)
           $assets += @($sources | ForEach-Object { Join-Path $folder $_.source_archive.path })
-          gh release create $env:RELEASE_TAG @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title $env:RELEASE_TAG --notes 'FileHue Windows x64: unsigned release candidate.'
+          gh release create $env:RELEASE_TAG @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title $env:RELEASE_TAG --notes 'FileHue Windows x64: unsigned candidate. Windows 11 Shell and Explorer validation is required before publication.'
           exit $LASTEXITCODE

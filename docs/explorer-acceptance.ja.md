@@ -10,6 +10,12 @@
 
 記録には、Windowsの版とビルド、CPU、画面の倍率、実行ファイル・DLL・ZIPのSHA-256、ソースコミット、パック名・版・テーマ識別子、実行日時を含める。画面とログは管理対象外の `work/` 配下へ保持し、共有前に個人パスや関連付け情報を確認する。パックを取得しただけの状態と、適用した状態を区別する。
 
+## 公開前・Shell変更時の自動検証
+
+Windows 11 x64の通常権限のターミナルで、対象コミットのソースから`just test-shell`を実行する。Shellの登録・保護・委譲・復元やWindows API依存に影響する変更時も対象とする。専用の設定とHKCUキーを使う隔離試験であり、通常のユーザー設定へ登録する操作ではない。
+
+公開候補は、対象コミットのソースから`just verify-release --public-candidate --archive <候補ZIP> --report <新しい報告書>`を実行し、同梱DLLのSTA/MTAを含めて確認する。候補ZIPのハッシュと報告書の`shell_sta_mta=passed`を照合する。通常CIはこの試験を省略して`not-run`を記録するため、公開前の合格記録として読み替えない。自動試験の成功後、以下の実Explorer確認へ進む。
+
 ## 適用前の記録
 
 検証専用の異なる二つのフォルダーに、Cargo.toml、settings.toml、package.json、data.json、README.md、notes.md、sample.rs、拡張子なしのDockerfile、対応しない拡張子のファイルを置く。PNG画像も置き、通常のアイコンとサムネイルを記録する。既存の利用者ファイルは試験のために書き換えない。

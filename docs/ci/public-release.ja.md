@@ -14,12 +14,16 @@ PR検証は署名・公開権限を持たない。配布候補のビルド側に
 
 公開先の`main`から「公開候補の作成」を手動実行し、作成済みタグ（例`v0.1.0`）を入力する。タグ、Cargo.tomlの版、対象コミットが一致しない場合はビルドへ進まない。
 
-`just verify`、文書、公開候補の生成と完成ZIPの検証が成功すると、ZIPの来歴を証明する。別ジョブが成果物と来歴を確認し、リリースをドラフトとして作る。失敗した場合はログと途中のドラフトを確認し、不足したまま公開しない。検証後にZIPを再ビルドしない。
+`just verify`、文書、公開候補の生成と`just verify-release --skip-shell`が成功すると、ZIPの来歴を証明する。別ジョブが成果物と来歴を確認し、リリースをドラフトとして作る。失敗した場合はログと途中のドラフトを確認し、不足したまま公開しない。検証後にZIPを再ビルドしない。
 
 Windows検証と候補作成は、Rust 1.99.0、just 1.43.0、cargo-deny 0.20.2、cargo-about 0.9.2を使う。検証ツールの保存先だけを公式のキャッシュActionで再利用し、製品のビルド出力や資格情報はキャッシュに含めない。ツールの導入はチェックアウトしたソースの外で行う。
 
 初回のEXEとDLLは未署名である。SHA-256は内容の一致を、[ビルド来歴証明](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)は作成元を確認するもので、Windowsのコード署名ではない。ZIP、`SHA256SUMS.txt`、外部マニフェスト、提供ソース、検証報告が同じ版・コミットを示すことを確認し、必要な原本を継続して提供できるよう保持する。
 
-新しいWindows環境でドラフトから同じZIPを取得し、ハッシュと`gh attestation verify <ZIP> --repo YukiWorks432/FileHue`を確認する。[実Explorerの受け入れ](../explorer-acceptance.ja.md)と、起動、権利表示、更新・復元・削除を確認し、結果をGUI起動試験や隔離DLL試験と区別して残す。
+通常CIはメモリ上のレジストリ実装やCOMの試験用実装と、実際の本体ロジックを組み合わせて検証する。実Shell試験をGitHub管理ランナーで実行せず、一時ユーザーの作成や権限変更を行わない。CI報告書の`shell_sta_mta=not-run`は未実施を表し、公開の受け入れ結果には使わない。
+
+対応対象のWindows 11 x64の通常権限の環境で、対象コミットのソースとドラフトから取得した同じZIPを用意し、`just verify-release --public-candidate --archive <候補ZIP> --report <新しい報告書>`を実行する。ZIPのハッシュがCI報告と一致し、`shell_sta_mta=passed`であることを確認する。Shellの登録・保護・委譲・復元を変更した場合も、[実Shell検証](../development.ja.md#windows-11での実shell検証)を実行する。
+
+同じWindows 11環境で、ハッシュと`gh attestation verify <ZIP> --repo YukiWorks432/FileHue`を確認する。[実Explorerの受け入れ](../explorer-acceptance.ja.md)と、起動、権利表示、更新・復元・削除を確認し、結果をGUI起動試験や隔離DLL試験と区別して残す。
 
 担当者がタグ・版・コミット、添付物、受け入れ結果を照合し、日英の公開案内を揃えて公開を判断する。ドラフト作成はリリースを公開しない。公開後の修正は次の版で行う。

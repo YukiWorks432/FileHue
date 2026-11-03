@@ -73,20 +73,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: 監査後にShellの隔離試験を先に確認する
-        run: |
-          $ErrorActionPreference = 'Stop'
-          just audit
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./.github/scripts/run-as-standard-user.ps1 -Command @'
-          cargo build -p file-icons-shell --locked
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo test -p file-icons-shell --test isolated_shell --locked -- --nocapture
-          exit $LASTEXITCODE
-          '@
-
-      - name: 監査・静的解析・GPUI操作とShellの隔離試験を実行する
-        run: ./.github/scripts/run-as-standard-user.ps1 -Command 'just verify'
+      - name: 監査・静的解析・モックとGPUI操作試験を実行する
+        run: just verify
 
       - name: 文書の相対リンクを検査する
         run: just check-docs
@@ -94,9 +82,9 @@ jobs:
       - name: 測定結果の集計を検証する
         run: cargo test -p file-icons-shell --example measure_shell --locked
 
-      - name: 最適化ZIPと同梱DLLを検証する
+      - name: 最適化ZIP・権利表示・GUIとCLIを検証する
         timeout-minutes: 45
-        run: ./.github/scripts/run-as-standard-user.ps1 -Command 'just verify-release --report work/ci-release/verification.json'
+        run: just verify-release --skip-shell --report work/ci-release/verification.json
 
       - name: 公式配布物を取得して検証する
         if: github.event_name == 'workflow_dispatch' && inputs.verify_downloads

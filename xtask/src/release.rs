@@ -120,6 +120,7 @@ pub fn verify(
     archive: &Path,
     report: &Path,
     purpose: package::Purpose,
+    verify_shell: bool,
 ) -> Result<Value> {
     let source = package::source_state(root)?;
     ensure!(!source.dirty, "commit source before validating release");
@@ -167,44 +168,50 @@ pub fn verify(
     }
     let sysroot = package::run(root, "rustc", &["--print", "sysroot"], 30)?;
     crate::privacy::verify(&folder, root, Path::new(&sysroot))?;
-    let messages = process::checked(
-        Command::new("cargo")
-            .args([
-                "test",
-                "--workspace",
-                "--exclude",
-                "xtask",
-                "--features",
-                "file-icons-manager/test-support",
-                "--no-run",
-                "--locked",
-                "--message-format=json",
-            ])
-            .current_dir(root),
-        Duration::from_secs(1800),
-        "配布検証の試験ビルド",
-        &logs.join("build"),
-    )?;
-    let probe = probe(std::str::from_utf8(&messages)?)?;
-    let copied = work.path().join("probe");
-    fs::create_dir(&copied)?;
-    fs::copy(&probe, copied.join("isolated_shell.exe"))?;
-    fs::copy(
-        folder.join("file_icons_shell.dll"),
-        copied.join("file_icons_shell.dll"),
-    )?;
-    process::checked(
-        Command::new(copied.join("isolated_shell.exe"))
-            .args([
-                "--exact",
-                "isolated_shell_registration_probe",
-                "--nocapture",
-            ])
-            .current_dir(root),
-        Duration::from_secs(420),
-        "配布DLLのSTA/MTA",
-        &logs.join("shell"),
-    )?;
+    let probe_sha256 = if verify_shell {
+        let messages = process::checked(
+            Command::new("cargo")
+                .args([
+                    "test",
+                    "-p",
+                    "file-icons-shell",
+                    "--test",
+                    "isolated_shell",
+                    "--features",
+                    "shell-integration",
+                    "--no-run",
+                    "--locked",
+                    "--message-format=json",
+                ])
+                .current_dir(root),
+            Duration::from_secs(1800),
+            "配布検証の試験ビルド",
+            &logs.join("build"),
+        )?;
+        let probe = probe(std::str::from_utf8(&messages)?)?;
+        let copied = work.path().join("probe");
+        fs::create_dir(&copied)?;
+        fs::copy(&probe, copied.join("isolated_shell.exe"))?;
+        fs::copy(
+            folder.join("file_icons_shell.dll"),
+            copied.join("file_icons_shell.dll"),
+        )?;
+        process::checked(
+            Command::new(copied.join("isolated_shell.exe"))
+                .args([
+                    "--exact",
+                    "isolated_shell_registration_probe",
+                    "--nocapture",
+                ])
+                .current_dir(root),
+            Duration::from_secs(420),
+            "配布DLLのSTA/MTA",
+            &logs.join("shell"),
+        )?;
+        Some(package::digest(&probe)?)
+    } else {
+        None
+    };
     smoke(
         &folder.join("file-icons-manager.exe"),
         &logs.join("smoke/profile"),
@@ -251,8 +258,8 @@ pub fn verify(
     );
     let mut result = json!({"product":package::PRODUCT,"purpose":purpose,"source_commit":source.head,"version":manifest.version,"target":manifest.target,
         "source_repository":manifest.source_repository,"signature":"unsigned","archive":archive_name,"archive_sha256":archive_hash,"files":manifest.files.len(),
-        "dll_sha256":package::digest(&folder.join("file_icons_shell.dll"))?,"gui_sha256":package::digest(&folder.join("file-icons-manager.exe"))?,"probe_sha256":package::digest(&probe)?,
-        "manifest":"passed","document_links":"passed","document_links_checked":links,"shell_sta_mta":"passed","gui_startup":"passed","cli_smoke":"passed","cli_sha256":package::digest(&folder.join("file-icons.exe"))?,"actual_user_registration_modified":false,
+        "dll_sha256":package::digest(&folder.join("file_icons_shell.dll"))?,"gui_sha256":package::digest(&folder.join("file-icons-manager.exe"))?,"probe_sha256":probe_sha256,
+        "manifest":"passed","document_links":"passed","document_links_checked":links,"shell_sta_mta":if verify_shell { "passed" } else { "not-run" },"gui_startup":"passed","cli_smoke":"passed","cli_sha256":package::digest(&folder.join("file-icons.exe"))?,"actual_user_registration_modified":false,
         "license_review_required":manifest.license_review_required,"publication_approved":false});
     // 生ログ・ローカルパスは検証者だけが保持し、公開候補の報告には含めない。
     if purpose == package::Purpose::Validation {

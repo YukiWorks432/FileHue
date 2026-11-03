@@ -21,7 +21,8 @@ PowerShell 7.4以降、RustのMSVC環境、justを用意する。リポジトリ
 | `just build` / `just build-release` | ワークスペースをビルド |
 | `just fmt` / `just fmt-check` | Rustの整形／整形確認 |
 | `just clippy` | GPUI試験構成を含む全対象を警告なしで静的解析 |
-| `just test` | ビルド後にGPUI操作・隔離登録・契約試験を実行 |
+| `just test` | 既存のモック・契約試験、COMの単体試験、GPUI操作試験を実行（実Shellは別途） |
+| `just test-shell` | Windows 11の通常権限で実DLLとShellの隔離結合試験を実行 |
 | `just test-scripts` | 配布・プロセス制御・言語表更新のRust試験 |
 | `just smoke` | 専用プロファイルでGUIの起動と終了を確認 |
 | `just verify` | 整形確認、Clippy、ビルド・Rust試験、xtaskの契約試験、GUI起動確認 |
@@ -30,7 +31,7 @@ PowerShell 7.4以降、RustのMSVC環境、justを用意する。リポジトリ
 | `just check-binaries --folder <フォルダー>` | 配布EXE・DLLのビルド元パスを検査 |
 | `just perf-gui <未作成のJSON>` / `just perf-icons <未作成のJSON>` | GUI・関連付け調査／ICO変換の時間とメモリーを手動計測 |
 
-個別のRustコマンドが必要な場合は、Shell結合試験より前にDLLをビルドする。
+通常CIと日常の開発では、既存のメモリ上のレジストリ実装とCOMの試験用実装を使い、本体の保護・適用・競合・復元ロジックを検証する。GPUI操作試験もこの範囲に含める。個別のRustコマンドは次のとおり。
 
 ```powershell
 cargo fmt --all -- --check
@@ -42,7 +43,17 @@ pwsh -NoProfile -File scripts/smoke-gui.ps1
 ```
 
 
-Shell試験は、実在するProgIDを共有する種類と、ProgIDが未登録の拡張子を分けて準備する。存在しないProgIDへの別名に依存せず、元アイコンの画素、パックの適用先、復元後の全登録を照合する。保護対象外のアイコン照会に失敗した場合は、実際の関連付け、同じDLLへの直接呼び出し、試験プロセスのトークンをログへ記録する。
+### Windows 11での実Shell検証
+
+公開前と、Shellの登録・アイコン解決・委譲・保護・復元やWindows API依存に影響する変更時には、対応対象のWindows 11 x64の通常権限で次を実行する。
+
+```powershell
+just test-shell
+```
+
+実DLLへのShell呼び出し、STA/MTA、既存画像の保護、共有する関連付け、復元後の登録を検証する。専用プロファイルと専用HKCUキーを使う。`shell-integration`機能を明示したときだけ結合試験をビルド・実行し、既定の`cargo test`と`just verify`には含めない。実Shellを使わない通常試験でも、本体ロジックとCOMの引数・戻り値の契約を検証する。
+
+公開候補では、同じソースコミットから`just verify-release --public-candidate --archive <候補ZIP> --report <新しい報告書>`を実行し、同梱DLLの`shell_sta_mta=passed`とZIPのハッシュを確認する。続いて[実Explorerの受け入れ](explorer-acceptance.ja.md)を行う。CIの成功や`not-run`の報告を、この確認の代わりにしない。
 
 同じPCで負荷の高い試験・性能測定を同時に実行しない。個人環境の共通CPU排他を使う場合はその手順に従う。ビルド単独は排他対象としない。
 
@@ -55,7 +66,7 @@ GUIの起動だけでは登録は変わらない。通常のGUI・CLI操作は�
 - `just package [--profile debug|release] [--allow-dirty]`: 検証用ZIP・展開内容・`SHA256SUMS.txt`を一つの出力フォルダーへ作成する。
 - `just package --public-candidate`: 新しい公開先のクリーンなコミットから未署名の公開候補を作成する。GitHub CLIも必要とする。
 - `cargo xtask package --verify <展開先> [--metadata <外部記録のフォルダー>] [--public-candidate]`: 指定した用途とZIP外のマニフェスト・権利確認記録を照合する。外部記録の既定は展開先の親フォルダー。
-- `just verify-release --report <報告書> [--public-candidate]`: 作成から配布DLL・GUI・CLI・文書の確認まで行う。既存ZIPには `--archive <ZIP>` を指定し、隣接する`SHA256SUMS.txt`も保持する。公開候補の報告にはローカルパスと生ログの場所を含めない。
+- `just verify-release --report <報告書> [--public-candidate]`: Windows 11で、作成から配布DLL・GUI・CLI・文書の確認まで行う。CIでは`--skip-shell`を指定し、同梱DLLの実Shell試験を省略する。省略時は報告書に`shell_sta_mta=not-run`と`probe_sha256=null`を記録する。既存ZIPには `--archive <ZIP>` を指定し、隣接する`SHA256SUMS.txt`も保持する。公開候補の報告にはローカルパスと生ログの場所を含めない。
 - `just check-docs`: 文書の相対リンクを照合する。
 - `just test-tools` / `just test-scripts`: 開発補助のRust試験を実行する。
 
@@ -67,7 +78,7 @@ xtask内から呼ぶ製品のビルド・試験ビルドは `--workspace --exclu
 
 GPUIのtest-supportはクリックとキー入力、画面遷移、下書き、保存、処理中の制限を検証する。描画画像では日英・明暗・狭い幅・文字拡大と、面・余白・選択の見え方を別に確認する。手順は[デザイン規約](ui-design.ja.md#変更時の確認)に従う。
 
-隔離登録試験は専用の設定とレジストリを使い、通常のExplorer全体を操作する試験とは区別する。`just verify` は実Explorerでの受け入れや公式パックの実取得を含まない。[実機受け入れ](explorer-acceptance.ja.md)、[配布物の検証](distribution.ja.md)、[性能計測](performance.ja.md)は必要に応じて別に行う。結果には対象コミット、コマンド、環境、終了コードと未確認事項を記録し、ログと画像は `work/` に保存する。利用者のパスやレジストリ情報を含む記録をそのまま公開しない。
+実Shellの隔離登録試験は専用の設定とレジストリを使い、通常のExplorer全体を操作する試験とは区別する。`just verify` は実Shell・実Explorerでの受け入れや公式パックの実取得を含まない。[実機受け入れ](explorer-acceptance.ja.md)、[配布物の検証](distribution.ja.md)、[性能計測](performance.ja.md)は必要に応じて別に行う。結果には対象コミット、コマンド、環境、終了コードと未確認事項を記録し、ログと画像は `work/` に保存する。利用者のパスやレジストリ情報を含む記録をそのまま公開しない。
 
 
 ## 試験プロセスの待機期限と診断
@@ -141,8 +152,8 @@ just audit
 
 ## Windows向けCI
 
-Windows検証では監査後にShellの隔離試験を先に実行し、GPUIを含む全体ビルドより前に登録経路を確認する。[GitHub管理のWindowsランナー](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#administrative-privileges)は管理者・UAC無効で動作し、[ユーザー単位のCOM登録が無視される](https://learn.microsoft.com/en-us/windows/win32/sysinfo/merged-view-of-hkey-classes-root)。このためShellを含む検証は、ランナー専用スクリプトが作成する一時的な標準ユーザーで実行する。プロファイルを読み込み、検証領域とツールに限ったアクセス権を渡し、終了時にアカウントを削除する。この処理を開発PCで実行しない。固定版ツールはソースの外で導入し、導入成功時点でツールの保存先だけをキャッシュする。以降の試験に失敗した場合も、再実行で同じツールを再構築せずに復元できる。キャッシュの識別子にはRustと各ツールの版を含める。
+通常CIは`just verify`で既存のモック・契約試験とGPUI操作試験を実行し、実Shell検証は上記のWindows 11での手順へ分離する。Windowsランナーのアカウント・UAC・整合性ラベルを変更しない。固定版ツールはソースの外で導入し、導入成功時点でツールの保存先だけをキャッシュする。以降の試験に失敗した場合も、再実行で同じツールを再構築せずに復元できる。キャッシュの識別子にはRustと各ツールの版を含める。
 
-[Windows検証](../.github/workflows/windows.yml)はPRとmainへの変更、および手動実行で動く。固定版のツールとActionを使い、`just verify`、文書のリンク、測定結果の集計、最適化ZIPと同梱DLLを検証する。公式パックの実取得は手動実行の`verify_downloads`で選ぶ。検証の成功は実Explorerの受け入れやリリース公開を意味しない。
+[Windows検証](../.github/workflows/windows.yml)はPRとmainへの変更、および手動実行で動く。固定版のツールとActionを使い、`just verify`、文書のリンク、測定結果の集計と`just verify-release --skip-shell`を実行する。ZIPの整合・権利表示・パス・GUI起動・CLIを確認し、実Shellは`not-run`として残す。公式パックの実取得は手動実行の`verify_downloads`で選ぶ。検証の成功は実Explorerの受け入れやリリース公開を意味しない。
 
 [依存監査](../.github/workflows/dependency-audit.yml)は毎日と手動で実行し、製品コードをビルドしない。配布候補は[専用ワークフロー](../.github/workflows/public-release.yml)をmainから手動実行し、[配布候補の生成と公開](ci/public-release.ja.md)に従う。

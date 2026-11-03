@@ -85,9 +85,9 @@ pub(super) fn verify(
         !report.iter().any(|e| e.extension == "wfi-shared"),
         "extension protection leaked to a sibling"
     );
-    // 未登録の種類で比較し、存在しないProgIDへの別名をShellへ渡さない。
-    // 既知の共有クラスは上の計画照合で、拡張子自身の指定は実アイコンで検証する。
-    classes.create_subkey(".wfi-own-peer")?;
+    // まだ照会していない種類で比較し、同一プロセスの関連付けキャッシュを混ぜない。
+    write(classes, ".wfi-own", "", "WfiProbe.Own")?;
+    write(classes, ".wfi-own-peer", "", "WfiProbe.Own")?;
     write(
         classes,
         ".wfi-own\\DefaultIcon",
@@ -114,34 +114,14 @@ pub(super) fn verify(
         "extension-specific original icon changed: before={own_location:?}, after={:?}",
         query(&own_file)?
     );
-    let peer_location = query(&peer_file)?;
-    let expected = own_pack.theme.resolve("pack.wfi-own-peer").unwrap();
-    if peer_location.0 != expected.to_string_lossy() {
-        // Shell経由と同じDLLへの直接呼び出しを分け、実行環境を失敗時だけ記録する。
-        eprintln!(
-            "probe associations: own={:?}, peer={:?}, administrator={}",
-            file_icons_windows::association("wfi-own"),
-            file_icons_windows::association("wfi-own-peer"),
-            unsafe { IsUserAnAdmin().as_bool() }
-        );
-        let direct = (|| -> Result<(String, i32)> {
-            let handler: IPersistFile = unsafe {
-                CoCreateInstance(&file_icons_windows::CLSID, None, CLSCTX_INPROC_SERVER)?
-            };
-            direct_query(&handler, &peer_file)
-        })();
-        eprintln!("probe direct DLL result: {direct:?}");
-        match Command::new("whoami.exe").arg("/groups").test_output() {
-            Ok(output) => eprintln!(
-                "probe token groups: {}",
-                String::from_utf8_lossy(&output.stdout)
-            ),
-            Err(error) => eprintln!("probe token groups unavailable: {error}"),
-        }
-    }
     ensure!(
-        peer_location.0 == expected.to_string_lossy(),
-        "unprotected sibling did not use pack icon: actual={peer_location:?}, expected={expected:?}"
+        query(&peer_file)?.0
+            == own_pack
+                .theme
+                .resolve("pack.wfi-own-peer")
+                .unwrap()
+                .to_string_lossy(),
+        "unprotected sibling did not use pack icon"
     );
     file_icons_windows::restore(&mut settings)?;
     settings.packs = vec![pack.clone()];

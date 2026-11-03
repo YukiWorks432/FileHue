@@ -294,17 +294,23 @@ fn release_entry_rejects_wrong_version_commit_lock_and_archive_checksum_before_e
         )
         .unwrap();
         let report = temp.path().join(format!("report-{index}.json"));
-        let error =
-            xtask::release::verify(&root, &archive, &report, Purpose::Validation).unwrap_err();
-        assert!(error.to_string().contains(reason), "{field}: {error:#}");
-        assert!(!report.exists());
-        fs::write(temp.path().join("SHA256SUMS.txt"), "changed checksum").unwrap();
-        assert!(
-            xtask::release::verify(&root, &archive, &report, Purpose::Validation)
-                .unwrap_err()
-                .to_string()
-                .contains("SHA256SUMS")
-        );
+        let sums = temp.path().join("SHA256SUMS.txt");
+        let valid_sums = fs::read(&sums).unwrap();
+        // 実Shellを省略しても、版・ソース・チェックサムの拒否を維持する。
+        for verify_shell in [true, false] {
+            fs::write(&sums, &valid_sums).unwrap();
+            let error =
+                xtask::release::verify(&root, &archive, &report, Purpose::Validation, verify_shell)
+                    .unwrap_err();
+            assert!(error.to_string().contains(reason), "{field}: {error:#}");
+            assert!(!report.exists());
+            fs::write(&sums, "changed checksum").unwrap();
+            assert!(
+                xtask::release::verify(
+                    &root, &archive, &report, Purpose::Validation, verify_shell,
+                ).unwrap_err().to_string().contains("SHA256SUMS")
+            );
+        }
     }
     // 非公開の開発チェックアウトでは、ビルド開始前に公開候補の作成を拒否する。
     package::run(
