@@ -42,7 +42,9 @@ try {
     exit 1
 }
 '@
-    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($childScript))
+    # 資格情報付きの起動は引数が1024文字以内なので、専用ファイルから実行する。
+    $childPath = Join-Path $runtime 'verify.ps1'
+    [IO.File]::WriteAllText($childPath, $childScript, [Text.UTF8Encoding]::new($false))
     $environment = @{
         CARGO_HOME = $cargoHome
         RUSTUP_HOME = $rustupHome
@@ -56,7 +58,7 @@ try {
         GIT_CONFIG_VALUE_0 = $workspace
     }
     $credential = [pscredential]::new("$env:COMPUTERNAME\$name", $secure)
-    $process = Start-Process -FilePath (Get-Command pwsh.exe).Source -Credential $credential -LoadUserProfile -WindowStyle Hidden -WorkingDirectory $workspace -ArgumentList @('-NoProfile', '-NonInteractive', '-EncodedCommand', $encoded) -Environment $environment -RedirectStandardOutput (Join-Path $runtime 'stdout.log') -RedirectStandardError (Join-Path $runtime 'stderr.log') -Wait -PassThru
+    $process = Start-Process -FilePath (Get-Command pwsh.exe).Source -Credential $credential -LoadUserProfile -WindowStyle Hidden -WorkingDirectory $workspace -ArgumentList @('-NoProfile', '-NonInteractive', '-File', ('"' + $childPath + '"')) -Environment $environment -RedirectStandardOutput (Join-Path $runtime 'stdout.log') -RedirectStandardError (Join-Path $runtime 'stderr.log') -Wait -PassThru
     Get-Content -LiteralPath (Join-Path $runtime 'stdout.log')
     Get-Content -LiteralPath (Join-Path $runtime 'stderr.log')
     if ($process.ExitCode -ne 0) { throw "標準ユーザーでの検証に失敗しました（終了コード $($process.ExitCode)）。" }
