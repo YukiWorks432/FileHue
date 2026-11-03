@@ -42,8 +42,6 @@ pwsh -NoProfile -File scripts/smoke-gui.ps1
 ```
 
 
-Shell結合試験は、管理者で起動された場合だけ、同じユーザーのSAFER標準ユーザートークンとMedium整合性レベルを使う。すでに昇格していない場合は通常の起動経路を使う。子側でも管理者権限がないことを確認し、ユーザー単位COMの条件を揃えてから専用レジストリへ分離する（[GitHubのランナー権限](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#administrative-privileges)、[Windowsのユーザー単位COM](https://learn.microsoft.com/en-us/windows/win32/sysinfo/hkey-classes-root-key)、[SAFERの標準ユーザーレベル](https://learn.microsoft.com/en-us/windows/win32/api/winsafer/nf-winsafer-safercreatelevel)）。標準ユーザーの外側の試験プロセスは420秒、各STA/MTA子試験は180秒で制限し、既存のWindowsジョブによる子孫回収を使う。
-
 Shell試験は、実在するProgIDを共有する種類と、ProgIDが未登録の拡張子を分けて準備する。存在しないProgIDへの別名に依存せず、元アイコンの画素、パックの適用先、復元後の全登録を照合する。保護対象外のアイコン照会に失敗した場合は、実際の関連付け、同じDLLへの直接呼び出し、試験プロセスのトークンをログへ記録する。
 
 同じPCで負荷の高い試験・性能測定を同時に実行しない。個人環境の共通CPU排他を使う場合はその手順に従う。ビルド単独は排他対象としない。
@@ -143,7 +141,7 @@ just audit
 
 ## Windows向けCI
 
-Windows検証では監査後にShellの隔離試験を先に実行し、GPUIを含む全体ビルドより前に登録経路を確認する。固定版ツールはソースの外で導入し、導入成功時点でツールの保存先だけをキャッシュする。以降の試験に失敗した場合も、再実行で同じツールを再構築せずに復元できる。キャッシュの識別子にはRustと各ツールの版を含める。
+Windows検証では監査後にShellの隔離試験を先に実行し、GPUIを含む全体ビルドより前に登録経路を確認する。拡張子自身の保護と別の種類への適用は、登録前のキャッシュを持たない別の隔離プロセスからも実際のShell APIで照合する。固定版ツールはソースの外で導入し、導入成功時点でツールの保存先だけをキャッシュする。以降の試験に失敗した場合も、再実行で同じツールを再構築せずに復元できる。キャッシュの識別子にはRustと各ツールの版を含める。
 
 [Windows検証](../.github/workflows/windows.yml)はPRとmainへの変更、および手動実行で動く。固定版のツールとActionを使い、`just verify`、文書のリンク、測定結果の集計、最適化ZIPと同梱DLLを検証する。公式パックの実取得は手動実行の`verify_downloads`で選ぶ。検証の成功は実Explorerの受け入れやリリース公開を意味しない。
 

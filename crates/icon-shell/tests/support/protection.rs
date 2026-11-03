@@ -6,6 +6,7 @@ pub(super) fn verify(
     classes: &RegKey,
     pack: &file_icons_core::ImportedPack,
     dll: &Path,
+    namespace: &str,
 ) -> Result<()> {
     let mut protected_pack = pack.clone();
     let icon = pack
@@ -139,9 +140,23 @@ pub(super) fn verify(
             Err(error) => eprintln!("probe token groups unavailable: {error}"),
         }
     }
+    // 同一プロセス内に残る登録前のキャッシュを避け、起動直後のShellでも照合する。
+    // 直接COMを呼ぶだけでは、Shellが拡張を実際に選ぶことを保証できない。
+    let output = Command::new(std::env::current_exe()?)
+        .args([
+            "--exact",
+            "isolated_shell_registration_probe",
+            "--nocapture",
+        ])
+        .env("WFI_ICON_READER", namespace)
+        .env("WFI_ICON_READER_FILE", &peer_file)
+        .env("WFI_ICON_READER_EXPECTED", expected)
+        .test_output()?;
     ensure!(
-        peer_location.0 == expected.to_string_lossy(),
-        "unprotected sibling did not use pack icon: actual={peer_location:?}, expected={expected:?}"
+        output.status.success(),
+        "fresh Shell verification failed: {} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
     );
     file_icons_windows::restore(&mut settings)?;
     settings.packs = vec![pack.clone()];

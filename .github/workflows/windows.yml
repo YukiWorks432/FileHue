@@ -80,8 +80,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo build -p file-icons-shell --locked
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo test -p xtask --test process --locked
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test -p file-icons-shell --test isolated_shell --locked -- --nocapture
           exit $LASTEXITCODE
 

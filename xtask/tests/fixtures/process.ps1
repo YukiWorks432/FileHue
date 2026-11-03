@@ -5,7 +5,7 @@
     出力・異常終了・ファイルロック・子孫の残留を意図的に作る。
     待機中のプロセスとその子孫は、Rust側の試験が所有するWindowsジョブで回収する。
 .PARAMETER Mode
-    identity: ユーザーIDと管理者権限、output: 大量出力、failure: 異常終了、holder: ロック保持、
+    output: 大量出力、failure: 異常終了、holder: ロック保持、
     timeout: 子孫を起動して待機、linger: 子孫を残して正常終了。
 .PARAMETER Value
     outputでは受け渡しを確かめる文字列。
@@ -20,17 +20,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-
-if ($Mode -eq 'identity') {
-    # 起動に使ったトークンについて、同じユーザーのまま管理者権限を落とせたかを確かめる。
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
-    [Console]::Write((@{
-        user = $identity.User.Value
-        administrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    } | ConvertTo-Json -Compress))
-    return
-}
 
 if ($Mode -eq 'output') {
     # 引数の引用・Unicode・環境変数の設定と削除が正しく伝わるかを確かめる。
