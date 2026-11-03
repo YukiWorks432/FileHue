@@ -138,4 +138,6 @@ just audit
 
 ## Windows向けCI
 
-[ワークフロー例](ci/windows.yml.example)にビルド・GPUI操作・隔離登録・配布検証をまとめている。実行するCIはまだ配置していない。導入時はツールとActionの固定版、実行環境、権限、待機期限を確認し、検証対象のコミットと結果を結び付ける。例の保存だけでワークフローを有効にしない。
+[Windows検証](../.github/workflows/windows.yml)はPRとmainへの変更、および手動実行で動く。固定版のツールとActionを使い、`just verify`、文書のリンク、測定結果の集計、最適化ZIPと同梱DLLを検証する。公式パックの実取得は手動実行の`verify_downloads`で選ぶ。検証の成功は実Explorerの受け入れやリリース公開を意味しない。
+
+[依存監査](../.github/workflows/dependency-audit.yml)は毎日と手動で実行し、製品コードをビルドしない。配布候補は[専用ワークフロー](../.github/workflows/public-release.yml)をmainから手動実行し、[配布候補の生成と公開](ci/public-release.ja.md)に従う。

@@ -36,7 +36,7 @@ just package --public-candidate
 just verify-release --public-candidate --archive dist/<候補名>/<候補名>.zip --report work/<候補名>-verification.json
 ```
 
-作成時と最終検証時にoriginが確定済みの公開先を指し、GitHub API上でそのリポジトリが公開状態であり、HEADと同じコミットが存在することを照合する。公開候補は`release`構成・変更なしに限定し、`--allow-dirty`との併用を拒否する。通常の`just package`は従来どおり検証用途である。展開済み公開候補の照合にも`cargo xtask package --verify <展開先> --public-candidate`を指定する。
+作成時と最終検証時にoriginが確定済みの公開先を指し、GitHub API上でそのリポジトリが公開状態であり、HEADと同じコミットが存在することを照合する。所有者名・リポジトリ名の英字の大文字と小文字は区別せず、別の公開先や異なるコミットは受理しない。公開候補は`release`構成・変更なしに限定し、`--allow-dirty`との併用を拒否する。通常の`just package`は従来どおり検証用途である。展開済み公開候補の照合にも`cargo xtask package --verify <展開先> --public-candidate`を指定する。
 
 `verify-release`は隣接する`SHA256SUMS.txt`でZIPと外部マニフェストを照合した後、ZIPを専用領域へ展開し、外部記録・文書・パス・同梱DLL・GUI・CLIを検証する。外部マニフェストに記録した権利確認記録のハッシュ、HTMLに掲載した原文と依存ごとの参照、提供ソースのハッシュ、版、コミット、ソース側Cargo.lock、追跡ファイル一覧のハッシュを照合する。自動検証は実Explorerの受け入れを代替しない。
 
@@ -86,4 +86,4 @@ mac固有の権利表示・追加通知の完全性が上流で確認された�
 
 ## 公開用配布へ移る条件
 
-通常は`purpose=private-validation-only`、明示指定した公開候補は`purpose=public-candidate`とする。両方で`publication_approved=false`を維持し、生成・検証の成功を人による公開許可として記録しない。未解決の権利確認が残れば公開候補の作成を停止する。実Explorerの[受け入れ手順](explorer-acceptance.ja.md)と明示的な公開許可を別途確認し、同じ最終ZIPを公開まで保持する。公開先でのCI・来歴証明・リリース添付は[設定例と手順](ci/public-release.ja.md)を参照する。
+通常は`purpose=private-validation-only`、明示指定した公開候補は`purpose=public-candidate`とする。両方で`publication_approved=false`を維持し、生成・検証の成功を人による公開許可として記録しない。未解決の権利確認が残れば公開候補の作成を停止する。実Explorerの[受け入れ手順](explorer-acceptance.ja.md)と明示的な公開許可を別途確認し、同じ最終ZIPを公開まで保持する。公開先でのCI・来歴証明・リリース添付は[配布候補の生成と公開](ci/public-release.ja.md)を参照する。

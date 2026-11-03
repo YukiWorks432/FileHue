@@ -1,0 +1,90 @@
+name: Windows検証
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      verify_downloads:
+        description: 公式パックの実取得と全テーマ変換も検証する
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: WindowsのビルドとGPUI操作試験
+    runs-on: windows-2025
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RUSTUP_TOOLCHAIN: 1.99.0
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '2'
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: 検証したRust版を用意する
+        working-directory: ${{ runner.temp }}
+        run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --component rust-docs
+
+      - name: 固定版の検証ツールを復元する
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.tool_cache }}/filehue-tools
+          key: windows-x64-rust-1.99.0-just-1.43.0-deny-0.20.2-about-0.9.2
+
+      - name: 固定版の検証ツールを用意する
+        if: steps.tools.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolRoot = Join-Path $env:RUNNER_TOOL_CACHE 'filehue-tools'
+          cargo install just --version 1.43.0 --locked --root $toolRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo install cargo-deny --version 0.20.2 --locked --root $toolRoot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo install cargo-about --version 0.9.2 --locked --root $toolRoot
+          exit $LASTEXITCODE
+
+      - name: 検証ツールをPATHへ追加する
+        run: |
+          $toolRoot = Join-Path $env:RUNNER_TOOL_CACHE 'filehue-tools'
+          "$(Join-Path $toolRoot 'bin')" >> $env:GITHUB_PATH
+
+      - name: ソースを取得する
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: 監査・静的解析・GPUI操作とShellの隔離試験を実行する
+        run: just verify
+
+      - name: 文書の相対リンクを検査する
+        run: just check-docs
+
+      - name: 測定結果の集計を検証する
+        run: cargo test -p file-icons-shell --example measure_shell --locked
+
+      - name: 最適化ZIPと同梱DLLを検証する
+        timeout-minutes: 45
+        run: just verify-release --report work/ci-release/verification.json
+
+      - name: 公式配布物を取得して検証する
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_downloads
+        timeout-minutes: 8
+        run: cargo test -p file-icons-catalog --locked -- --ignored --exact tests::official_releases_download_and_compile --nocapture
+
+      - name: CLIから公式配布物を取得して検証する
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_downloads
+        timeout-minutes: 8
+        run: cargo test -p file-icons-cli --test cli --locked -- --ignored --exact official_downloads_through_real_cli_keep_registration_inactive

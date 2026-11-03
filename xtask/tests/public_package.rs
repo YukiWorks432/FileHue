@@ -176,6 +176,12 @@ fn only_the_public_filehue_repository_and_exact_published_commit_are_accepted() 
     let public = json!({"full_name":"YukiWorks432/filehue","private":false});
     let commit = json!({"sha":head});
     package::verify_public_source(&public, &commit, head).unwrap();
+    package::verify_public_source(
+        &json!({"full_name":"YukiWorks432/FileHue","private":false}),
+        &commit,
+        head,
+    )
+    .unwrap();
     assert!(
         package::verify_public_source(
             &json!({"full_name":"YukiWorks432/filehue","private":true}),

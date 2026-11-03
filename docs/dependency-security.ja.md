@@ -67,8 +67,8 @@ cargo-denyの未指定の検査を一括実行すると権利条件の別判定�
 
 公開後の自動更新提案の方式は未決定とし、Dependabotを候補として検討する。選定時には、通常更新は週1回・公開から7日待機・日時不明は保留・自動マージなしという条件を維持する。推移的依存の扱いと、既知の脆弱性への更新提案との違いを確認してから設定を用意する。取り込み時の待機短縮は人が記録し、cargo-denyの定期監査も併用する。GitHub Actionsを導入する場合はコミットへ固定する。
 
-[監査ワークフロー例](ci/dependency-audit.yml.example)を公開後に`.github/workflows/`へ配置する。検証は読み取り権限だけで実行し、候補の製品コードをビルドしない。PRで変更された検査設定自身もレビュー対象であり、このジョブだけを悪意あるPRへの完全な防御とは扱わない。変更不能な外側の検査が必要なら、信頼した基点の設定を使う別の検査として設計する。
+[依存監査](../.github/workflows/dependency-audit.yml)を毎日03:17 UTC（日本時間12:17）と手動で実行する。PRとmainへの変更は[Windows検証](../.github/workflows/windows.yml)内の`just verify`で同じ監査を行う。定期監査は読み取り権限だけで実行し、候補の製品コードをビルドしない。PRで変更された検査設定自身もレビュー対象であり、このジョブだけを悪意あるPRへの完全な防御とは扱わない。変更不能な外側の検査が必要なら、信頼した基点の設定を使う別の検査として設計する。
 
-非公開期間は例を保存するだけで、ActionsやAppを有効にしない。公開・署名の手順は別途承認を必要とする。全面的なcargo-vet導入と独自の依存解決器は採用しない。将来、Cargo標準の最低経過時間を採用する場合も、利用する安定版での対応と既存ロック依存の扱いを確認する。
+定期監査は依存を自動更新せず、公開・署名の手順とも分ける。全面的なcargo-vet導入と独自の依存解決器は採用しない。将来、Cargo標準の最低経過時間を採用する場合も、利用する安定版での対応と既存ロック依存の扱いを確認する。
 
 参考: [cargo-denyの監査](https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html)、[ビルド時の検査](https://embarkstudios.github.io/cargo-deny/checks/bans/cfg.html)、[Dependabotの待機期間](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#cooldown)、[Rustのビルドスクリプト](https://doc.rust-lang.org/cargo/reference/build-scripts.html)。

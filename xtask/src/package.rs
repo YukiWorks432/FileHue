@@ -216,7 +216,8 @@ pub fn public_source(root: &Path, source: &Source) -> Result<()> {
             format!("{REPOSITORY}.git"),
             "git@github.com:YukiWorks432/filehue.git".to_owned()
         ]
-        .contains(&remote),
+        .iter()
+        .any(|expected| expected.eq_ignore_ascii_case(&remote)),
         "公開候補は新しいfilehueリポジトリのチェックアウトから作成してください"
     );
     let repository: Value = serde_json::from_str(&run(
@@ -239,7 +240,10 @@ pub fn public_source(root: &Path, source: &Source) -> Result<()> {
 
 pub fn verify_public_source(repository: &Value, commit: &Value, head: &str) -> Result<()> {
     ensure!(
-        repository["full_name"] == "YukiWorks432/filehue" && repository["private"] == false,
+        repository["full_name"]
+            .as_str()
+            .is_some_and(|name| name.eq_ignore_ascii_case("YukiWorks432/filehue"))
+            && repository["private"] == false,
         "公開先のリポジトリを確認できません"
     );
     ensure!(commit["sha"] == head, "公開先に対象コミットがありません");
