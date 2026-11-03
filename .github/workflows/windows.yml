@@ -66,6 +66,17 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: ユーザー単位のShell試験用に出力を用意する
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # 管理者で動く標準ランナーでも、試験EXEとその子をMediumで実行する。
+          foreach ($name in @('target', 'work')) {
+            $outputRoot = Join-Path $env:GITHUB_WORKSPACE $name
+            New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
+            icacls $outputRoot /setintegritylevel '(OI)(CI)M'
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
       - name: 監査・静的解析・GPUI操作とShellの隔離試験を実行する
         run: just verify
 

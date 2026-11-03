@@ -41,6 +41,9 @@ cargo test -p xtask --locked
 pwsh -NoProfile -File scripts/smoke-gui.ps1
 ```
 
+
+GitHubのWindows標準ランナーは[管理者権限・UAC無効](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#administrative-privileges)で動作し、通常のユーザー単位COMとは条件が異なる（[Microsoftの説明](https://learn.microsoft.com/en-us/windows/win32/sysinfo/hkey-classes-root-key)）。Windows検証と配布候補のジョブでは、新規作成する`target/`と`work/`だけに子へ継承するMedium整合性ラベルを付け、試験EXEとその子プロセスを通常のユーザーと同じ整合性レベルで実行する。関連付けの登録先は引き続き試験専用キーへ分離する。
+
 同じPCで負荷の高い試験・性能測定を同時に実行しない。個人環境の共通CPU排他を使う場合はその手順に従う。ビルド単独は排他対象としない。
 
 GUIの起動だけでは登録は変わらない。通常のGUI・CLI操作は実際の設定を使うため、開発PCへの適用には明示的な許可を得る。適用ではビルド出力のDLLを直接登録せず、ユーザー領域へコピーした内容ハッシュ別のDLLを使う。

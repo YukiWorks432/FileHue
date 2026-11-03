@@ -114,14 +114,11 @@ pub(super) fn verify(
         "extension-specific original icon changed: before={own_location:?}, after={:?}",
         query(&own_file)?
     );
+    let peer_location = query(&peer_file)?;
+    let expected = own_pack.theme.resolve("pack.wfi-own-peer").unwrap();
     ensure!(
-        query(&peer_file)?.0
-            == own_pack
-                .theme
-                .resolve("pack.wfi-own-peer")
-                .unwrap()
-                .to_string_lossy(),
-        "unprotected sibling did not use pack icon"
+        peer_location.0 == expected.to_string_lossy(),
+        "unprotected sibling did not use pack icon: actual={peer_location:?}, expected={expected:?}"
     );
     file_icons_windows::restore(&mut settings)?;
     settings.packs = vec![pack.clone()];
