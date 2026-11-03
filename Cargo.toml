@@ -1,0 +1,20 @@
+[workspace]
+members = ["crates/icon-core", "crates/icon-catalog", "crates/icon-windows", "crates/icon-shell", "apps/icon-manager", "crates/icon-manager-service", "apps/icon-cli", "xtask"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4.3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "unwind"

@@ -1,0 +1,146 @@
+name: 公開候補の作成
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 作成済みの版タグ（例 v0.1.0）
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  candidate:
+    if: github.repository == 'YukiWorks432/filehue' && github.ref == 'refs/heads/main'
+    runs-on: windows-2025
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RUSTUP_TOOLCHAIN: 1.99.0
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - name: 確定した公開コミットを取得する
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 版と既存タグを照合する
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw '版タグが不正です' }
+          $versionLine = Select-String -LiteralPath Cargo.toml -Pattern '^version = "([0-9]+\.[0-9]+\.[0-9]+)"$'
+          if (@($versionLine).Count -ne 1 -or $env:RELEASE_TAG -cne "v$($versionLine.Matches[0].Groups[1].Value)") { throw '版が一致しません' }
+          $tagCommit = git rev-parse --verify "refs/tags/$($env:RELEASE_TAG)^{commit}"
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -cne $env:GITHUB_SHA) { throw 'タグと対象コミットが一致しません' }
+          $remoteTag = git ls-remote origin "refs/tags/$($env:RELEASE_TAG)" "refs/tags/$($env:RELEASE_TAG)^{}"
+          if ($LASTEXITCODE -ne 0 -or -not ($remoteTag | Where-Object { $_ -match "^$tagCommit\s" })) { throw '公開先のタグが対象コミットと一致しません' }
+
+      - name: 固定版の検証ツールを用意する
+        run: |
+          $ErrorActionPreference = 'Stop'
+          rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --component rust-docs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo install just --version 1.43.0 --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo install cargo-deny --version 0.20.2 --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo install cargo-about --version 0.9.2 --locked
+          exit $LASTEXITCODE
+
+      - name: 検証と公開候補の生成を行う
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          just verify
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          just check-docs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          just package --public-candidate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $folders = @(Get-ChildItem dist -Directory -Filter 'filehue-*-windows-x64-candidate-release-*')
+          if ($folders.Count -ne 1) { throw '公開候補を一意に特定できません' }
+          $folder = $folders[0].FullName
+          $zip = Join-Path $folder ($folders[0].Name + '.zip')
+          just verify-release --public-candidate --archive $zip --report work/public-candidate-verification.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "CANDIDATE_DIR=$folder" >> $env:GITHUB_ENV
+          "CANDIDATE_ZIP=$zip" >> $env:GITHUB_ENV
+
+      - name: 完成ZIPのビルド来歴を証明する
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: ${{ env.CANDIDATE_ZIP }}
+
+      - name: 検証済み成果物を受け渡す
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: public-candidate
+          if-no-files-found: error
+          path: |
+            ${{ env.CANDIDATE_DIR }}
+            work/public-candidate-verification.json
+
+  draft:
+    needs: candidate
+    runs-on: windows-2025
+    permissions:
+      contents: write
+      attestations: read
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: 成果物を取得する
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: public-candidate
+          path: candidate
+
+      - name: 検証済み成果物をドラフトへ添付する
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $reportFile = @(Get-ChildItem candidate -Filter public-candidate-verification.json -File -Recurse)
+          $zipFile = @(Get-ChildItem candidate -Filter '*-candidate-release-*.zip' -File -Recurse)
+          if ($reportFile.Count -ne 1 -or $zipFile.Count -ne 1) { throw '成果物を一意に特定できません' }
+          $report = Get-Content $reportFile[0].FullName -Raw | ConvertFrom-Json
+          $zip = $zipFile[0].FullName
+          $folder = $zipFile[0].Directory.FullName
+          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($report.source_commit -cne $env:GITHUB_SHA -or $report.archive_sha256 -cne $actual -or $report.signature -cne 'unsigned') { throw '検証結果が一致しません' }
+          $manifestPath = Join-Path $folder 'manifest.json'
+          $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sums = @(Get-Content (Join-Path $folder 'SHA256SUMS.txt'))
+          if ($sums.Count -ne 2 -or $sums[0] -cne "$actual  $($zipFile[0].Name)" -or $sums[1] -cne "$manifestHash  manifest.json") { throw 'チェックサムが一致しません' }
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          if ($manifest.source_commit -cne $env:GITHUB_SHA -or $manifest.version -cne $report.version -or $manifest.signature -cne 'unsigned') { throw 'マニフェストが一致しません' }
+          $recordsPath = Join-Path $folder 'dependencies.json'
+          if ((Get-FileHash -LiteralPath $recordsPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $manifest.license_records_sha256) { throw '権利記録が一致しません' }
+          $sources = @(Get-Content $recordsPath -Raw | ConvertFrom-Json | Where-Object source_archive)
+          if ($sources.Count -eq 0) { throw '提供ソースの記録がありません' }
+          foreach ($source in $sources) {
+            $path = Join-Path $folder $source.source_archive.path
+            if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -cne $source.source_archive.sha256) { throw '提供ソースが一致しません' }
+          }
+          gh attestation verify $zip --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $remote = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:RELEASE_TAG" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $remote.sha -cne $env:GITHUB_SHA) { throw '公開先のタグが変更されています' }
+          $assets = @($zip, "$folder/SHA256SUMS.txt", "$folder/manifest.json", $reportFile[0].FullName)
+          $assets += @($sources | ForEach-Object { Join-Path $folder $_.source_archive.path })
+          gh release create $env:RELEASE_TAG @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title $env:RELEASE_TAG --notes 'FileHue Windows x64: unsigned release candidate.'
+          exit $LASTEXITCODE

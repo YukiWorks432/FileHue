@@ -1,0 +1,82 @@
+[
+  {
+    "id": "RUSTSEC-2024-0384",
+    "reviewed_on": "2026-10-23",
+    "path": "gpui-kit -> gpui-base / gpui-component -> instant",
+    "package": "instant@0.1.13",
+    "reason": "GPUIの推移的依存。保守停止の指摘であり、上流の移行を追跡する。",
+    "recheck_when": "期限到達、依存経路変更、上流の対応版、新しい脆弱性のいずれか",
+    "scope": "Windowsを含む",
+    "review_by": "2026-11-23"
+  },
+  {
+    "id": "RUSTSEC-2024-0436",
+    "reviewed_on": "2026-10-23",
+    "path": "gpui-kit -> gpui-component -> paste; image -> exr -> pulp -> paste",
+    "package": "paste@1.0.15",
+    "reason": "GUIと画像処理のビルド時マクロ。推移的依存の置換を上流で確認する。",
+    "recheck_when": "期限到達、依存経路変更、上流の対応版、新しい脆弱性のいずれか",
+    "scope": "Windowsを含む",
+    "review_by": "2026-11-23"
+  },
+  {
+    "id": "RUSTSEC-2025-0134",
+    "reviewed_on": "2026-10-23",
+    "path": "gpui-kit -> gpui-kit-assets -> gpui-pre-reqwest -> rustls-pemfile",
+    "package": "rustls-pemfile@2.2.0",
+    "reason": "Windowsの選択グラフには含まれない。ほかの対象も含め上流の依存整理を追跡する。",
+    "recheck_when": "期限到達、依存経路変更、上流の対応版、新しい脆弱性のいずれか",
+    "scope": "非Windowsの選択経路",
+    "review_by": "2026-11-23"
+  },
+  {
+    "id": "RUSTSEC-2026-0192",
+    "reviewed_on": "2026-10-23",
+    "path": "gpui-kit -> gpui-component -> resvg@0.45.1 -> usvg -> fontdb -> ttf-parser; gpui-kit -> gpui-pre -> usvg@0.46.0 -> fontdb; gpui-kit -> gpui-pre -> ttf-parser",
+    "package": "ttf-parser@0.25.1",
+    "reason": "本体の変換処理はresvg 0.48へ移行したが、GPUIの描画依存に残る。入力上限は保守停止の解消ではなく、GUI上流の移行を追跡する。",
+    "recheck_when": "期限到達、依存経路変更、上流の対応版、新しい脆弱性のいずれか",
+    "scope": "Windowsを含む",
+    "review_by": "2026-11-23"
+  },
+  {
+    "id": "RUSTSEC-2026-0206",
+    "reviewed_on": "2026-10-23",
+    "path": "gpui-kit -> gpui-component -> resvg@0.45.1 -> usvg -> rustybuzz; gpui-kit -> gpui-pre -> usvg@0.46.0 -> rustybuzz",
+    "package": "rustybuzz@0.20.1",
+    "reason": "本体の変換処理はresvg 0.48へ移行したが、GPUIのSVG文字整形に残る。GUI上流の代替移行と描画互換性を追跡する。",
+    "recheck_when": "期限到達、依存経路変更、上流の対応版、新しい脆弱性のいずれか",
+    "scope": "Windowsを含む",
+    "review_by": "2026-11-23"
+  },
+  {
+    "id": "RUSTSEC-2026-0370",
+    "reviewed_on": "2026-10-23",
+    "path": "gpui-kit -> gpui-pre-platform -> gpui-pre-linux -> accesskit_unix -> atspi -> zvariant",
+    "package": "zvariant@5.15.1",
+    "reason": "Linuxのアクセシビリティ経路。Windowsには含まれないが全対象の監査では残して追跡する。",
+    "recheck_when": "期限到達、依存経路変更、上流の対応版、新しい脆弱性のいずれか",
+    "scope": "Linux",
+    "review_by": "2026-11-23"
+  },
+  {
+    "id": "RUSTSEC-2026-0371",
+    "reviewed_on": "2026-10-23",
+    "path": "gpui-pre-linux -> accesskit_unix -> atspi -> zbus_names",
+    "package": "zbus_names@4.3.5",
+    "reason": "Linuxのアクセシビリティ経路。zbusへの統合に対する上流の対応を追跡する。",
+    "recheck_when": "期限到達、依存経路変更、上流の対応版、新しい脆弱性のいずれか",
+    "scope": "Linux",
+    "review_by": "2026-11-23"
+  },
+  {
+    "id": "RUSTSEC-2026-0372",
+    "reviewed_on": "2026-10-23",
+    "path": "gpui-pre-linux -> accesskit_unix -> atspi -> zvariant -> zvariant_derive",
+    "package": "zvariant_derive@5.15.1",
+    "reason": "Linux経路のビルド時マクロ。zbusへの統合に対する上流の対応を追跡する。",
+    "recheck_when": "期限到達、依存経路変更、上流の対応版、新しい脆弱性のいずれか",
+    "scope": "Linux",
+    "review_by": "2026-11-23"
+  }
+]

@@ -1,0 +1,24 @@
+[package]
+name = "file-icons-manager"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+file-icons-manager-service = { path = "../../crates/icon-manager-service" }
+file-icons-catalog = { path = "../../crates/icon-catalog" }
+serde_json.workspace = true
+file-icons-core = { path = "../../crates/icon-core" }
+file-icons-windows = { path = "../../crates/icon-windows" }
+gpui-kit = "=0.7.3"
+anyhow.workspace = true
+tempfile = "3"
+
+[features]
+test-support = ["gpui-kit/test-support", "file-icons-catalog/test-support"]
+
+[dev-dependencies]
+xtask = { path = "../../xtask" }
+winreg = "0.56"
+windows = { version = "0.62.2", features = ["Win32_System_Registry", "Win32_System_ProcessStatus", "Win32_System_Threading"] }

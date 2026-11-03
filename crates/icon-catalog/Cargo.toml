@@ -1,0 +1,21 @@
+[package]
+name = "file-icons-catalog"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+file-icons-core = { path = "../icon-core" }
+reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "rustls-no-provider"] }
+rustls = { version = "0.23.46", default-features = false, features = ["std", "ring", "tls12"] }
+webpki-roots = "1.0.11"
+zip = { version = "9", default-features = false, features = ["deflate"] }
+sha2 = "0.11.1"
+hex.workspace = true
+tempfile = "3"
+
+[features]
+test-support = []

@@ -1,0 +1,120 @@
+{
+  "package": "mac",
+  "version": "0.1.1",
+  "verification_date": "2026-10-22",
+  "crate_checksum": "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4",
+  "source_revision": "66afc663b68a65633ea165c742b5a9c6734581c2",
+  "licensing_commit": "6b35d271ca8783a513aaa9bb47c2a926a68107d2",
+  "declared_license": "MIT/Apache-2.0",
+  "selected_license": "Apache-2.0",
+  "additional_notices": [
+    "Simon Sapin: MIT",
+    "html5ever Project Developers: MIT, COPYRIGHT, AUTHORS"
+  ],
+  "source_files_compared": [
+    {
+      "path": ".gitignore",
+      "sha256": "f58cbb29ee4ff8a030c1e32d3f4ac2b19753d7fdf8f72d050d4bda1353364fda",
+      "git_blob": "8ac5ebd272c10eab3bbad3fb7eaf601fd27d16e9",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": ".travis.yml",
+      "sha256": "180cc837b1ea2ce0ed737c2e15208e83abf6f92291a77ed1ebcc564c628c2077",
+      "git_blob": "47adcf7efb08832738cb4b9ccf91c4f008dee511",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "6d465c5e5a4b3e197049e9fb7393b2f996c1c654e6ded700afce046fac2f7969",
+      "git_blob": "ff284cd96553dc6b4d1ec7f4e0e5a7066ce930ba",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "README.md",
+      "sha256": "8edb7a912d295acf1e1cfeafdd19a6813a63b301c7bbfda3c67f65509bd8d8cc",
+      "git_blob": "8669166f6ef2b0c7029cb2d5ba042ac885e20081",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "src/cfg.rs",
+      "sha256": "63e9c4da8b0f588c6af1e157e626044fc1fb52757348aa466d08d69795335f33",
+      "git_blob": "3dbb8fbe0d7ad4906a94e724201f42e2700bb928",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "src/format.rs",
+      "sha256": "3c528949cdde598d3ddc5abea31b136ca256c7bb3932e053c5ff6e49775579a3",
+      "git_blob": "8d4c8bb09f1021a60f31899ad862887272ff36fd",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "src/inspect.rs",
+      "sha256": "cf039cc721daa177b13d6b432589ceef3bdfa6078af3f71c34c28d2eca68d0c3",
+      "git_blob": "4fd8ce2ce02e3eef2eeadfc5bdf8231acbc060a5",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "f9c7705196f71dcabb4cfe1636f1b71b6362abb7eac70ddaa6e05cf9a0683dee",
+      "git_blob": "9287f32bb6296c35a5e5ed960598b9c1b7d4d3ce",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "src/matches.rs",
+      "sha256": "1ef2b80946cc5e3cd15e20a22f62b832066d2e2445881191741a83abe80e7566",
+      "git_blob": "a788fe478c810d6b6558789cf2a98fda9802e8ee",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "src/mem.rs",
+      "sha256": "f74d9172bb136b370c33fa524aae3543cf37815eeacf1d862b29b3c8c32a6aee",
+      "git_blob": "49cf5f1b13eb3066086fe7bc7da1b45b92163fad",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "src/syntax_ext.rs",
+      "sha256": "5c938b44d7aaa0f47eef495f4a42f1f91cd11fb0d1b20915786085b77e1db284",
+      "git_blob": "ab7e82bb2ca0a75178e21005472c20e5d14ae2eb",
+      "identical_to_release_tag": true
+    },
+    {
+      "path": "src/test.rs",
+      "sha256": "895fc0aed7f5f3863025b85de4d01c2551bed51778ca8846920be7febff837ac",
+      "git_blob": "1e9858c27c379da38a4bd6a85e21386545696833",
+      "identical_to_release_tag": true
+    }
+  ],
+  "source_documents": [
+    {
+      "file": "APACHE-2.0.txt",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "file": "SIMON-SAPIN-MIT.txt",
+      "url": "https://github.com/SimonSapin/rust-std-candidates/blob/836264aaca5a701d130b86579395693c1430c1d2/LICENSE",
+      "sha256": "13b7dd691a0dc2a0172321c14146359c1bbbc92271ff76832345898a09216a32"
+    },
+    {
+      "file": "HTML5EVER-MIT.txt",
+      "url": "https://github.com/servo/html5ever/blob/2bdd5045e6ec3337ad35c98a8b29344b6d181870/LICENSE-MIT",
+      "sha256": "86dd7f026f916daf7511e39951ad8ea8cf55a8db67ae64060dacf829761c18f3"
+    },
+    {
+      "file": "HTML5EVER-COPYRIGHT.txt",
+      "url": "https://github.com/servo/html5ever/blob/2bdd5045e6ec3337ad35c98a8b29344b6d181870/COPYRIGHT",
+      "sha256": "5f06ac088f868238288568e90d667f463cdf84a006f50861ac8d9182fe23181f"
+    },
+    {
+      "file": "HTML5EVER-AUTHORS.txt",
+      "url": "https://github.com/servo/html5ever/blob/2bdd5045e6ec3337ad35c98a8b29344b6d181870/AUTHORS",
+      "sha256": "113894742c1dc250d8867268b24c87d7026bac67be533dde3d94163d3305c081"
+    }
+  ],
+  "upstream_issue": "https://github.com/reem/rust-mac/issues/14",
+  "upstream_mac_specific_copyright_confirmed": false,
+  "additional_notice_completeness_confirmed": false,
+  "review_required": true,
+  "publication_approved": false
+}

@@ -1,0 +1,25 @@
+[package]
+name = "file-icons-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "file-icons"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+file-icons-core = { path = "../../crates/icon-core" }
+file-icons-catalog = { path = "../../crates/icon-catalog" }
+file-icons-windows = { path = "../../crates/icon-windows" }
+file-icons-manager-service = { path = "../../crates/icon-manager-service" }
+windows = { version = "0.62.2", features = ["Win32_System_Console", "Win32_System_Com"] }
+
+[dev-dependencies]
+xtask = { path = "../../xtask" }
+tempfile = "3"
+winreg = "0.56"
+windows = { version = "0.62.2", features = ["Win32_System_Registry"] }

@@ -1,0 +1,13 @@
+[package]
+name = "file-icons-manager-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+file-icons-core = { path = "../icon-core" }
+file-icons-windows = { path = "../icon-windows" }
+file-icons-catalog = { path = "../icon-catalog" }

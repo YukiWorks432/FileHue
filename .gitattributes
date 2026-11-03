@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.md text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.ps1 text eol=lf
+LICENSE text eol=lf
+# 上流の権利表示は、取得時のハッシュに対応する原文のバイト列を保持する。
+licenses/upstream/**/*.txt -text -whitespace

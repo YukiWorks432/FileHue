@@ -1,0 +1,12 @@
+/target/
+/work/
+/dist/
+# 個別の監査結果はPR・CIの成果物またはwork/へ保存する。
+/docs/evidence/dependency-update-*.json
+/.env
+/.env.*
+*.pfx
+*.p12
+*.key
+
+__pycache__/

@@ -1,0 +1,29 @@
+name: 依存の監査
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    env:
+      RUSTUP_TOOLCHAIN: 1.99.0
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - run: rustup toolchain install 1.99.0 --profile minimal
+      # 未取得の候補ソースの.cargo/config等を使わず、監査ツールを事前導入する。
+      - run: cargo install cargo-deny --version 0.20.2 --locked
+      - run: cargo install just --version 1.58.0 --locked
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      # 検査対象のRustコードはビルドしない。導入する監査ツールは版とロックを固定する。
+      - run: just audit

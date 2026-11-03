@@ -1,0 +1,26 @@
+{
+  "package": "simd_helpers",
+  "version": "0.1.0",
+  "verification_date": "2026-10-17",
+  "crate_checksum": "95890f873bec569a0362c235787f3aca6e1e887302ba4840839bcc6459c42da6",
+  "source_revision": "ca1a2f84aa386d758e98f8a609d990263932fb85",
+  "license_revision": "82040194cd05affb060bf94d6f19f82a771d07fb",
+  "license_url": "https://raw.githubusercontent.com/lu-zero/simd_helpers/82040194cd05affb060bf94d6f19f82a771d07fb/LICENSE",
+  "license_sha256": "d69f24ad84ec2ade64c0b68bdb31b41170e997b158370342056918329cc9af1e",
+  "license_commit_parent": "ca1a2f84aa386d758e98f8a609d990263932fb85",
+  "license_commit_changed_files": [
+    {
+      "path": "LICENSE",
+      "status": "added"
+    }
+  ],
+  "source_files_compared": [
+    {
+      "path": "src/lib.rs",
+      "sha256": "7776fe38ba2018bdd2e744e42b0affa34966797ededdf381144bb92bb41e194c",
+      "identical_to_license_revision": true
+    }
+  ],
+  "commit_url": "https://github.com/lu-zero/simd_helpers/commit/82040194cd05affb060bf94d6f19f82a771d07fb",
+  "publication_approved": false
+}

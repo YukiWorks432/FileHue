@@ -1,0 +1,79 @@
+name: Windows検証
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      verify_downloads:
+        description: 公式パックの実取得と全テーマ変換も検証する
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: WindowsのビルドとGPUI操作試験
+    runs-on: windows-2025
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RUSTUP_TOOLCHAIN: 1.99.0
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '2'
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: 検証したRust版を用意する
+        run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --component rust-docs
+
+      - name: Rustの版とターゲットを記録する
+        run: rustc -vV
+
+      - name: 権利表示の生成ツールを用意する
+        run: cargo install cargo-about --version 0.9.2 --locked
+
+      - name: 整形を検査する
+        run: cargo fmt --all -- --check
+
+      - name: 全対象を静的解析する
+        run: cargo clippy --workspace --all-targets --features file-icons-manager/test-support --locked -- -D warnings
+
+      # GUIとShellの結合試験は、ここで生成する実DLLを使う。
+      - name: GUIとShell DLLをビルドする
+        run: cargo build --workspace --locked
+
+      - name: GPUI操作とShellの隔離結合試験を実行する
+        run: cargo test --workspace --features file-icons-manager/test-support --locked
+
+      - name: 測定結果の集計を検証する
+        run: cargo test -p file-icons-shell --example measure_shell --locked
+
+      - name: 配布スクリプトを検証する
+        run: cargo test -p xtask --locked
+
+      - name: 最適化ZIPと同梱DLLを検証する
+        timeout-minutes: 20
+        run: cargo xtask verify-release --report work/ci-release/verification.json
+
+      - name: 公式配布物を取得して検証する
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_downloads
+        timeout-minutes: 8
+        run: cargo test -p file-icons-catalog --locked -- --ignored --exact tests::official_releases_download_and_compile --nocapture
+
+      - name: CLIから公式配布物を取得して検証する
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_downloads
+        timeout-minutes: 8
+        run: cargo test -p file-icons-cli --test cli --locked -- --ignored --exact official_downloads_through_real_cli_keep_registration_inactive

@@ -1,0 +1,25 @@
+[package]
+name = "file-icons-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+file-icons-windows = { path = "../icon-windows" }
+windows-core = "0.62.2"
+winreg = "0.56"
+windows = { version = "0.62.2", features = ["Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_Com", "Win32_System_Ole", "Win32_Storage_FileSystem", "Win32_System_Registry", "Win32_System_ApplicationInstallationAndServicing", "Win32_Graphics_Gdi", "Win32_System_Threading", "Win32_Security"] }
+
+[dev-dependencies]
+xtask = { path = "../../xtask" }
+windows = { version = "0.62.2", features = ["Win32_Security_Authorization", "Win32_System_LibraryLoader", "Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_System_WindowsProgramming"] }
+anyhow.workspace = true
+file-icons-core = { path = "../icon-core" }
+tempfile = "3"
+serde_json.workspace = true
+sha2 = "0.11.1"
+hex.workspace = true

@@ -1,0 +1,10 @@
+# cargo-about 0.9.2。選択可能な場合はApache-2.0を優先する。
+# 許可一覧の外にある条件は生成を失敗させ、原文と必要な提供物を確認する。
+accepted = [
+    "Apache-2.0", "MIT", "ISC", "Unicode-3.0", "BSD-3-Clause", "Zlib",
+    "0BSD", "BSD-2-Clause", "CC0-1.0", "CDLA-Permissive-2.0", "MPL-2.0",
+]
+targets = ["x86_64-pc-windows-msvc"]
+ignore-dev-dependencies = true
+ignore-build-dependencies = false
+ignore-transitive-dependencies = false

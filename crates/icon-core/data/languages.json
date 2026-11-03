@@ -1,0 +1,1213 @@
+{
+  "repository": "https://github.com/microsoft/vscode",
+  "commit": "6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1",
+  "languages": [
+    {
+      "id": "bat",
+      "extensions": [
+        ".bat",
+        ".cmd"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/bat/package.json"
+      ]
+    },
+    {
+      "id": "bibtex",
+      "extensions": [
+        ".bib"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/latex/package.json"
+      ]
+    },
+    {
+      "id": "c",
+      "extensions": [
+        ".c",
+        ".i"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/cpp/package.json"
+      ]
+    },
+    {
+      "id": "chatagent",
+      "extensions": [
+        ".agent.md",
+        ".chatmode.md"
+      ],
+      "filenames": [],
+      "patterns": [
+        "**/.claude/agents/*.md",
+        "**/.github/agents/*.md"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/prompt-basics/package.json"
+      ]
+    },
+    {
+      "id": "clojure",
+      "extensions": [
+        ".clj",
+        ".cljc",
+        ".cljs",
+        ".cljx",
+        ".clojure",
+        ".edn"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/clojure/package.json"
+      ]
+    },
+    {
+      "id": "coffeescript",
+      "extensions": [
+        ".coffee",
+        ".cson",
+        ".iced"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/coffeescript/package.json"
+      ]
+    },
+    {
+      "id": "cpp",
+      "extensions": [
+        ".c++",
+        ".c++m",
+        ".cc",
+        ".ccm",
+        ".cpp",
+        ".cppm",
+        ".cxx",
+        ".cxxm",
+        ".h",
+        ".h.in",
+        ".h++",
+        ".hh",
+        ".hpp",
+        ".hpp.in",
+        ".hxx",
+        ".ii",
+        ".inl",
+        ".ino",
+        ".ipp",
+        ".ixx",
+        ".mpp",
+        ".mxx",
+        ".tpp",
+        ".txx"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/cpp/package.json"
+      ]
+    },
+    {
+      "id": "cpp_embedded_latex",
+      "extensions": [],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/latex/package.json"
+      ]
+    },
+    {
+      "id": "csharp",
+      "extensions": [
+        ".cake",
+        ".cs",
+        ".csx"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/csharp/package.json"
+      ]
+    },
+    {
+      "id": "css",
+      "extensions": [
+        ".css"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/css/package.json"
+      ]
+    },
+    {
+      "id": "cuda-cpp",
+      "extensions": [
+        ".cu",
+        ".cuh"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/cpp/package.json"
+      ]
+    },
+    {
+      "id": "dart",
+      "extensions": [
+        ".dart"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/dart/package.json"
+      ]
+    },
+    {
+      "id": "diff",
+      "extensions": [
+        ".diff",
+        ".patch",
+        ".rej"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/diff/package.json"
+      ]
+    },
+    {
+      "id": "dockercompose",
+      "extensions": [],
+      "filenames": [],
+      "patterns": [
+        "*docker*compose*.yaml",
+        "*docker*compose*.yml",
+        "compose.*.yaml",
+        "compose.*.yml",
+        "compose.yaml",
+        "compose.yml"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/yaml/package.json"
+      ]
+    },
+    {
+      "id": "dockerfile",
+      "extensions": [
+        ".containerfile",
+        ".dockerfile"
+      ],
+      "filenames": [
+        "Containerfile",
+        "Dockerfile"
+      ],
+      "patterns": [
+        "Containerfile.*",
+        "Dockerfile.*"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/docker/package.json"
+      ]
+    },
+    {
+      "id": "dotenv",
+      "extensions": [
+        ".env"
+      ],
+      "filenames": [
+        ".env",
+        ".flaskenv",
+        "user-dirs.dirs"
+      ],
+      "patterns": [
+        ".env.*"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/dotenv/package.json"
+      ]
+    },
+    {
+      "id": "fsharp",
+      "extensions": [
+        ".fs",
+        ".fsi",
+        ".fsscript",
+        ".fsx"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/fsharp/package.json"
+      ]
+    },
+    {
+      "id": "git-commit",
+      "extensions": [],
+      "filenames": [
+        "COMMIT_EDITMSG",
+        "MERGE_MSG"
+      ],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/git-base/package.json"
+      ]
+    },
+    {
+      "id": "git-rebase",
+      "extensions": [],
+      "filenames": [
+        "git-rebase-todo"
+      ],
+      "patterns": [
+        "**/rebase-merge/done"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/git-base/package.json"
+      ]
+    },
+    {
+      "id": "go",
+      "extensions": [
+        ".go"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/go/package.json"
+      ]
+    },
+    {
+      "id": "groovy",
+      "extensions": [
+        ".gradle",
+        ".groovy",
+        ".gvy",
+        ".jenkinsfile",
+        ".nf"
+      ],
+      "filenames": [
+        "Jenkinsfile"
+      ],
+      "patterns": [
+        "Jenkinsfile*"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/groovy/package.json"
+      ]
+    },
+    {
+      "id": "handlebars",
+      "extensions": [
+        ".handlebars",
+        ".hbs",
+        ".hjs"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/handlebars/package.json"
+      ]
+    },
+    {
+      "id": "hlsl",
+      "extensions": [
+        ".cginc",
+        ".compute",
+        ".fx",
+        ".fxh",
+        ".hlsl",
+        ".hlsli",
+        ".psh",
+        ".vsh"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/hlsl/package.json"
+      ]
+    },
+    {
+      "id": "html",
+      "extensions": [
+        ".asp",
+        ".aspx",
+        ".ejs",
+        ".htm",
+        ".html",
+        ".jshtm",
+        ".jsp",
+        ".mdoc",
+        ".rhtml",
+        ".shtml",
+        ".volt",
+        ".xht",
+        ".xhtml"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/html/package.json"
+      ]
+    },
+    {
+      "id": "ignore",
+      "extensions": [
+        ".git-blame-ignore-revs",
+        ".gitignore",
+        ".gitignore_global",
+        ".npmignore"
+      ],
+      "filenames": [
+        ".vscodeignore"
+      ],
+      "patterns": [
+        ".copilotignore"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/copilot/package.json",
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/extension-editing/package.json",
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/git-base/package.json",
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/npm/package.json"
+      ]
+    },
+    {
+      "id": "ini",
+      "extensions": [
+        ".ini"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/ini/package.json"
+      ]
+    },
+    {
+      "id": "instructions",
+      "extensions": [
+        ".instructions.md",
+        "copilot-instructions.md"
+      ],
+      "filenames": [],
+      "patterns": [
+        "**/.claude/rules/**/*.md"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/prompt-basics/package.json"
+      ]
+    },
+    {
+      "id": "jade",
+      "extensions": [
+        ".jade",
+        ".pug"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/pug/package.json"
+      ]
+    },
+    {
+      "id": "java",
+      "extensions": [
+        ".jav",
+        ".java"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/java/package.json"
+      ]
+    },
+    {
+      "id": "javascript",
+      "extensions": [
+        ".cjs",
+        ".es6",
+        ".js",
+        ".mjs",
+        ".pac"
+      ],
+      "filenames": [
+        "jakefile"
+      ],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/javascript/package.json"
+      ]
+    },
+    {
+      "id": "javascriptreact",
+      "extensions": [
+        ".jsx"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/javascript/package.json"
+      ]
+    },
+    {
+      "id": "json",
+      "extensions": [
+        ".bowerrc",
+        ".code-profile",
+        ".css.map",
+        ".geojson",
+        ".har",
+        ".ipynb",
+        ".js.map",
+        ".jscsrc",
+        ".jslintrc",
+        ".json",
+        ".jsonld",
+        ".ts.map",
+        ".tsbuildinfo",
+        ".vuerc",
+        ".webmanifest"
+      ],
+      "filenames": [
+        ".watchmanconfig",
+        "composer.lock"
+      ],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/configuration-editing/package.json",
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/json/package.json",
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/typescript-basics/package.json"
+      ]
+    },
+    {
+      "id": "jsonc",
+      "extensions": [
+        ".babelrc",
+        ".code-workspace",
+        ".eslintrc",
+        ".eslintrc.json",
+        ".hintrc",
+        ".jsfmtrc",
+        ".jshintrc",
+        ".jsonc",
+        ".swcrc",
+        ".toolset.jsonc",
+        "color-theme.json",
+        "icon-theme.json",
+        "language-configuration.json"
+      ],
+      "filenames": [
+        ".babelrc.json",
+        ".devcontainer.json",
+        ".ember-cli",
+        "argv.json",
+        "babel.config.json",
+        "bun.lock",
+        "devcontainer.json",
+        "extensions.json",
+        "jsconfig.json",
+        "keybindings.json",
+        "launch.json",
+        "mcp.json",
+        "profiles.json",
+        "settings.json",
+        "tasks.json",
+        "tsconfig.json",
+        "typedoc.json"
+      ],
+      "patterns": [
+        "**/.github/hooks/*.json",
+        "jsconfig-*.json",
+        "jsconfig.*.json",
+        "tsconfig-*.json",
+        "tsconfig.*.json"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/configuration-editing/package.json",
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/json/package.json",
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/typescript-basics/package.json"
+      ]
+    },
+    {
+      "id": "jsonl",
+      "extensions": [
+        ".jsonl",
+        ".ndjson"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/json/package.json"
+      ]
+    },
+    {
+      "id": "jsx-tags",
+      "extensions": [],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/javascript/package.json"
+      ]
+    },
+    {
+      "id": "julia",
+      "extensions": [
+        ".jl"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/julia/package.json"
+      ]
+    },
+    {
+      "id": "juliamarkdown",
+      "extensions": [
+        ".jmd"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/julia/package.json"
+      ]
+    },
+    {
+      "id": "latex",
+      "extensions": [
+        ".ctx",
+        ".ltx",
+        ".tex"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/latex/package.json"
+      ]
+    },
+    {
+      "id": "less",
+      "extensions": [
+        ".less"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/less/package.json"
+      ]
+    },
+    {
+      "id": "log",
+      "extensions": [
+        ".log",
+        "*.log.?"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/log/package.json"
+      ]
+    },
+    {
+      "id": "lua",
+      "extensions": [
+        ".lua"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/lua/package.json"
+      ]
+    },
+    {
+      "id": "makefile",
+      "extensions": [
+        ".mak",
+        ".mk"
+      ],
+      "filenames": [
+        "GNUmakefile",
+        "Makefile",
+        "OCamlMakefile"
+      ],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/make/package.json"
+      ]
+    },
+    {
+      "id": "markdown",
+      "extensions": [
+        ".copilotmd",
+        ".litcoffee",
+        ".markdn",
+        ".markdown",
+        ".md",
+        ".mdown",
+        ".mdtext",
+        ".mdtxt",
+        ".mdwn",
+        ".mkd",
+        ".mkdn",
+        ".ron",
+        ".ronn",
+        ".workbook"
+      ],
+      "filenames": [],
+      "patterns": [
+        "**/.cursor/**/*.mdc"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/copilot/package.json",
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/markdown-basics/package.json"
+      ]
+    },
+    {
+      "id": "markdown_latex_combined",
+      "extensions": [],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/latex/package.json"
+      ]
+    },
+    {
+      "id": "markdown-math",
+      "extensions": [],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/markdown-math/package.json"
+      ]
+    },
+    {
+      "id": "objective-c",
+      "extensions": [
+        ".m"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/objective-c/package.json"
+      ]
+    },
+    {
+      "id": "objective-cpp",
+      "extensions": [
+        ".mm"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/objective-c/package.json"
+      ]
+    },
+    {
+      "id": "perl",
+      "extensions": [
+        ".pl",
+        ".pm",
+        ".pod",
+        ".psgi",
+        ".t"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/perl/package.json"
+      ]
+    },
+    {
+      "id": "php",
+      "extensions": [
+        ".ctp",
+        ".php",
+        ".php4",
+        ".php5",
+        ".phtml"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/php/package.json"
+      ]
+    },
+    {
+      "id": "powershell",
+      "extensions": [
+        ".ps1",
+        ".psd1",
+        ".psm1",
+        ".psrc",
+        ".pssc"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/powershell/package.json"
+      ]
+    },
+    {
+      "id": "prompt",
+      "extensions": [
+        ".prompt.md"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/prompt-basics/package.json"
+      ]
+    },
+    {
+      "id": "properties",
+      "extensions": [
+        ".cfg",
+        ".conf",
+        ".directory",
+        ".editorconfig",
+        ".gitattributes",
+        ".gitconfig",
+        ".gitmodules",
+        ".npmrc",
+        ".properties",
+        ".repo"
+      ],
+      "filenames": [
+        "gitconfig"
+      ],
+      "patterns": [
+        "**/.config/git/config",
+        "**/.git/config"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/ini/package.json",
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/npm/package.json"
+      ]
+    },
+    {
+      "id": "python",
+      "extensions": [
+        ".cpy",
+        ".gyp",
+        ".gypi",
+        ".ipy",
+        ".py",
+        ".pyi",
+        ".pyt",
+        ".pyw",
+        ".rpy"
+      ],
+      "filenames": [
+        "SConscript",
+        "SConstruct"
+      ],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/python/package.json"
+      ]
+    },
+    {
+      "id": "r",
+      "extensions": [
+        ".R",
+        ".Rhistory",
+        ".Rprofile",
+        ".rt"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/r/package.json"
+      ]
+    },
+    {
+      "id": "raku",
+      "extensions": [
+        ".nqp",
+        ".p6",
+        ".pl6",
+        ".pm6",
+        ".raku",
+        ".rakudoc",
+        ".rakumod",
+        ".rakutest"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/perl/package.json"
+      ]
+    },
+    {
+      "id": "razor",
+      "extensions": [
+        ".cshtml",
+        ".razor"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/razor/package.json"
+      ]
+    },
+    {
+      "id": "restructuredtext",
+      "extensions": [
+        ".rst"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/restructuredtext/package.json"
+      ]
+    },
+    {
+      "id": "ruby",
+      "extensions": [
+        ".erb",
+        ".gemspec",
+        ".podspec",
+        ".rake",
+        ".rb",
+        ".rbi",
+        ".rbx",
+        ".rjs",
+        ".ru"
+      ],
+      "filenames": [
+        "appfile",
+        "appraisals",
+        "berksfile",
+        "berksfile.lock",
+        "brewfile",
+        "capfile",
+        "cheffile",
+        "dangerfile",
+        "deliverfile",
+        "fastfile",
+        "gemfile",
+        "guardfile",
+        "gymfile",
+        "hobofile",
+        "matchfile",
+        "podfile",
+        "puppetfile",
+        "rakefile",
+        "rantfile",
+        "scanfile",
+        "snapfile",
+        "thorfile",
+        "vagrantfile"
+      ],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/ruby/package.json"
+      ]
+    },
+    {
+      "id": "rust",
+      "extensions": [
+        ".rs"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/rust/package.json"
+      ]
+    },
+    {
+      "id": "scss",
+      "extensions": [
+        ".scss"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/scss/package.json"
+      ]
+    },
+    {
+      "id": "search-result",
+      "extensions": [
+        ".code-search"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/search-result/package.json"
+      ]
+    },
+    {
+      "id": "shaderlab",
+      "extensions": [
+        ".shader"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/shaderlab/package.json"
+      ]
+    },
+    {
+      "id": "shellscript",
+      "extensions": [
+        ".bash",
+        ".bash_aliases",
+        ".bash_login",
+        ".bash_logout",
+        ".bash_profile",
+        ".bashrc",
+        ".csh",
+        ".cshrc",
+        ".ebuild",
+        ".eclass",
+        ".fish",
+        ".ksh",
+        ".profile",
+        ".sh",
+        ".tcshrc",
+        ".xprofile",
+        ".Xsession",
+        ".xsessionrc",
+        ".yash_profile",
+        ".yashrc",
+        ".zlogin",
+        ".zlogout",
+        ".zprofile",
+        ".zsh",
+        ".zsh-theme",
+        ".zshenv",
+        ".zshrc"
+      ],
+      "filenames": [
+        ".envrc",
+        ".hushlogin",
+        "APKBUILD",
+        "bashrc_Apple_Terminal",
+        "PKGBUILD",
+        "zlogin",
+        "zlogout",
+        "zprofile",
+        "zshenv",
+        "zshrc",
+        "zshrc_Apple_Terminal"
+      ],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/shellscript/package.json"
+      ]
+    },
+    {
+      "id": "skill",
+      "extensions": [],
+      "filenames": [
+        "SKILL.md"
+      ],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/prompt-basics/package.json"
+      ]
+    },
+    {
+      "id": "snippets",
+      "extensions": [
+        ".code-snippets"
+      ],
+      "filenames": [],
+      "patterns": [
+        "**/snippets*.json",
+        "**/User/profiles/*/snippets/*.json",
+        "**/User/snippets/*.json"
+      ],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/json/package.json"
+      ]
+    },
+    {
+      "id": "sql",
+      "extensions": [
+        ".dsql",
+        ".sql"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/sql/package.json"
+      ]
+    },
+    {
+      "id": "swift",
+      "extensions": [
+        ".swift"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/swift/package.json"
+      ]
+    },
+    {
+      "id": "tex",
+      "extensions": [
+        ".bbx",
+        ".cbx",
+        ".cls",
+        ".sty"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/latex/package.json"
+      ]
+    },
+    {
+      "id": "typescript",
+      "extensions": [
+        ".cts",
+        ".mts",
+        ".ts"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/typescript-basics/package.json"
+      ]
+    },
+    {
+      "id": "typescriptreact",
+      "extensions": [
+        ".tsx"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/typescript-basics/package.json"
+      ]
+    },
+    {
+      "id": "vb",
+      "extensions": [
+        ".bas",
+        ".brs",
+        ".vb",
+        ".vba",
+        ".vbs"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/vb/package.json"
+      ]
+    },
+    {
+      "id": "xml",
+      "extensions": [
+        ".ascx",
+        ".atom",
+        ".axaml",
+        ".axml",
+        ".bpmn",
+        ".cpt",
+        ".csl",
+        ".csproj",
+        ".csproj.user",
+        ".dita",
+        ".ditamap",
+        ".dtd",
+        ".dtml",
+        ".ent",
+        ".fsproj",
+        ".fxml",
+        ".iml",
+        ".isml",
+        ".jmx",
+        ".launch",
+        ".menu",
+        ".mod",
+        ".mxml",
+        ".nuspec",
+        ".opml",
+        ".owl",
+        ".proj",
+        ".props",
+        ".pt",
+        ".publishsettings",
+        ".pubxml",
+        ".pubxml.user",
+        ".rbxlx",
+        ".rbxmx",
+        ".rdf",
+        ".rng",
+        ".rss",
+        ".shproj",
+        ".slnx",
+        ".storyboard",
+        ".svg",
+        ".targets",
+        ".tld",
+        ".tmx",
+        ".vbproj",
+        ".vbproj.user",
+        ".vcxproj",
+        ".vcxproj.filters",
+        ".wixproj",
+        ".wsdl",
+        ".wxi",
+        ".wxl",
+        ".wxs",
+        ".xaml",
+        ".xbl",
+        ".xib",
+        ".xlf",
+        ".xliff",
+        ".xml",
+        ".xoml",
+        ".xpdl",
+        ".xsd",
+        ".xul"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/xml/package.json"
+      ]
+    },
+    {
+      "id": "xsl",
+      "extensions": [
+        ".xsl",
+        ".xslt"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/xml/package.json"
+      ]
+    },
+    {
+      "id": "yaml",
+      "extensions": [
+        ".cff",
+        ".eyaml",
+        ".eyml",
+        ".winget",
+        ".yaml",
+        ".yaml-tmlanguage",
+        ".yaml-tmpreferences",
+        ".yaml-tmtheme",
+        ".yml"
+      ],
+      "filenames": [],
+      "patterns": [],
+      "sources": [
+        "https://raw.githubusercontent.com/microsoft/vscode/6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1/extensions/yaml/package.json"
+      ]
+    }
+  ]
+}

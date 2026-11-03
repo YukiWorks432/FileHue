@@ -1,0 +1,56 @@
+{
+  "package": "seahash",
+  "version": "4.1.0",
+  "verification_date": "2026-10-17",
+  "crate_checksum": "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b",
+  "source_revision": "94b632aeac099031c373599313d5b5f0acbbaec0",
+  "license_revision": "3088c5c912b70b586d27bf553fbe964e025a2c89",
+  "license_url": "https://gitlab.redox-os.org/redox-os/seahash/-/blob/3088c5c912b70b586d27bf553fbe964e025a2c89/LICENSE",
+  "license_sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+  "license_commit_parent": "94b632aeac099031c373599313d5b5f0acbbaec0",
+  "license_commit_changed_files": [
+    {
+      "path": "LICENSE",
+      "status": "added"
+    }
+  ],
+  "source_files_compared": [
+    {
+      "path": "src/buffer.rs",
+      "sha256": "24476bc2a380d78e0b70f8465ee90b0ea1ce8bd761474766d93491c633a85cbe",
+      "identical_to_license_revision": true
+    },
+    {
+      "path": "src/helper.rs",
+      "sha256": "d266d15724dbe705818aa31db08027a63bee077e5859e3e3d06ee7192c258a2f",
+      "identical_to_license_revision": true
+    },
+    {
+      "path": "src/impl_std.rs",
+      "sha256": "1a83d003954cb11e6712922573d3de978c8646113838b3ca033e6b3e129c1d14",
+      "identical_to_license_revision": true
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "09694fcbc9ebede5a5edd79debd23cae4d8b5c37c104e9b87a4952d7f4fc199a",
+      "identical_to_license_revision": true
+    },
+    {
+      "path": "src/reference.rs",
+      "sha256": "15898feb23b1241dd4dd80f0f53f5819715c6ba0a45e57a3f61b7acc099bdb84",
+      "identical_to_license_revision": true
+    },
+    {
+      "path": "src/stream.rs",
+      "sha256": "72e765d1ef7ec098fb3303d5635a3d543515d80052ebb5ce8ce6e478c7a8e91f",
+      "identical_to_license_revision": true
+    }
+  ],
+  "retrieved_from": "https://gitlab.redox-os.org/redox-os/seahash.git",
+  "retrieval_method": "git clone; git show <revision>:LICENSE",
+  "license_git_blob": "31aa79387f27e730e33d871925e152e35e428031",
+  "commit_url": "https://gitlab.redox-os.org/redox-os/seahash/-/commit/3088c5c912b70b586d27bf553fbe964e025a2c89",
+  "copyright_notice_in_upstream_license": false,
+  "authors_preserved_in_distribution_metadata": true,
+  "publication_approved": false
+}
