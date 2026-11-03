@@ -42,7 +42,7 @@ pwsh -NoProfile -File scripts/smoke-gui.ps1
 ```
 
 
-GitHubのWindows標準ランナーは[管理者権限・UAC無効](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#administrative-privileges)で動作し、通常のユーザー単位COMとは条件が異なる（[Microsoftの説明](https://learn.microsoft.com/en-us/windows/win32/sysinfo/hkey-classes-root-key)）。Windows検証と配布候補のジョブでは、新規作成する`target/`と`work/`だけに子へ継承するMedium整合性ラベルを付け、試験EXEとその子プロセスを通常のユーザーと同じ整合性レベルで実行する。関連付けの登録先は引き続き試験専用キーへ分離する。
+GitHubのWindows標準ランナーは[管理者権限・UAC無効](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#administrative-privileges)で動作し、通常のユーザー単位COMとは条件が異なる（[Microsoftの説明](https://learn.microsoft.com/en-us/windows/win32/sysinfo/hkey-classes-root-key)）。Windows検証と配布候補のジョブでは、新規作成する`target/`と`work/`だけに子へ継承するMedium整合性ラベルを付け、試験EXEとその子プロセスを通常のユーザーと同じ整合性レベルで実行する。関連付けの登録先は引き続き試験専用キーへ分離する。Windows CIでは監査後にShellの隔離試験を先に実行し、GPUIを含む全体ビルドより前に登録経路の失敗を確認する。保護対象外のアイコン照会に失敗した場合は、実際の関連付け、同じDLLへの直接呼び出し、試験プロセスのトークンをログへ記録する。
 
 同じPCで負荷の高い試験・性能測定を同時に実行しない。個人環境の共通CPU排他を使う場合はその手順に従う。ビルド単独は排他対象としない。
 

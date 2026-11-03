@@ -77,6 +77,16 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+      - name: 監査後にShellの隔離試験を先に確認する
+        run: |
+          $ErrorActionPreference = 'Stop'
+          just audit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build -p file-icons-shell --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test -p file-icons-shell --test isolated_shell --locked -- --nocapture
+          exit $LASTEXITCODE
+
       - name: 監査・静的解析・GPUI操作とShellの隔離試験を実行する
         run: just verify
 
