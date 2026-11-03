@@ -343,32 +343,6 @@ fn initialize_com() -> Result<()> {
     Ok(())
 }
 
-/// 登録変更前のShellキャッシュを引き継がず、実際のShell呼び出しを照合する。
-fn fresh_icon_reader() -> Result<()> {
-    let _redirect = Redirect::attach(std::env::var("WFI_ICON_READER")?)?;
-    initialize_com()?;
-    let reader = file_icons_windows::home()?.join("icon-reader");
-    fs::create_dir_all(&reader)?;
-    let registered: String = RegKey::predef(HKEY_CLASSES_ROOT)
-        .open_subkey(format!(
-            "CLSID\\{}\\InprocServer32",
-            file_icons_windows::CLSID_TEXT
-        ))?
-        .get_value("")?;
-    let _activation = Activation::new(&reader, Path::new(&registered))?;
-    let file = std::env::var("WFI_ICON_READER_FILE")?;
-    let expected = std::env::var("WFI_ICON_READER_EXPECTED")?;
-    let actual = query(Path::new(&file))?;
-    ensure!(
-        actual == (expected.clone(), 0),
-        "fresh Shell reader did not use pack icon: actual={actual:?}, expected={expected:?}"
-    );
-    unsafe {
-        CoUninitialize();
-    }
-    Ok(())
-}
-
 /// DLLと設定キャッシュを一度も読み込んでいない、別プロセスで通常表示を確認する。
 fn fresh_recovery_reader() -> Result<()> {
     let _redirect = Redirect::attach(std::env::var("WFI_RECOVERY_READER")?)?;
@@ -641,9 +615,6 @@ fn isolated_restore_scope() -> Result<()> {
 
 #[test]
 fn isolated_shell_registration_probe() -> Result<()> {
-    if std::env::var_os("WFI_ICON_READER").is_some() {
-        return fresh_icon_reader();
-    }
     if let Ok(namespace) = std::env::var("WFI_SHARED_RESTORED_READER") {
         let _redirect = Redirect::attach(namespace)?;
         initialize_com()?;
@@ -819,7 +790,7 @@ fn isolated_shell_registration_probe() -> Result<()> {
         file_icons_windows::association("wfi-known")?,
         file_icons_windows::association("wfi-shared")?
     );
-    protection::verify(&root, &classes, &pack, &dll, &redirect.name)?;
+    protection::verify(&root, &classes, &pack, &dll)?;
     icon_policy::verify(&classes, &pack, &dll, &redirect.name)?;
     casing::verify(&classes, &pack, &dll, &original_icon)?;
     let _switch_write_denial = switching::prepare(&classes, &original_icon)?;

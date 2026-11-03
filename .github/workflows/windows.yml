@@ -78,13 +78,15 @@ jobs:
           $ErrorActionPreference = 'Stop'
           just audit
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./.github/scripts/run-as-standard-user.ps1 -Command @'
           cargo build -p file-icons-shell --locked
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test -p file-icons-shell --test isolated_shell --locked -- --nocapture
           exit $LASTEXITCODE
+          '@
 
       - name: 監査・静的解析・GPUI操作とShellの隔離試験を実行する
-        run: just verify
+        run: ./.github/scripts/run-as-standard-user.ps1 -Command 'just verify'
 
       - name: 文書の相対リンクを検査する
         run: just check-docs
@@ -94,7 +96,7 @@ jobs:
 
       - name: 最適化ZIPと同梱DLLを検証する
         timeout-minutes: 45
-        run: just verify-release --report work/ci-release/verification.json
+        run: ./.github/scripts/run-as-standard-user.ps1 -Command 'just verify-release --report work/ci-release/verification.json'
 
       - name: 公式配布物を取得して検証する
         if: github.event_name == 'workflow_dispatch' && inputs.verify_downloads

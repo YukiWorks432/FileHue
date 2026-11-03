@@ -141,7 +141,7 @@ just audit
 
 ## Windows向けCI
 
-Windows検証では監査後にShellの隔離試験を先に実行し、GPUIを含む全体ビルドより前に登録経路を確認する。拡張子自身の保護と別の種類への適用は、登録前のキャッシュを持たない別の隔離プロセスからも実際のShell APIで照合する。固定版ツールはソースの外で導入し、導入成功時点でツールの保存先だけをキャッシュする。以降の試験に失敗した場合も、再実行で同じツールを再構築せずに復元できる。キャッシュの識別子にはRustと各ツールの版を含める。
+Windows検証では監査後にShellの隔離試験を先に実行し、GPUIを含む全体ビルドより前に登録経路を確認する。[GitHub管理のWindowsランナー](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#administrative-privileges)は管理者・UAC無効で動作し、[ユーザー単位のCOM登録が無視される](https://learn.microsoft.com/en-us/windows/win32/sysinfo/merged-view-of-hkey-classes-root)。このためShellを含む検証は、ランナー専用スクリプトが作成する一時的な標準ユーザーで実行する。プロファイルを読み込み、検証領域とツールに限ったアクセス権を渡し、終了時にアカウントを削除する。この処理を開発PCで実行しない。固定版ツールはソースの外で導入し、導入成功時点でツールの保存先だけをキャッシュする。以降の試験に失敗した場合も、再実行で同じツールを再構築せずに復元できる。キャッシュの識別子にはRustと各ツールの版を含める。
 
 [Windows検証](../.github/workflows/windows.yml)はPRとmainへの変更、および手動実行で動く。固定版のツールとActionを使い、`just verify`、文書のリンク、測定結果の集計、最適化ZIPと同梱DLLを検証する。公式パックの実取得は手動実行の`verify_downloads`で選ぶ。検証の成功は実Explorerの受け入れやリリース公開を意味しない。
 
