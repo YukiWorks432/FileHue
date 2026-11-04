@@ -677,10 +677,7 @@ impl Manager {
                 .disabled_elevated(blocked || self.protection.error.is_some())
                 .on_click(cx.listener(|this, _, _, cx| this.apply_recommended_protection(cx))),
         );
-        settings = settings.child(packs).child(div().text_xs().text_color(colors.muted_foreground).child(self.text(
-            "全体保護をオンにし、VS Code・開発用の個別指定をパック優先にします。",
-            "Use pack icons for VS Code and development files; replace overrides and protect others.",
-        )));
+        settings = settings.child(packs);
         let current = if self.protection.pack.as_ref() == self.settings.active.as_ref() {
             self.protection.current_rows.len()
         } else {
@@ -703,6 +700,10 @@ impl Manager {
                 format!("このパック: 保護 {kept}・パック許可 {replaced} / 適用中の除外: {current}")
             }
         };
+        let summary = format!("{} {summary}", self.text(
+            "おすすめ設定は全体保護をオンにし、VS Code・開発用の個別指定をパック優先にします。",
+            "Recommended settings enable default protection and prefer pack icons for VS Code and development types, replacing their overrides.",
+        ));
         if self.protection.previews_loading {
             settings = settings.child(
                 div()
