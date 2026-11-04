@@ -152,8 +152,10 @@ just audit
 
 ## Windows向けCI
 
-通常CIは`just verify`で既存のモック・契約試験とGPUI操作試験を実行し、実Shell検証は上記のWindows 11での手順へ分離する。Windowsランナーのアカウント・UAC・整合性ラベルを変更しない。固定版ツールはソースの外で導入し、導入成功時点でツールの保存先だけをキャッシュする。以降の試験に失敗した場合も、再実行で同じツールを再構築せずに復元できる。キャッシュの識別子にはRustと各ツールの版を含める。
+通常CIは`just verify`で既存のモック・契約試験とGPUI操作試験を実行し、実Shell検証は上記のWindows 11での手順へ分離する。Windowsランナーのアカウント・UAC・整合性ラベルを変更しない。固定版ツールはソースの外で導入し、導入成功時点でツールの保存先をキャッシュする。以降の試験に失敗した場合も、再実行で同じツールを再構築せずに復元できる。キャッシュの識別子にはRustと各ツールの版を含める。
 
-[Windows検証](../.github/workflows/windows.yml)はPRとmainへの変更、および手動実行で動く。固定版のツールとActionを使い、`just verify`、文書のリンク、測定結果の集計と`just verify-release --skip-shell`を実行する。ZIPの整合・権利表示・パス・GUI起動・CLIを確認し、実Shellは`not-run`として残す。公式パックの実取得は手動実行の`verify_downloads`で選ぶ。検証の成功は実Explorerの受け入れやリリース公開を意味しない。
+[Windows検証](../.github/workflows/windows.yml)はPRとmainへの変更、および手動実行で動く。固定版のツールとActionを使い、通常検証とZIP検証を別ジョブで並列に実行する。通常検証は`just verify`、文書のリンク、測定結果の集計を確認する。ZIP検証は`just audit`の成功後に`just verify-release --skip-shell`を実行し、ZIPの整合・権利表示・パス・GUI起動・CLIを確認する。両ジョブの成功を既存のチェック名「WindowsのビルドとGPUI操作試験」へ集約する。実Shellは`not-run`として残す。公式パックの実取得は手動実行の`verify_downloads`で選び、通常検証側だけで実行する。検証の成功は実Explorerの受け入れやリリース公開を意味しない。
+
+通常CIの依存・ビルド結果は構成別にキャッシュし、mainへのプッシュで成功したジョブから保存する。PRと手動実行は復元だけを行い、キャッシュの有無によらず依存監査と検査コマンドを実行する。公開候補では製品のビルド結果を再利用しない。保存範囲とキーは[配布候補の生成と公開](ci/public-release.ja.md#候補の作成と確認)を参照する。高速化を確認する際は、同じ構成でキャッシュがない実行と復元できた実行を比較し、各ジョブの所要時間、キャッシュの復元・保存時間とサイズ、集約チェックの結果を記録する。
 
 [依存監査](../.github/workflows/dependency-audit.yml)は毎日と手動で実行し、製品コードをビルドしない。配布候補は[専用ワークフロー](../.github/workflows/public-release.yml)をmainから手動実行し、[配布候補の生成と公開](ci/public-release.ja.md)に従う。
