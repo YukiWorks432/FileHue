@@ -70,15 +70,41 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         rules
     );
     cx.update_window(window, |_, w, cx| {
+        super::protection_sources::reveal(w, "original-icon-mts", cx);
+        w.click("original-icon-mts", cx);
+    })
+    .unwrap();
+    assert!(cx.read(|cx| manager.read(cx).protection.source("mts").unwrap().protect));
+    cx.update_window(window, |_, w, cx| {
         w.click("protection-back", cx);
         w.click("protection-open", cx);
     })
     .unwrap();
     cx.run_until_parked();
     assert!(cx.read(|cx| manager.read(cx).protection.source("mts").unwrap().protect));
+    // 保存先の置換を一時的に拒否し、実際の保存失敗から再試行まで確認する。
+    use std::os::windows::fs::OpenOptionsExt;
+    let locked = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(1)
+        .open(home().unwrap().join("settings.library.json"))
+        .unwrap();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("protection-recommended", cx);
+        w.render_frame(cx);
+        w.click("protection-save", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(cx.read(|cx| manager.read(cx).operation.failed()));
+    assert_eq!(serde_json::to_value(load().unwrap()).unwrap(), before);
+    assert_eq!(
+        cx.read(|cx| manager.read(cx).protection.rules.clone()),
+        rules
+    );
+    drop(locked);
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("protection-save", cx);
     })
