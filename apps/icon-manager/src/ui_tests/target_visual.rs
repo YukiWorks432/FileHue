@@ -1164,6 +1164,15 @@ fn extensionless_protection_visual_probe() {
                                 .unwrap()
                                 .save(output.join(format!("{name}-protected.png")))
                                 .unwrap();
+                            w.click("protection-collapse-all", cx);
+                            w.render_frame(cx);
+                            assert!(w.try_find("protection-extensionless-scope").is_none());
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join(format!("{name}-collapsed.png")))
+                                .unwrap();
+                            w.click("protection-expand-all", cx);
+                            w.render_frame(cx);
                             super::protection_sources::reveal(w, "pack-icon-", cx);
                             w.click("pack-icon-", cx);
                             w.render_frame(cx);

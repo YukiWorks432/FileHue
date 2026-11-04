@@ -95,6 +95,12 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
     });
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        w.click("protection-collapse-all", cx);
+        w.render_frame(cx);
+        assert!(w.try_find("protection-extensionless-scope").is_none());
+        w.click("protection-expand-all", cx);
+        w.render_frame(cx);
+        assert!(w.find("protection-extensionless-scope").visible());
         assert!(
             w.find("provider-toggle-extensionless")
                 .label()

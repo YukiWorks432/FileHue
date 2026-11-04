@@ -848,9 +848,9 @@ impl Manager {
                                 .label(self.text("すべて閉じる", "Collapse all"))
                                 .disabled_elevated(blocked || !has_expanded_group)
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.protection.collapsed.extend(
-                                        this.protection.sources.iter().map(ExistingIcon::group_id),
-                                    );
+                                    this.protection
+                                        .collapsed
+                                        .extend(this.protection.sources.iter().map(display_group));
                                     this.reset_protection_list();
                                     cx.notify();
                                 })),
