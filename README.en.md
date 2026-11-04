@@ -4,7 +4,7 @@ English | [日本語](README.md)
 
 A Rust application that brings VS Code file icon themes to Windows 11 x64 File Explorer. Icons are selected by filename and extension while preserving file contents and default applications.
 
-Public release preparation is in progress. The public repository will be `YukiWorks432/filehue`. The initial 0.1.0 release will be an unsigned Windows x64 ZIP; its publication date is not finalized. See the [initial release overview](docs/releases/0.1.0.en.md) for features and limitations. See the Japanese [distribution guide](docs/distribution.ja.md) for build and distribution checks.
+The Windows x64 ZIP for 0.1.0 is being prepared for [GitHub Releases](https://github.com/YukiWorks432/FileHue/releases). The initial release will be unsigned; its publication date is not finalized. See the [initial release overview](docs/releases/0.1.0.en.md) for features and limitations. See the Japanese [distribution guide](docs/distribution.ja.md) for build and distribution checks.
 
 ## Features
 
@@ -41,7 +41,7 @@ Launching the GUI does not change Shell registration. Normal GUI and CLI command
 
 ## License
 
-Notice generation uses cargo-about 0.9.2. Install it with `cargo install cargo-about --version 0.9.2 --locked`. The Japanese [distribution guide](docs/distribution.ja.md#権利表示の収集範囲) describes the scope of generated information, original notices, and source archives.
+Notice generation uses cargo-about 0.9.2. Install it with `cargo install cargo-about --version 0.9.2 --features cli --locked`. The Japanese [distribution guide](docs/distribution.ja.md#権利表示の収集範囲) describes the scope of generated information, original notices, and source archives.
 
 The application uses the [MIT License](LICENSE). External packs, dependencies, and language mappings retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.en.md). Icon-pack artwork is not bundled in the source repository. The application's MIT license does not grant blanket redistribution rights for external assets.
 

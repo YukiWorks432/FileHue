@@ -24,6 +24,7 @@ fn run() -> Result<()> {
     let mut values = BTreeMap::<String, OsString>::new();
     let mut dirty = false;
     let mut public_candidate = false;
+    let mut skip_shell = false;
     while let Some(arg) = args.next() {
         if arg == "--allow-dirty" {
             ensure!(!dirty, "重複した引数です");
@@ -33,6 +34,11 @@ fn run() -> Result<()> {
         if arg == "--public-candidate" {
             ensure!(!public_candidate, "重複した引数です");
             public_candidate = true;
+            continue;
+        }
+        if arg == "--skip-shell" {
+            ensure!(!skip_shell, "重複した引数です");
+            skip_shell = true;
             continue;
         }
         let name = arg.to_str().context("引数名が不正です")?.to_owned();
@@ -46,6 +52,10 @@ fn run() -> Result<()> {
     ensure!(
         !public_candidate || command == "package" || command == "verify-release",
         "--public-candidateはpackageとverify-releaseだけで使えます"
+    );
+    ensure!(
+        !skip_shell || command == "verify-release",
+        "--skip-shellはverify-releaseだけで使えます"
     );
     let purpose = if public_candidate {
         xtask::package::Purpose::PublicCandidate
@@ -135,7 +145,7 @@ fn run() -> Result<()> {
             };
             println!(
                 "{}",
-                xtask::release::verify(&root, &archive, &report, purpose)?
+                xtask::release::verify(&root, &archive, &report, purpose, !skip_shell)?
             );
         }
         Some("smoke") => {
@@ -180,6 +190,6 @@ fn run() -> Result<()> {
 }
 fn help() {
     println!(
-        "開発専用コマンド\n  cargo xtask check-binaries --folder <folder>\n  cargo xtask licenses [--output <folder>]\n  cargo xtask package [--public-candidate] [--profile debug|release] [--allow-dirty]\n  cargo xtask package --verify <folder> [--metadata <folder>] [--public-candidate]\n  cargo xtask verify-release [--public-candidate] [--archive <zip>] --report <json>\n  cargo xtask smoke [--executable <exe>] [--profile <folder>]\n  cargo xtask check-docs [--root <folder>]"
+        "開発専用コマンド\n  cargo xtask check-binaries --folder <folder>\n  cargo xtask licenses [--output <folder>]\n  cargo xtask package [--public-candidate] [--profile debug|release] [--allow-dirty]\n  cargo xtask package --verify <folder> [--metadata <folder>] [--public-candidate]\n  cargo xtask verify-release [--public-candidate] [--skip-shell] [--archive <zip>] --report <json>\n  cargo xtask smoke [--executable <exe>] [--profile <folder>]\n  cargo xtask check-docs [--root <folder>]"
     )
 }

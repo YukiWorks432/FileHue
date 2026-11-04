@@ -8,6 +8,13 @@ publish.workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+shell-integration = []
+
+[[test]]
+name = "isolated_shell"
+required-features = ["shell-integration"]
+
 [dependencies]
 file-icons-windows = { path = "../icon-windows" }
 windows-core = "0.62.2"

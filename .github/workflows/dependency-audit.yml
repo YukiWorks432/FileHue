@@ -1,0 +1,44 @@
+name: 依存の監査
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    env:
+      RUSTUP_TOOLCHAIN: 1.99.0
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: 固定版の監査ツールを事前に用意する
+        working-directory: ${{ runner.temp }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          rustup toolchain install 1.99.0 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo install cargo-deny --version 0.20.2 --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo install just --version 1.43.0 --locked
+          exit $LASTEXITCODE
+
+      - name: ソースを取得する
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # 検査対象のRustコードをビルドせず、例外の期限・対象版と標準の依存条件を調べる。
+      - name: 全体とWindowsの依存を監査する
+        working-directory: ${{ github.workspace }}
+        run: just audit

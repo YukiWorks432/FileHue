@@ -4,7 +4,7 @@
 
 Windows 11 x64の標準エクスプローラーで、VS Codeのファイルアイコンテーマを使うRust製アプリです。ファイルの内容や既定のアプリを変更せず、ファイル名と拡張子からアイコンを選びます。
 
-公開準備中です。公開先は `YukiWorks432/filehue` とし、初回0.1.0は未署名のWindows x64向けZIPで配布します。公開日は未確定です。0.1.0の機能と制限は[初回リリースの案内](docs/releases/0.1.0.ja.md)、配布前の確認は[配布手順](docs/distribution.ja.md)を参照します。
+0.1.0のWindows x64向けZIPは準備中です。[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)から公開予定で、初回は未署名で配布します。公開日は未確定です。0.1.0の機能と制限は[初回リリースの案内](docs/releases/0.1.0.ja.md)、配布前の確認は[配布手順](docs/distribution.ja.md)を参照します。
 
 ## できること
 
@@ -41,7 +41,7 @@ GUIの起動だけではShell登録を変更しません。通常の起動・CLI
 
 ## ライセンス
 
-開発時の権利表示生成には`cargo-about 0.9.2`を使います。`cargo install cargo-about --version 0.9.2 --locked`で導入します。配布物へ同梱する原文・ソースと生成結果の範囲は[配布手順](docs/distribution.ja.md#権利表示の収集範囲)を参照します。
+開発時の権利表示生成には`cargo-about 0.9.2`を使います。`cargo install cargo-about --version 0.9.2 --features cli --locked`で導入します。配布物へ同梱する原文・ソースと生成結果の範囲は[配布手順](docs/distribution.ja.md#権利表示の収集範囲)を参照します。
 
 本体は[MIT License](LICENSE)です。外部アイコンパック、依存ライブラリ、言語対応表には、それぞれの利用条件が適用されます。[第三者の権利表示](THIRD_PARTY_NOTICES.md)を参照します。アイコンパックの画像はソースリポジトリへ同梱しません。本体のMITは外部素材の再配布を一律に許可するものではありません。
 
