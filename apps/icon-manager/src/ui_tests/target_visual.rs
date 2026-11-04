@@ -1065,6 +1065,134 @@ fn recovery_visual_probe() {
 }
 
 #[test]
+#[ignore = "隔離した保存先で拡張子なしの独立表示と対応名の見本を実描画する"]
+fn extensionless_protection_visual_probe() {
+    assert_eq!(std::env::var("WFI_GUI_PROBE").as_deref(), Ok("1"));
+    let output = std::path::PathBuf::from(std::env::var("WFI_VISUAL_OUTPUT").unwrap());
+    assert!(output.is_absolute() && home().unwrap().starts_with(output.parent().unwrap()));
+    std::fs::create_dir_all(&output).unwrap();
+    let registry = super::extensionless_protection::fixture();
+    let settings = load().unwrap();
+    let rows = file_icons_windows::inspect_existing_icons(&settings.packs[0], &settings)
+        .unwrap()
+        .into_iter()
+        .filter(|row| row.registration.extension.is_empty() || row.registration.extension == "mts")
+        .collect::<Vec<_>>();
+    application()
+        .with_assets(crate::ui_assets::Assets)
+        .run(move |cx| {
+            gpui_kit::init(cx);
+            let (window, manager) =
+                gpui_kit::open_window(WindowOptions::default(), cx, Manager::open).unwrap();
+            window
+                .update(cx, |_, w, cx| {
+                    manager.update(cx, |this, cx| {
+                        let guard = this._guard.take();
+                        this.open_protection(w, cx);
+                        this._guard = guard;
+                        this.accept_protection_sources(rows);
+                        this.refresh_protection_policy(cx);
+                    })
+                })
+                .unwrap();
+            cx.spawn(async move |cx| {
+                let _registry = registry;
+                for (name, width, height, font, mode, language) in [
+                    (
+                        "extensionless-ja-dark",
+                        1120.,
+                        900.,
+                        16.,
+                        ThemeMode::Dark,
+                        "ja",
+                    ),
+                    (
+                        "extensionless-en-light",
+                        1120.,
+                        900.,
+                        16.,
+                        ThemeMode::Light,
+                        "en",
+                    ),
+                    (
+                        "extensionless-small-ja",
+                        640.,
+                        640.,
+                        18.,
+                        ThemeMode::Dark,
+                        "ja",
+                    ),
+                    (
+                        "extensionless-small-en",
+                        640.,
+                        640.,
+                        18.,
+                        ThemeMode::Light,
+                        "en",
+                    ),
+                ] {
+                    window
+                        .update(cx, |_, w, cx| {
+                            theme::apply(mode, cx);
+                            gpui_kit::component::theme::Theme::update(cx, |theme| {
+                                theme.font_size = px(font)
+                            });
+                            manager.update(cx, |this, cx| {
+                                this.settings.language = language.into();
+                                let sources = this.protection.sources.clone();
+                                let guard = this._guard.take();
+                                this.open_protection(w, cx);
+                                this._guard = guard;
+                                this.accept_protection_sources(sources);
+                                this.protection
+                                    .visual_sources(this.protection.sources.clone());
+                                this.protection.rules = Default::default();
+                                this.refresh_protection_policy(cx);
+                            });
+                            w.resize(size(px(width), px(height)));
+                        })
+                        .unwrap();
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(400))
+                        .await;
+                    window
+                        .update(cx, |_, w, cx| {
+                            w.render_frame(cx);
+                            w.press("home", cx);
+                            w.render_frame(cx);
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join(format!("{name}-protected.png")))
+                                .unwrap();
+                            super::protection_sources::reveal(w, "pack-icon-", cx);
+                            w.click("pack-icon-", cx);
+                            w.render_frame(cx);
+                            assert!(w.find("protection-back").visible());
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join(format!("{name}-allowed.png")))
+                                .unwrap();
+                            w.click("protection-details", cx);
+                            w.render_frame(cx);
+                            super::protection_sources::reveal(
+                                w,
+                                "protection-extensionless-provider",
+                                cx,
+                            );
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join(format!("{name}-details.png")))
+                                .unwrap();
+                        })
+                        .unwrap();
+                }
+                cx.update(|cx| cx.quit());
+            })
+            .detach();
+        });
+}
+
+#[test]
 #[ignore = "隔離した保存先で既存アイコンの保護画面を実描画する"]
 fn protection_visual_probe() {
     assert_eq!(std::env::var("WFI_GUI_PROBE").as_deref(), Ok("1"));
