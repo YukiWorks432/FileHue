@@ -47,6 +47,6 @@ GUIの起動だけではShell登録を変更しません。通常の起動・CLI
 
 開発時の権利表示生成には`cargo-about 0.9.2`を使います。`cargo install cargo-about --version 0.9.2 --features cli --locked`で導入します。配布物へ同梱する原文・ソースと生成結果の範囲は[配布手順](docs/distribution.ja.md#権利表示の収集範囲)を参照します。
 
-本体は[MIT License](LICENSE)です。外部アイコンパック、依存ライブラリ、言語対応表には、それぞれの利用条件が適用されます。[第三者の権利表示](THIRD_PARTY_NOTICES.md)を参照します。アプリで使うアイコンパックは取得して利用します。READMEの比較画像と再現用HTMLに含む素材は、[画像の権利表示](docs/assets/explorer/NOTICE.md)に従います。本体のMITは外部素材の再配布を一律に許可するものではありません。
+本体は[MIT License](LICENSE)です。外部アイコンパック、依存ライブラリ、言語対応表には、それぞれの利用条件が適用されます。[第三者の権利表示](THIRD_PARTY_NOTICES.md)を参照します。アプリで使うアイコンパックは取得して利用します。READMEの比較画像に含む素材は、[画像の権利表示](docs/assets/explorer/NOTICE.md)に従います。本体のMITは外部素材の再配布を一律に許可するものではありません。
 
 配布版のGUIでは「アプリ情報」から本体と第三者のライセンスを開けます。開発版での準備は[開発手順](docs/development.ja.md#権利表示の生成)を参照してください。

@@ -16,7 +16,7 @@ TOML・YAML・Zigの補完対応は本製品の初期要件に基づく独自の
 
 ## 外部アイコンパックとRust依存
 
-アプリで使うアイコンパック一式は、このリポジトリへ同梱しない。ソースのREADME比較画像と再現用HTMLにはvscode-iconsの素材を含むため、[比較画像の権利表示](https://github.com/YukiWorks432/FileHue/blob/main/docs/assets/explorer/NOTICE.md)で出典・CC BY-SA 4.0・ブランド素材の条件を別に記録する。取り込み時に、パックの宣言、下位フォルダーと明示参照を含むライセンス・通知・READMEをキャッシュの `provenance.json` へ保存する。公式配布物から取得した場合は、配布物のSHA-256、取得URL、版、利用条件の要約、ICOへの変換内容も保持する。素材は本体のMITへ変更しない。具体的な候補と条件は[パック取得の設計](docs/pack-downloads.ja.md)を参照する。
+アプリで使うアイコンパック一式は、このリポジトリへ同梱しない。READMEの比較PNGにはvscode-iconsの素材を含むため、[比較画像の権利表示](https://github.com/YukiWorks432/FileHue/blob/main/docs/assets/explorer/NOTICE.md)で出典・CC BY-SA 4.0・ブランド素材の条件を別に記録する。取り込み時に、パックの宣言、下位フォルダーと明示参照を含むライセンス・通知・READMEをキャッシュの `provenance.json` へ保存する。公式配布物から取得した場合は、配布物のSHA-256、取得URL、版、利用条件の要約、ICOへの変換内容も保持する。素材は本体のMITへ変更しない。具体的な候補と条件は[パック取得の設計](docs/pack-downloads.ja.md)を参照する。
 
 Rust依存の完全な一覧と配布時の通知は、配布物を作成する段階でCargo.lockと実際に配布する部品から整備する。この文書だけで全依存の権利表示を完了したとは扱わない。
 
