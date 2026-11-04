@@ -669,30 +669,23 @@ impl Manager {
             );
         }
         settings = settings.child(packs);
-        settings = settings.child(div().flex().flex_wrap().items_center().gap_2()
-            .child(theme::button("protection-recommended", cx).small()
+        settings = settings.child(div().flex().items_center().gap_2()
+            .child(theme::button("protection-recommended", cx).small().flex_shrink_0()
                 .label(self.text("おすすめ設定", "Recommended settings"))
                 .disabled_elevated(blocked || self.protection.error.is_some())
                 .on_click(cx.listener(|this, _, _, cx| this.apply_recommended_protection(cx))))
-            .child(div().text_xs().text_color(colors.muted_foreground).child(self.text(
+            .child(div().flex_1().min_w_0().text_xs().text_color(colors.muted_foreground).child(self.text(
                 "全体の保護をオンにし、VS Code・開発用の種類をパック優先にします。個別指定も更新します。保存前に調整できます。",
                 "Enable default protection and prefer pack icons for VS Code and development types, replacing their overrides. Adjust before saving.",
             ))));
-        if let Some(notice) = &self.protection.recommendation_notice {
-            settings = settings.child(
-                div()
-                    .id("protection-recommendation-result")
-                    .text_xs()
-                    .role(Role::Status)
-                    .child(notice.clone()),
-            );
-        }
         let current = if self.protection.pack.as_ref() == self.settings.active.as_ref() {
             self.protection.current_rows.len()
         } else {
             0
         };
-        let summary = if self.protection.loading {
+        let summary = if let Some(notice) = &self.protection.recommendation_notice {
+            notice.clone()
+        } else if self.protection.loading {
             self.text("調査中…", "Checking…").into()
         } else if self.protection.pack.is_none() {
             self.text("パックなし", "No pack").into()

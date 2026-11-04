@@ -96,6 +96,9 @@ fn recommended_visual_probe() {
     assert!(output.is_absolute() && home().unwrap().starts_with(output.parent().unwrap()));
     std::fs::create_dir_all(&output).unwrap();
     let _registry = super::target_protection::fixture();
+    let settings = load().unwrap();
+    let sources =
+        file_icons_windows::inspect_existing_icons(&settings.packs[0], &settings).unwrap();
     gpui_kit::application()
         .with_assets(crate::ui_assets::Assets)
         .run(move |cx| {
@@ -111,6 +114,7 @@ fn recommended_visual_probe() {
                 cx.background_executor()
                     .timer(std::time::Duration::from_secs(2))
                     .await;
+                manager.update(cx, |this, _| this.protection.visual_sources(sources));
                 for (language, mode, width, font) in [
                     ("ja", ThemeMode::Dark, 1120., 16.),
                     ("en", ThemeMode::Light, 1120., 16.),
@@ -130,6 +134,14 @@ fn recommended_visual_probe() {
                             w.resize(size(px(width), px(640.)));
                             w.render_frame(cx);
                             w.click("protection-recommended", cx);
+                            w.render_frame(cx);
+                        })
+                        .unwrap();
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(350))
+                        .await;
+                    window
+                        .update(cx, |_, w, cx| {
                             w.render_frame(cx);
                             w.render_to_image()
                                 .unwrap()
