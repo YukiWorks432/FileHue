@@ -6,6 +6,10 @@ A Rust application that brings VS Code file icon themes to Windows 11 x64 File E
 
 The Windows x64 ZIP for 0.1.0 is being prepared for [GitHub Releases](https://github.com/YukiWorks432/FileHue/releases). The initial release will be unsigned; its publication date is not finalized. See the [initial release overview](docs/releases/0.1.0.en.md) for features and limitations. See the Japanese [distribution guide](docs/distribution.ja.md) for build and distribution checks.
 
+![File Explorer before and after applying FileHue. AGENTS.md, Cargo.toml, package.json, and tsconfig.json receive filename-specific icons.](docs/assets/explorer/comparison.en.png)
+
+Illustration with fictional files using vscode-icons 13.0.0. Results depend on the icon pack, associations, and protection settings. See the [image credits and terms](docs/assets/explorer/NOTICE.md).
+
 ## Features
 
 - Download reviewed icon packs, preview the results and licenses, then apply a pack from the GUI.
@@ -43,6 +47,6 @@ Launching the GUI does not change Shell registration. Normal GUI and CLI command
 
 Notice generation uses cargo-about 0.9.2. Install it with `cargo install cargo-about --version 0.9.2 --features cli --locked`. The Japanese [distribution guide](docs/distribution.ja.md#権利表示の収集範囲) describes the scope of generated information, original notices, and source archives.
 
-The application uses the [MIT License](LICENSE). External packs, dependencies, and language mappings retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.en.md). Icon-pack artwork is not bundled in the source repository. The application's MIT license does not grant blanket redistribution rights for external assets.
+The application uses the [MIT License](LICENSE). External packs, dependencies, and language mappings retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.en.md). Icon packs for use by the application are downloaded separately. Artwork in the README illustrations and their HTML source is covered by the [image notices](docs/assets/explorer/NOTICE.md). The application's MIT license does not grant blanket redistribution rights for external assets.
 
 In a distribution build, open the application and select “About” to view FileHue's license and third-party licenses. See the Japanese [development guide](docs/development.ja.md#権利表示の生成) for preparing these files in a development build.

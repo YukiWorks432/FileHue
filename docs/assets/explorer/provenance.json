@@ -1,0 +1,118 @@
+{
+  "pack": "vscode-icons",
+  "version": "13.0.0",
+  "author": "vscode-icons contributors",
+  "source": "https://github.com/vscode-icons/vscode-icons/tree/866d4f48701ba71e39d309e9e519bcf2eaf1c3e2",
+  "commit": "866d4f48701ba71e39d309e9e519bcf2eaf1c3e2",
+  "archive": "https://github.com/vscode-icons/vscode-icons/releases/download/v13.0.0/vscode-icons-13.0.0.vsix",
+  "archive_sha256": "0f38ea41a7a9395d79d2ca712b5930009416fa609b9a77f9eb90247125258983",
+  "license": "General icons: CC-BY-SA-4.0; branded icons: respective owners' terms",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "upstream_readme": "https://github.com/vscode-icons/vscode-icons/blob/866d4f48701ba71e39d309e9e519bcf2eaf1c3e2/README.md#license",
+  "changes": "SVG artwork is unmodified; scaled and placed in an original fictional Explorer comparison.",
+  "language_catalog_repository": "https://github.com/microsoft/vscode",
+  "language_catalog_commit": "6d62b1d5dace93a33b3a6d3eca1317bd5e15bcb1",
+  "language_catalog_sha256": "2dfe48ce8aa988c5093e13390c8e2ca98086e3b9c17ce99f8af1ce428446e6a1",
+  "files": [
+    {
+      "name": ".gitignore",
+      "definition": "_f_git",
+      "match": "filename",
+      "sha256": "273a5c8719145b01e0e490629459b0c79b4a07b67220cb2bcec2c0f0f7feaf73",
+      "upstream_asset_path": "icons/file_type_git.svg"
+    },
+    {
+      "name": "AGENTS.md",
+      "definition": "_f_agents",
+      "match": "filename",
+      "sha256": "4a172a0757666710786e9ae8b7bf413050e8c8749f1f4040d9368aea98928a7f",
+      "upstream_asset_path": "icons/file_type_agents.svg"
+    },
+    {
+      "name": "app.ts",
+      "definition": "_f_typescript",
+      "match": "language-extension",
+      "sha256": "5ebd14bd43aea8116a932d99b0d41ecc3f63cdbc0bda9a58bd0eb08a00129020",
+      "upstream_asset_path": "icons/file_type_typescript.svg"
+    },
+    {
+      "name": "Cargo.toml",
+      "definition": "_f_cargo",
+      "match": "filename",
+      "sha256": "fcec19a1e09aee952e303e9d7bf7e9d91c7cc113bc012c101fd6da38719c6815",
+      "upstream_asset_path": "icons/file_type_cargo.svg"
+    },
+    {
+      "name": "main.rs",
+      "definition": "_f_rust",
+      "match": "language-extension",
+      "sha256": "e3b757d00621b208470a24894170f2798c7014d24452c4c0b81625c5e00dfe09",
+      "upstream_asset_path": "icons/file_type_rust.svg"
+    },
+    {
+      "name": "notes.md",
+      "definition": "_f_markdown",
+      "match": "language-extension",
+      "sha256": "fa10b34b3c72cc10ac1c6f7013c366e76b310fa3efab1635b1e382bc6d6f9530",
+      "upstream_asset_path": "icons/file_type_markdown.svg"
+    },
+    {
+      "name": "package.json",
+      "definition": "_f_npm",
+      "match": "filename",
+      "sha256": "ed62774c5d922bad05dd8bb9f0d2f0cf78e29fc92fbf04520c582901ddfb43ba",
+      "upstream_asset_path": "icons/file_type_npm.svg"
+    },
+    {
+      "name": "README.md",
+      "definition": "_f_markdown",
+      "match": "language-extension",
+      "sha256": "fa10b34b3c72cc10ac1c6f7013c366e76b310fa3efab1635b1e382bc6d6f9530",
+      "upstream_asset_path": "icons/file_type_markdown.svg"
+    },
+    {
+      "name": "settings.json",
+      "definition": "_f_json",
+      "match": "language-filename",
+      "sha256": "89efce449a8e2d6224cd0984263ab7c5bf518b9bedaee3267a3049e320389652",
+      "upstream_asset_path": "icons/file_type_json.svg"
+    },
+    {
+      "name": "settings.toml",
+      "definition": "_f_toml",
+      "match": "language-extension",
+      "sha256": "54af3f2d60a54a8a9d121c727a94827710790bb3a14ca599dbb1cb6f59d4cf94",
+      "upstream_asset_path": "icons/file_type_toml.svg"
+    },
+    {
+      "name": "styles.css",
+      "definition": "_f_css",
+      "match": "language-extension",
+      "sha256": "60770fec4356ea426c1757d2563f055861188bf3f2d3417652484ed5d633df2a",
+      "upstream_asset_path": "icons/file_type_css.svg"
+    },
+    {
+      "name": "tsconfig.json",
+      "definition": "_f_tsconfig",
+      "match": "filename",
+      "sha256": "3dbfe711ab16711194988da3f3eccc3d3a21f6795763762b2168970e7293114d",
+      "upstream_asset_path": "icons/file_type_tsconfig.svg"
+    }
+  ],
+  "images": [
+    {
+      "path": "comparison.ja.png",
+      "width": 3360,
+      "height": 1766,
+      "sha256": "3c721bc097e9b30debd2153b57e683e3487e61f9e7a45abc333e5ef4d1cf0afb"
+    },
+    {
+      "path": "comparison.en.png",
+      "width": 3360,
+      "height": 1766,
+      "sha256": "ee08632d5bae438299dbed51794ffe10ad3d22909b8f297d9ef7516590fb02a8"
+    }
+  ],
+  "archive_readme_path": "extension/README.md",
+  "archive_readme_sha256": "bad3102a504300a2fee5b72cb6d8e8af3c84791c122b9bc14ebacf4a5374a01e"
+}
