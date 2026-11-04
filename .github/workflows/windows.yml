@@ -20,9 +20,17 @@ concurrency:
 
 jobs:
   windows:
-    name: WindowsのビルドとGPUI操作試験
+    name: ${{ matrix.name }}
     runs-on: windows-2025
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: verify
+            name: 通常検証とGPUI操作試験
+          - kind: zip
+            name: 最適化ZIPの生成と検証
     defaults:
       run:
         shell: pwsh
@@ -79,25 +87,73 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: ビルドキャッシュの保存先を確認する
+        id: cache-paths
+        run: |
+          $cargoRoot = if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $env:USERPROFILE '.cargo' }
+          "registry=$(Join-Path $cargoRoot 'registry')" >> $env:GITHUB_OUTPUT
+
+      # 構成と依存が一致するmainの成果物を再利用し、現在のソースとの差分はCargoが再構築する。
+      - name: 依存とビルド結果を復元する
+        id: build-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.cache-paths.outputs.registry }}
+            target
+          key: windows-x64-rust-1.99.0-build-v1-${{ matrix.kind }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', '.cargo/config.toml', '.github/workflows/windows.yml', 'xtask/src/privacy.rs') }}-${{ github.sha }}
+          restore-keys: |
+            windows-x64-rust-1.99.0-build-v1-${{ matrix.kind }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', '.cargo/config.toml', '.github/workflows/windows.yml', 'xtask/src/privacy.rs') }}-
+
       - name: 監査・静的解析・モックとGPUI操作試験を実行する
+        if: matrix.kind == 'verify'
         run: just verify
 
       - name: 文書の相対リンクを検査する
+        if: matrix.kind == 'verify'
         run: just check-docs
 
       - name: 測定結果の集計を検証する
+        if: matrix.kind == 'verify'
         run: cargo test -p file-icons-shell --example measure_shell --locked
 
+      - name: ZIPのビルド前に依存を監査する
+        if: matrix.kind == 'zip'
+        run: just audit
+
       - name: 最適化ZIP・権利表示・GUIとCLIを検証する
+        if: matrix.kind == 'zip'
         timeout-minutes: 45
         run: just verify-release --skip-shell --report work/ci-release/verification.json
 
       - name: 公式配布物を取得して検証する
-        if: github.event_name == 'workflow_dispatch' && inputs.verify_downloads
+        if: matrix.kind == 'verify' && github.event_name == 'workflow_dispatch' && inputs.verify_downloads
         timeout-minutes: 8
         run: cargo test -p file-icons-catalog --locked -- --ignored --exact tests::official_releases_download_and_compile --nocapture
 
       - name: CLIから公式配布物を取得して検証する
-        if: github.event_name == 'workflow_dispatch' && inputs.verify_downloads
+        if: matrix.kind == 'verify' && github.event_name == 'workflow_dispatch' && inputs.verify_downloads
         timeout-minutes: 8
         run: cargo test -p file-icons-cli --test cli --locked -- --ignored --exact official_downloads_through_real_cli_keep_registration_inactive
+
+      - name: mainの検証に成功したビルド結果を保存する
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.cache-paths.outputs.registry }}
+            target
+          key: ${{ steps.build-cache.outputs.cache-primary-key }}
+
+  validation:
+    # 既存の必須チェック名で、並列に実行した両方の結果を確認する。
+    name: WindowsのビルドとGPUI操作試験
+    if: always()
+    needs: windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 通常検証とZIP検証の成功を確認する
+        env:
+          RESULT: ${{ needs.windows.result }}
+        run: test "$RESULT" = success
