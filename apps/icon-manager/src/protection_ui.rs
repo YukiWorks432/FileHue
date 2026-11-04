@@ -2,6 +2,8 @@
 use super::*;
 use file_icons_windows::{ExistingIcon, IconExclusion, IconProtectionRules, ProtectionReason};
 use gpui_kit::prelude::FluentBuilder;
+#[path = "protection_recommendations.rs"]
+mod recommendations;
 #[path = "protection_sources.rs"]
 mod sources;
 use gpui_kit::component::{
@@ -71,6 +73,7 @@ pub(super) struct Editor {
     details: bool,
     previous_focus: Option<FocusHandle>,
     pub(super) inspection: u64,
+    recommendation_notice: Option<String>,
     picker: Option<Entity<SelectState<Vec<PackOption>>>>,
     picker_subscription: Option<Subscription>,
 }
@@ -276,6 +279,7 @@ impl Manager {
     }
 
     pub(super) fn inspect_protection(&mut self, cx: &mut Context<Self>) {
+        self.protection.recommendation_notice = None;
         self.targets.invalidate();
         self.protection.inspection += 1;
         let inspection = self.protection.inspection;
@@ -451,6 +455,7 @@ impl Manager {
             .collect();
     }
     pub(super) fn refresh_protection_policy(&mut self, cx: &mut Context<Self>) {
+        self.protection.recommendation_notice = None;
         self.targets.invalidate();
         for source in &mut self.protection.sources {
             source.update_protection(&self.protection.rules, self.protection.draft);
@@ -664,6 +669,24 @@ impl Manager {
             );
         }
         settings = settings.child(packs);
+        settings = settings.child(div().flex().flex_wrap().items_center().gap_2()
+            .child(theme::button("protection-recommended", cx).small()
+                .label(self.text("おすすめ設定", "Recommended settings"))
+                .disabled_elevated(blocked || self.protection.error.is_some())
+                .on_click(cx.listener(|this, _, _, cx| this.apply_recommended_protection(cx))))
+            .child(div().text_xs().text_color(colors.muted_foreground).child(self.text(
+                "全体の保護をオンにし、VS Code・開発用の種類をパック優先にします。個別指定も更新します。保存前に調整できます。",
+                "Enable default protection and prefer pack icons for VS Code and development types, replacing their overrides. Adjust before saving.",
+            ))));
+        if let Some(notice) = &self.protection.recommendation_notice {
+            settings = settings.child(
+                div()
+                    .id("protection-recommendation-result")
+                    .text_xs()
+                    .role(Role::Status)
+                    .child(notice.clone()),
+            );
+        }
         let current = if self.protection.pack.as_ref() == self.settings.active.as_ref() {
             self.protection.current_rows.len()
         } else {

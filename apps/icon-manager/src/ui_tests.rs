@@ -1248,5 +1248,6 @@ mod targets;
 mod target_visual;
 
 mod performance;
+mod protection_recommendations;
 mod protection_sources;
 mod target_protection;
