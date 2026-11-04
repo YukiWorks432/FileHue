@@ -19,18 +19,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: 変更範囲の判定
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.scope.outputs.matrix }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: 比較元を含むソースを取得する
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 変更範囲の判定を契約試験で確認する
+        run: ./scripts/tests/ci-scope-contract.ps1
+
+      - name: 必要な検証を選ぶ
+        id: scope
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $scope = & ./scripts/ci-scope.ps1 -EventName $env:CI_EVENT -Base $env:CI_BASE -Head $env:CI_HEAD
+          $matrix = if ($scope -ceq 'docs') {
+            '{"include":[{"kind":"docs","name":"文書と設定の検証"}]}'
+          } else {
+            '{"include":[{"kind":"verify","name":"通常検証とGPUI操作試験"},{"kind":"zip","name":"最適化ZIPの生成と検証"}]}'
+          }
+          "matrix=$matrix" >> $env:GITHUB_OUTPUT
+          "選択した検証: $scope" >> $env:GITHUB_STEP_SUMMARY
+          # Gitの差分取得失敗を全検証へ退避した場合も、判定自体は成功とする。
+          exit 0
+
   windows:
     name: ${{ matrix.name }}
+    needs: changes
     runs-on: windows-2025
     timeout-minutes: 120
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - kind: verify
-            name: 通常検証とGPUI操作試験
-          - kind: zip
-            name: 最適化ZIPの生成と検証
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
     defaults:
       run:
         shell: pwsh
@@ -88,6 +121,7 @@ jobs:
           persist-credentials: false
 
       - name: ビルドキャッシュの保存先を確認する
+        if: matrix.kind != 'docs'
         id: cache-paths
         run: |
           $cargoRoot = if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $env:USERPROFILE '.cargo' }
@@ -95,6 +129,7 @@ jobs:
 
       # 構成と依存が一致するmainの成果物を再利用し、現在のソースとの差分はCargoが再構築する。
       - name: 依存とビルド結果を復元する
+        if: matrix.kind != 'docs'
         id: build-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -112,6 +147,14 @@ jobs:
       - name: 文書の相対リンクを検査する
         if: matrix.kind == 'verify'
         run: just check-docs
+
+      - name: 文書と設定の依存監査・リンク検査を実行する
+        if: matrix.kind == 'docs'
+        run: |
+          just audit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          just check-docs
+          exit $LASTEXITCODE
 
       - name: 測定結果の集計を検証する
         if: matrix.kind == 'verify'
@@ -137,7 +180,7 @@ jobs:
         run: cargo test -p file-icons-cli --test cli --locked -- --ignored --exact official_downloads_through_real_cli_keep_registration_inactive
 
       - name: mainの検証に成功したビルド結果を保存する
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.build-cache.outputs.cache-hit != 'true'
+        if: matrix.kind != 'docs' && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.build-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -146,14 +189,15 @@ jobs:
           key: ${{ steps.build-cache.outputs.cache-primary-key }}
 
   validation:
-    # 既存の必須チェック名で、並列に実行した両方の結果を確認する。
+    # 判定と、選択した全ジョブの成功を既存の必須チェック名で確認する。
     name: WindowsのビルドとGPUI操作試験
     if: always()
-    needs: windows
+    needs: [changes, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: 通常検証とZIP検証の成功を確認する
+      - name: 判定と選択した検証の成功を確認する
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           RESULT: ${{ needs.windows.result }}
-        run: test "$RESULT" = success
+        run: test "$CHANGES_RESULT" = success && test "$RESULT" = success

@@ -20,6 +20,10 @@ audit:
 test-policy:
     cargo test -p xtask --test audit_policy --locked
 
+# 実Git差分で、軽量検証の選択と全検証への退避を確認する
+test-ci-scope:
+    & ./scripts/tests/ci-scope-contract.ps1
+
 # 最適化したGUIを起動する（Shell DLLも同じ構成でビルドする）
 run *args: build-release
     $forward = @($args | Select-Object -Skip 1); & ./target/release/file-icons-manager.exe @forward; exit $LASTEXITCODE
