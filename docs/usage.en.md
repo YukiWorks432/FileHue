@@ -4,6 +4,8 @@ The GUI and auxiliary CLI target Windows 11 x64. See the [0.1.0 overview](releas
 
 Select “About” to see the application version and open the application and third-party licenses. Choose “Open distribution page” to view published versions and downloads on GitHub Releases. Individual icon-pack terms are available in each pack's details.
 
+Download the Windows x64 ZIP and `SHA256SUMS.txt` from the published [v0.1.0 release page](https://github.com/YukiWorks432/FileHue/releases/tag/v0.1.0).
+
 ## Before launching
 
 This build targets Windows 11 x64 and requires the Microsoft Visual C++ v14 Redistributable (x64), at least as recent as the MSVC 14.44 build tools used for this build. If the runtime is missing or Windows reports that VCRUNTIME140.dll cannot be found, use [Microsoft's official download instructions](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170). The application does not install the runtime automatically. Extract the ZIP and keep the executable and Shell DLL in the same folder.

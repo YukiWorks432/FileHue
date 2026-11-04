@@ -6,6 +6,8 @@ Windows 11 x64向けのGUIと補助CLIを提供します。対応範囲は[0.1.0
 
 「アプリ情報」では製品の版と本体・第三者のライセンスを確認できます。「配布ページを開く」でGitHub Releasesへ移動し、公開済みの版と配布物を確認できます。各アイコンパックの利用条件は、パックの詳細で確認してください。
 
+公開済みの[v0.1.0のリリースページ](https://github.com/YukiWorks432/FileHue/releases/tag/v0.1.0)から、Windows x64向けZIPと`SHA256SUMS.txt`を取得できます。
+
 ## 起動前の準備
 
 対象はWindows 11 x64です。このビルドにはMicrosoft Visual C++ v14再頒布可能パッケージ（x64）が必要です。未導入、またはVCRUNTIME140.dllが見つからないと表示された場合は、[Microsoft公式のダウンロード案内](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)からx64版を導入します。ビルドで使ったMSVC 14.44以上の版を必要とします。このアプリは再頒布可能パッケージを自動導入しません。ZIPは展開し、実行ファイルとShell DLLを同じフォルダーに保持します。

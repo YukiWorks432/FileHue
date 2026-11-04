@@ -1,6 +1,6 @@
 # 配布物の作成と検証
 
-FileHue 0.1.0のWindows x64向け配布物を作る。検証用と公開候補を明示的に分け、作成成功を実Explorerの受け入れや公開許可と混同しない。公開先は `https://github.com/YukiWorks432/filehue` とする。初回はGUI・CLI・Shell DLLを未署名で配布し、自己署名・仮署名も付けない。
+FileHueのWindows x64向け配布物を作る。検証用と公開候補を明示的に分け、作成成功を実Explorerの受け入れや公開許可と混同しない。公開先は `https://github.com/YukiWorks432/FileHue` とする。[0.1.0](https://github.com/YukiWorks432/FileHue/releases/tag/v0.1.0)は公開済みで、GUI・CLI・Shell DLLを未署名で配布している。自己署名・仮署名も付けない。
 
 ## 作成と確認
 
@@ -28,7 +28,7 @@ cargo xtask package --verify dist/<展開先> --metadata dist/<外部記録の�
 
 ## 公開候補の作成
 
-公開時は、検査したソースだけを履歴のない新規公開リポジトリへ展開する。旧開発リポジトリの履歴やコミットから作ったZIPは転用しない。新しい公開先のクリーンなチェックアウトから、GitHub CLIの`gh`も用意して実行する。
+公開リポジトリのクリーンなチェックアウトで、配布する版と対象コミットを確定する。GitHub CLIの`gh`も用意し、次のコマンドを実行する。公開済みのタグ・ZIP・添付物は差し替えず、修正は新しい版で公開する。
 
 ```powershell
 just audit
@@ -46,7 +46,7 @@ Windows 11での`verify-release`は隣接する`SHA256SUMS.txt`でZIPと外部�
 
 ## 未署名の案内
 
-SmartScreenの警告や、Smart App Control・組織の実行制御による起動制限があり得る。日英の[初回公開案内](releases/0.1.0.ja.md)で未署名を明示する。利用者へ自己署名証明書の信頼登録や保護機能の広範な無効化を求めない。SHA-256と、別途整備するGitHubのビルド来歴証明はWindowsのコード署名とは別の確認手段である。署名サービスや署名鍵を初回公開のために用意しない。
+SmartScreenの警告や、Smart App Control・組織の実行制御による起動制限があり得る。日英の[初回公開案内](releases/0.1.0.ja.md)で未署名を明示する。利用者へ自己署名証明書の信頼登録や保護機能の広範な無効化を求めない。SHA-256と、GitHubの配布ワークフローが付与するビルド来歴証明はWindowsのコード署名とは別の確認手段である。署名サービスや署名鍵を初回公開のために用意しない。
 
 配布物には競合復旧と対象選択の案内を含める。分類表と言語定義はアプリへ組み込み、VS Code由来の言語定義の利用条件の原文を同梱する。開発用文書一式は収録しない。
 
