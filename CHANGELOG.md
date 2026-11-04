@@ -6,6 +6,6 @@ Public release history starts at 0.1.0. A version listed here does not imply it 
 
 ## 0.1.0 — 未公開 / Unreleased
 
-初回公開版です。機能・対応範囲・制限は[日本語の案内](docs/releases/0.1.0.ja.md)と[English overview](docs/releases/0.1.0.en.md)を参照します。公開日と配布先は、公開の承認後に確定します。
+初回公開版です。機能・対応範囲・制限は[日本語の案内](docs/releases/0.1.0.ja.md)と[English overview](docs/releases/0.1.0.en.md)を参照します。公開日と配布物は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)で確認できます。0.1.0は公開準備中です。
 
-Initial public release. The publication date and download location will be added after publication is approved.
+Initial public release. See [GitHub Releases](https://github.com/YukiWorks432/FileHue/releases) for publication dates and downloads. Version 0.1.0 is being prepared for release.

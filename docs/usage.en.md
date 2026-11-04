@@ -2,7 +2,7 @@
 
 The GUI and auxiliary CLI target Windows 11 x64. See the [0.1.0 overview](releases/0.1.0.en.md) for supported scope and limitations. Downloading and previewing do not change Shell registration. Applying affects matching files for the current user, so review restoration before applying.
 
-Select “About” to see the application version and open the application and third-party licenses. Individual icon-pack terms are available in each pack's details.
+Select “About” to see the application version and open the application and third-party licenses. Choose “Open distribution page” to view published versions and downloads on GitHub Releases. Individual icon-pack terms are available in each pack's details.
 
 ## Before launching
 

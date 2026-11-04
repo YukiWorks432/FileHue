@@ -50,12 +50,7 @@ fn about_in_child(cx: &mut TestAppContext) {
         w.click("about-open", cx);
         w.render_frame(cx);
         assert!(manager.read(cx).about.open);
-        assert!(
-            w.find("about-distribution-unavailable")
-                .label()
-                .unwrap()
-                .contains("公開準備中")
-        );
+        w.click("about-distribution", cx);
         assert!(w.try_find("about-license-missing").is_none());
         w.click("about-license", cx);
         assert_eq!(
@@ -68,7 +63,10 @@ fn about_in_child(cx: &mut TestAppContext) {
         assert!(manager.read(cx).about.license_text.is_none());
     })
     .unwrap();
-    assert_eq!(cx.opened_url(), None);
+    assert_eq!(
+        cx.opened_url().as_deref(),
+        Some("https://github.com/YukiWorks432/FileHue/releases")
+    );
     cx.update_window(window, |_, w, cx| {
         w.click("about-third-party", cx);
     })
@@ -79,7 +77,7 @@ fn about_in_child(cx: &mut TestAppContext) {
     );
     cx.update_window(window, |_, w, cx| {
         manager.update(cx, |m, cx| {
-            m.about.distribution_url = Some("https://example.org/releases");
+            m.settings.language = "en".into();
             cx.notify();
         });
         w.render_frame(cx);
@@ -88,22 +86,15 @@ fn about_in_child(cx: &mut TestAppContext) {
     .unwrap();
     assert_eq!(
         cx.opened_url().as_deref(),
-        Some("https://example.org/releases")
+        Some("https://github.com/YukiWorks432/FileHue/releases")
     );
     std::fs::remove_file(root.join("LICENSE")).unwrap();
     cx.update_window(window, |_, w, cx| {
         manager.update(cx, |m, cx| {
-            m.about.distribution_url = None;
             m.settings.language = "en".into();
             cx.notify();
         });
         w.render_frame(cx);
-        assert!(
-            w.find("about-distribution-unavailable")
-                .label()
-                .unwrap()
-                .contains("not available")
-        );
         assert!(
             w.find("about-license-missing")
                 .label()
@@ -117,7 +108,7 @@ fn about_in_child(cx: &mut TestAppContext) {
     .unwrap();
     assert_eq!(
         cx.opened_url().as_deref(),
-        Some("https://example.org/releases")
+        Some("https://github.com/YukiWorks432/FileHue/releases")
     );
     cx.update_window(window, |_, w, cx| {
         w.press("escape", cx);
@@ -152,12 +143,14 @@ fn about_visual_probe() {
                 for (name, lang, mode, width, height, font, present) in [
                     ("ja-dark", "ja", ThemeMode::Dark, 1120., 780., 16., true),
                     ("en-light", "en", ThemeMode::Light, 1120., 780., 16., true),
+                    ("ja-light", "ja", ThemeMode::Light, 1120., 780., 16., true),
+                    ("en-dark", "en", ThemeMode::Dark, 1120., 780., 16., true),
                     (
                         "ja-narrow-missing",
                         "ja",
                         ThemeMode::Dark,
                         640.,
-                        700.,
+                        640.,
                         18.,
                         false,
                     ),
@@ -166,7 +159,7 @@ fn about_visual_probe() {
                         "en",
                         ThemeMode::Light,
                         640.,
-                        700.,
+                        640.,
                         18.,
                         false,
                     ),

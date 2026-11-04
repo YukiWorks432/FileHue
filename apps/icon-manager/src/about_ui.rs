@@ -3,13 +3,12 @@ use super::*;
 use gpui_kit::component::scroll::ScrollableElement;
 use gpui_kit::prelude::FluentBuilder;
 
-// 公開先の実在を確認した後、公開版の準備時に設定する。
-const DISTRIBUTION_URL: Option<&str> = None;
+// 公開済みの版と配布物は、この一覧で確認する。
+const DISTRIBUTION_URL: &str = "https://github.com/YukiWorks432/FileHue/releases";
 
 pub(super) struct About {
     pub(super) open: bool,
     pub(super) executable_dir: Option<PathBuf>,
-    pub(super) distribution_url: Option<&'static str>,
     pub(super) license_text: Option<String>,
     license_error: bool,
     pub(super) scroll: ScrollHandle,
@@ -22,7 +21,6 @@ impl Default for About {
             executable_dir: std::env::current_exe()
                 .ok()
                 .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf)),
-            distribution_url: DISTRIBUTION_URL,
             license_text: None,
             license_error: false,
             scroll: ScrollHandle::new(),
@@ -60,16 +58,10 @@ impl Manager {
                 )))
                 .child(div().flex().items_start().child(theme::button("about-distribution", cx)
                     .label(self.text("配布ページを開く", "Open distribution page"))
-                    .disabled_elevated(self.about.distribution_url.is_none())
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        if let Some(url) = this.about.distribution_url { cx.open_url(url); }
+                    .on_click(cx.listener(|_, _, _, cx| {
+                        cx.open_url(DISTRIBUTION_URL);
                     }))))
-                .when(self.about.distribution_url.is_none(), |card| card.child(
-                    self.about_notice("about-distribution-unavailable", self.text(
-                        "配布ページは公開準備中です。",
-                        "The distribution page is not available yet.",
-                    ), cx)
-                )))
+            )
             .child(theme::card(cx).p_4().flex().flex_col().gap_3()
                 .child(div().text_lg().font_weight(FontWeight::SEMIBOLD)
                     .child(self.text("ライセンス", "Licenses")))
