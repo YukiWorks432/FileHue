@@ -4,7 +4,7 @@
 
 Windows 11 x64の標準エクスプローラーで、VS Codeのファイルアイコンテーマを使うRust製アプリです。ファイルの内容や既定のアプリを変更せず、ファイル名と拡張子からアイコンを選びます。
 
-配布先は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)です。公開済みの版、公開日、Windows x64向けZIPと`SHA256SUMS.txt`を確認できます。0.1.0は公開準備中で、初回は未署名で配布します。0.1.0の機能と制限は[初回リリースの案内](docs/releases/0.1.0.ja.md)、配布前の確認は[配布手順](docs/distribution.ja.md)を参照します。
+[v0.1.0を公開しました](https://github.com/YukiWorks432/FileHue/releases/tag/v0.1.0)。リリースページから、未署名のWindows x64向けZIPと`SHA256SUMS.txt`を取得できます。導入は[使い方](docs/usage.ja.md)、機能と制限は[初回リリースの案内](docs/releases/0.1.0.ja.md)を参照してください。ほかの版は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)、配布物を作る開発者は[配布手順](docs/distribution.ja.md)を確認します。
 
 ![FileHueの適用前後のエクスプローラー比較。AGENTS.md、Cargo.toml、package.json、tsconfig.jsonにはファイル名に対応するアイコンを表示します。](docs/assets/explorer/comparison.ja.png)
 
@@ -39,7 +39,7 @@ WindowsのMSVC環境、Rust、PowerShell 7.4以降、[just](https://just.systems
 | `just audit` | 製品をビルドする前に、固定版cargo-denyで依存と例外期限を監査する |
 | `just licenses` | 第三者の権利表示、選択結果、閲覧用HTMLを生成する |
 | `just check-binaries --folder <フォルダー>` | EXE・DLLに残るビルド元のパスを検査する |
-| `just package` | 検証用ZIPを作成します。新しい公開先では`--public-candidate`で公開候補を明示します |
+| `just package` | 検証用ZIPを作成します。公開候補は`--public-candidate`で明示します |
 
 GUIの起動だけではShell登録を変更しません。通常の起動・CLIは利用者の設定を使い、`just smoke` と自動試験は専用の領域を使います。ビルド、試験、配布確認の詳細は[開発と検証](docs/development.ja.md)、変更時の規約は[貢献手順](CONTRIBUTING.md)を参照します。
 

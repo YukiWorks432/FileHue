@@ -1,6 +1,6 @@
 # アーキテクチャ
 
-Rust製のテーマ処理、取得、Windows統合と、GPUI / GPUI Kit製GUI、補助CLIを分離する。ここには採用中の構成と保存・登録の安全境界を記述する。依存版はCargo.lockを正本とし、未対応範囲は[要求仕様](requirements.ja.md#対応範囲と公開前の判断)に従う。
+Rust製のテーマ処理、取得、Windows統合と、GPUI / GPUI Kit製GUI、補助CLIを分離する。ここには採用中の構成と保存・登録の安全境界を記述する。依存版はCargo.lockを正本とし、未対応範囲は[要求仕様](requirements.ja.md#対応範囲と配布方針)に従う。
 
 ## 構成と責務
 
