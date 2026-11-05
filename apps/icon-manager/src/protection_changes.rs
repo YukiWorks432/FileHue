@@ -248,6 +248,7 @@ impl Manager {
             theme::button("protection-changes-pending", cx)
                 .small()
                 .label(self.text("保存予定", "Pending save"))
+                .disabled_elevated(self.protection.loading || self.protection.error.is_some())
                 .selected(!self.protection.changes_recommended)
                 .when(!self.protection.changes_recommended, |button| {
                     button

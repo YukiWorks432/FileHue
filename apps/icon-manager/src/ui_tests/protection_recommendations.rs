@@ -94,6 +94,24 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("保護 → パック許可")
         );
+        manager.update(cx, |this, cx| {
+            this.protection.error = Some("inspection failed".into());
+            cx.notify();
+        });
+        w.render_frame(cx);
+        w.click("protection-changes-pending", cx);
+        w.render_frame(cx);
+        assert!(
+            w.find("protection-change-row-mts")
+                .label()
+                .unwrap()
+                .contains("保護 → パック許可")
+        );
+        manager.update(cx, |this, cx| {
+            this.protection.error = None;
+            cx.notify();
+        });
+        w.render_frame(cx);
         w.click("protection-change-edit-mts", cx);
         w.render_frame(cx);
         super::protection_sources::reveal(w, "original-icon-mts", cx);
