@@ -65,7 +65,7 @@ GUIの起動だけでは登録は変わらない。通常のGUI・CLI操作は�
 `xtask/` に配布・検証・プロセス制御を置き、`.cargo/config.toml` の別名から `cargo xtask` として呼び出す。通常はjustから実行する。
 
 - `just package [--profile debug|release] [--allow-dirty]`: 検証用ZIP・展開内容・`SHA256SUMS.txt`を一つの出力フォルダーへ作成する。
-- `just package --public-candidate`: 新しい公開先のクリーンなコミットから未署名の公開候補を作成する。GitHub CLIも必要とする。
+- `just package --public-candidate`: 公開リポジトリのクリーンなコミットから未署名の公開候補を作成する。GitHub CLIも必要とする。
 - `cargo xtask package --verify <展開先> [--metadata <外部記録のフォルダー>] [--public-candidate]`: 指定した用途とZIP外のマニフェスト・権利確認記録を照合する。外部記録の既定は展開先の親フォルダー。
 - `just verify-release --report <報告書> [--public-candidate]`: Windows 11で、作成から配布DLL・GUI・CLI・文書の確認まで行う。CIでは`--skip-shell`を指定し、同梱DLLの実Shell試験を省略する。省略時は報告書に`shell_sta_mta=not-run`と`probe_sha256=null`を記録する。既存ZIPには `--archive <ZIP>` を指定し、隣接する`SHA256SUMS.txt`も保持する。公開候補の報告にはローカルパスと生ログの場所を含めない。
 - `just check-docs`: 文書の相対リンクを照合する。

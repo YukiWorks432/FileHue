@@ -1249,5 +1249,6 @@ mod target_visual;
 
 mod extensionless_protection;
 mod performance;
+mod protection_recommendations;
 mod protection_sources;
 mod target_protection;

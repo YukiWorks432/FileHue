@@ -3,6 +3,7 @@
 pub mod bounded_json;
 mod categories;
 mod language_catalog;
+pub mod recommendations;
 pub mod registry;
 pub mod storage;
 pub mod theme;

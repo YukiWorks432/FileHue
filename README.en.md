@@ -4,7 +4,7 @@ English | [日本語](README.md)
 
 A Rust application that brings VS Code file icon themes to Windows 11 x64 File Explorer. Icons are selected by filename and extension while preserving file contents and default applications.
 
-Find published versions, release dates, Windows x64 ZIPs, and `SHA256SUMS.txt` on [GitHub Releases](https://github.com/YukiWorks432/FileHue/releases). Version 0.1.0 is being prepared for release and will be unsigned. See the [initial release overview](docs/releases/0.1.0.en.md) for features and limitations. See the Japanese [distribution guide](docs/distribution.ja.md) for build and distribution checks.
+[v0.1.0 is available](https://github.com/YukiWorks432/FileHue/releases/tag/v0.1.0). Download the unsigned Windows x64 ZIP and `SHA256SUMS.txt` from the release page. Start with the [usage guide](docs/usage.en.md), or read the [initial release overview](docs/releases/0.1.0.en.md) for features and limitations. Find other versions on [GitHub Releases](https://github.com/YukiWorks432/FileHue/releases). Developers preparing distributions should follow the Japanese [distribution guide](docs/distribution.ja.md).
 
 ![File Explorer before and after applying FileHue. AGENTS.md, Cargo.toml, package.json, and tsconfig.json receive filename-specific icons.](docs/assets/explorer/comparison.en.png)
 
@@ -37,7 +37,7 @@ Install the Windows MSVC toolchain, Rust, PowerShell 7.4 or later, and [just](ht
 | `just audit` | Audit dependencies and exception deadlines with pinned cargo-deny before compiling the application |
 | `just licenses` | Generate third-party notices, license selections, and an offline HTML document |
 | `just check-binaries --folder <directory>` | Check distribution EXEs and DLLs for embedded build paths |
-| `just package` | Create a validation ZIP; public distribution requires separate preparation |
+| `just package` | Create a validation ZIP; add `--public-candidate` to prepare a public release candidate |
 
 Install the audit tool in advance with `cargo install cargo-deny --version 0.20.2 --locked`. Run `just audit` before compiling candidate dependency updates; see the Japanese [dependency policy](docs/dependency-security.ja.md).
 
