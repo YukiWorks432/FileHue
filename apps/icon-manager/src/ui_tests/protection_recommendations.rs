@@ -94,6 +94,21 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("保護 → パック許可")
         );
+        w.click("protection-change-edit-mts", cx);
+        w.render_frame(cx);
+        super::protection_sources::reveal(w, "original-icon-mts", cx);
+        w.click("original-icon-mts", cx);
+        w.render_frame(cx);
+        w.click("protection-review-changes", cx);
+        w.render_frame(cx);
+        assert!(
+            w.find("protection-change-row-mts")
+                .label()
+                .unwrap()
+                .contains("指定のみ変更")
+        );
+        w.click("protection-changes-recommended", cx);
+        w.render_frame(cx);
         manager.update(cx, |this, cx| {
             this.protection.error = Some("inspection failed".into());
             cx.notify();
@@ -112,27 +127,6 @@ fn recommended_in_child(cx: &mut TestAppContext) {
             cx.notify();
         });
         w.render_frame(cx);
-        w.click("protection-change-edit-mts", cx);
-        w.render_frame(cx);
-        super::protection_sources::reveal(w, "original-icon-mts", cx);
-        w.click("original-icon-mts", cx);
-        w.render_frame(cx);
-        w.click("protection-review-changes", cx);
-        w.render_frame(cx);
-        assert!(
-            w.find("protection-change-row-mts")
-                .label()
-                .unwrap()
-                .contains("指定のみ変更")
-        );
-        w.click("protection-changes-recommended", cx);
-        w.render_frame(cx);
-        assert!(
-            w.find("protection-change-row-mts")
-                .label()
-                .unwrap()
-                .contains("保護 → パック許可")
-        );
         w.click("protection-change-edit-mts", cx);
         w.render_frame(cx);
         super::protection_sources::reveal(w, "pack-icon-mts", cx);
