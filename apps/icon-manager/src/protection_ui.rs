@@ -373,7 +373,11 @@ impl Manager {
             source.update_protection(&self.protection.rules, self.protection.draft);
         }
         sources.sort_by_cached_key(|source| {
-            (display_group(source), source.registration.extension.clone())
+            (
+                !source.registration.extension.is_empty(),
+                display_group(source),
+                source.registration.extension.clone(),
+            )
         });
         self.protection.rows = sources.iter().map(|r| r.registration.clone()).collect();
         self.protection.sources = sources;
@@ -384,6 +388,7 @@ impl Manager {
         let by_extension = &self.protection.source_by_extension;
         self.protection.current_rows.sort_by_cached_key(|r| {
             (
+                !r.extension.is_empty(),
                 by_extension
                     .get(&r.extension)
                     .map(|i| display_group(&sources[*i])),

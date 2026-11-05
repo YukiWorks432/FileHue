@@ -291,6 +291,37 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("Check a filename")
         );
+        // 識別子の辞書順では先になるアプリと並べても、拡張子なしを先頭へ出す。
+        manager.update(cx, |this, cx| {
+            let mut sources = this.protection.sources.clone();
+            for source in &mut sources {
+                if !source.registration.extension.is_empty() {
+                    source.provider_id = Some("application:order-fixture".into());
+                    source.provider_name = Some("Example Editor".into());
+                }
+            }
+            this.accept_protection_sources(sources);
+            this.refresh_protection_policy(cx);
+        });
+        w.render_frame(cx);
+        w.click("protection-collapse-all", cx);
+        w.render_frame(cx);
+        w.press("home", cx);
+        w.render_frame(cx);
+        assert!(
+            w.find("provider-toggle-extensionless").bounds().top()
+                < w.find("provider-toggle-application:order-fixture")
+                    .bounds()
+                    .top()
+        );
+        w.click("protection-expand-all", cx);
+        w.render_frame(cx);
+        assert!(
+            w.find("provider-toggle-extensionless").bounds().top()
+                < w.find("provider-toggle-application:order-fixture")
+                    .bounds()
+                    .top()
+        );
     })
     .unwrap();
     assert!(

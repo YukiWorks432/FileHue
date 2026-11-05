@@ -1073,11 +1073,17 @@ fn extensionless_protection_visual_probe() {
     std::fs::create_dir_all(&output).unwrap();
     let registry = super::extensionless_protection::fixture();
     let settings = load().unwrap();
-    let rows = file_icons_windows::inspect_existing_icons(&settings.packs[0], &settings)
+    let mut rows = file_icons_windows::inspect_existing_icons(&settings.packs[0], &settings)
         .unwrap()
         .into_iter()
         .filter(|row| row.registration.extension.is_empty() || row.registration.extension == "mts")
         .collect::<Vec<_>>();
+    for row in &mut rows {
+        if !row.registration.extension.is_empty() {
+            row.provider_id = Some("application:order-fixture".into());
+            row.provider_name = Some("Example Editor".into());
+        }
+    }
     application()
         .with_assets(crate::ui_assets::Assets)
         .run(move |cx| {
