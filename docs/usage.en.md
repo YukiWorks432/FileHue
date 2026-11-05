@@ -114,3 +114,5 @@ Packaged Windows apps use their resolved display names and application icons. Re
 ## Recommended settings for developers
 
 In **Icon protection**, click **Recommended settings** once to prefer pack icons for VS Code and common development file types, including sources, scripts, JSON, YAML, TOML, and Markdown. This enables default protection and replaces overrides for the recommended types. Video files sharing `.ts` or `.mts` are affected too. Adjust individual types if needed, then choose **Save** or **Save and reapply**. Returning without saving discards the draft. Registrations requiring review remain protected until reviewed individually.
+
+Use **View changes** to compare the last recommended action or the pending save. Choose **Edit** on a row to return to its protection setting. Allowing a pack does not guarantee that an icon will change.

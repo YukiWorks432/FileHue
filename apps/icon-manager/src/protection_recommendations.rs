@@ -56,17 +56,20 @@ impl Manager {
         }
         self.pin_visible_protection_rows();
         let rules = recommended_rules(self.protection.rules.clone(), &self.protection.sources);
-        let unchanged = self.protection.draft && rules == self.protection.rules;
-        let changed = self
+        self.protection.recommendation_changes = Some(super::changes::compare(
+            &self.protection.sources,
+            self.protection.draft,
+            &self.protection.rules,
+            true,
+            &rules,
+        ));
+        let (released, protected, choices) = self
             .protection
-            .sources
-            .iter()
-            .filter(|row| {
-                let mut next = (*row).clone();
-                next.update_protection(&rules, true);
-                next.protect != row.protect
-            })
-            .count();
+            .recommendation_changes
+            .as_ref()
+            .unwrap()
+            .counts();
+        let unchanged = self.protection.draft && rules == self.protection.rules;
         let review = self
             .protection
             .sources
@@ -84,11 +87,11 @@ impl Manager {
             .into()
         } else if self.settings.language == "en" {
             format!(
-                "Developer settings updated: {changed} types changed, {review} require review. Save to confirm."
+                "Recommended: {released} unprotected, {protected} protected, {choices} choices changed, {review} require review. Save to confirm."
             )
         } else {
             format!(
-                "おすすめ設定を反映しました。表示方針変更: {changed}種類・要確認: {review}種類。保存で確定します。"
+                "おすすめ設定: 保護解除 {released}・保護追加 {protected}・指定のみ変更 {choices}・要確認 {review}。保存で確定します。"
             )
         });
     }

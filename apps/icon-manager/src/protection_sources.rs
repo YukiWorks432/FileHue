@@ -103,7 +103,7 @@ impl Manager {
         SampleDisplay::Pack(path.to_path_buf())
     }
 
-    fn protection_result(
+    pub(super) fn protection_result(
         &self,
         source: &ExistingIcon,
         after_save: bool,

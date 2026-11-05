@@ -41,7 +41,13 @@ impl Manager {
             self.focus.focus(window, cx);
             cx.notify();
         } else if self.protection.open {
-            self.close_protection(window, cx);
+            if self.protection.changes_open {
+                self.protection.changes_open = false;
+                self.focus.focus(window, cx);
+                cx.notify();
+            } else {
+                self.close_protection(window, cx);
+            }
         } else if self.recovery.is_open() {
             self.close_recovery(window, cx);
         } else if self.targets.pack.is_some() {

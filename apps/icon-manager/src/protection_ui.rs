@@ -2,6 +2,8 @@
 use super::*;
 use file_icons_windows::{ExistingIcon, IconExclusion, IconProtectionRules, ProtectionReason};
 use gpui_kit::prelude::FluentBuilder;
+#[path = "protection_changes.rs"]
+mod changes;
 #[path = "protection_recommendations.rs"]
 mod recommendations;
 #[path = "protection_sources.rs"]
@@ -74,6 +76,10 @@ pub(super) struct Editor {
     previous_focus: Option<FocusHandle>,
     pub(super) inspection: u64,
     recommendation_notice: Option<String>,
+    pub(super) changes_open: bool,
+    changes_recommended: bool,
+    recommendation_changes: Option<changes::Changes>,
+    changes_scroll: ScrollHandle,
     picker: Option<Entity<SelectState<Vec<PackOption>>>>,
     picker_subscription: Option<Subscription>,
 }
@@ -193,6 +199,8 @@ impl Manager {
         // 未表示行も測定し、ホイールとスクロールバーが全件の高さを参照できるようにする。
         self.protection.list = Some(ListState::new(0, ListAlignment::Top, px(0.)).measure_all());
         self.protection.open = true;
+        self.protection.changes_open = false;
+        self.protection.recommendation_changes = None;
         if !from_targets {
             self.protection.draft = self.settings.preserve_existing_icons;
             self.protection.rules = self.settings.icon_protection_rules.clone();
@@ -579,6 +587,9 @@ impl Manager {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        if self.protection.changes_open {
+            return self.protection_changes_panel(cx);
+        }
         let metrics = (window.rem_size(), self.settings.language.clone());
         if self.protection.text_metrics.as_ref() != Some(&metrics) {
             if let Some(list) = &self.protection.list {
@@ -676,6 +687,17 @@ impl Manager {
                 .label(self.text("おすすめ設定", "Recommended settings"))
                 .disabled_elevated(blocked || self.protection.error.is_some())
                 .on_click(cx.listener(|this, _, _, cx| this.apply_recommended_protection(cx))),
+        );
+        packs = packs.child(
+            theme::button("protection-recommended-changes", cx)
+                .small()
+                .label(self.text("変更内容を見る", "View changes"))
+                .disabled_elevated(blocked || self.protection.recommendation_changes.is_none())
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.protection.changes_recommended = true;
+                    this.protection.changes_open = true;
+                    cx.notify();
+                })),
         );
         settings = settings.child(packs);
         let current = if self.protection.pack.as_ref() == self.settings.active.as_ref() {
@@ -1009,6 +1031,17 @@ impl Manager {
                         } else {
                             self.text("保存済み", "Saved")
                         }),
+                )
+                .child(
+                    theme::button("protection-review-changes", cx)
+                        .small()
+                        .label(self.text("変更内容を見る", "View changes"))
+                        .disabled_elevated(blocked || !dirty)
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.protection.changes_recommended = false;
+                            this.protection.changes_open = true;
+                            cx.notify();
+                        })),
                 )
                 .child(
                     theme::button("protection-back", cx)

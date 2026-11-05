@@ -82,6 +82,46 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     .unwrap();
     cx.run_until_parked();
     assert!(cx.read(|cx| manager.read(cx).protection.source("mts").unwrap().protect));
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("protection-recommended", cx);
+        w.render_frame(cx);
+        w.click("protection-recommended-changes", cx);
+        w.render_frame(cx);
+        assert!(
+            w.find("protection-change-row-mts")
+                .label()
+                .unwrap()
+                .contains("保護 → パック許可")
+        );
+        w.click("protection-change-edit-mts", cx);
+        w.render_frame(cx);
+        super::protection_sources::reveal(w, "original-icon-mts", cx);
+        w.click("original-icon-mts", cx);
+        w.render_frame(cx);
+        w.click("protection-review-changes", cx);
+        w.render_frame(cx);
+        assert!(
+            w.find("protection-change-row-mts")
+                .label()
+                .unwrap()
+                .contains("指定のみ変更")
+        );
+        w.click("protection-changes-recommended", cx);
+        w.render_frame(cx);
+        assert!(
+            w.find("protection-change-row-mts")
+                .label()
+                .unwrap()
+                .contains("保護 → パック許可")
+        );
+        w.click("protection-change-edit-mts", cx);
+        w.render_frame(cx);
+        super::protection_sources::reveal(w, "pack-icon-mts", cx);
+        w.click("pack-icon-mts", cx);
+    })
+    .unwrap();
+    assert_eq!(serde_json::to_value(load().unwrap()).unwrap(), before);
     // 保存先の置換を一時的に拒否し、実際の保存失敗から再試行まで確認する。
     use std::os::windows::fs::OpenOptionsExt;
     let locked = std::fs::OpenOptions::new()
@@ -155,11 +195,14 @@ fn recommended_visual_probe() {
                             });
                             manager.update(cx, |this, cx| {
                                 this.settings.language = language.into();
+                                this.protection.changes_open = false;
                                 cx.notify();
                             });
                             w.resize(size(px(width), px(640.)));
                             w.render_frame(cx);
                             w.click("protection-recommended", cx);
+                            w.render_frame(cx);
+                            w.click("protection-recommended-changes", cx);
                             w.render_frame(cx);
                         })
                         .unwrap();
