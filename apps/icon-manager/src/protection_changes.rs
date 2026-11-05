@@ -85,6 +85,7 @@ pub(super) fn compare(
 
 impl Manager {
     pub(super) fn protection_changes_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        use gpui_kit::assets::IconName;
         let colors = cx.theme().colors;
         let changes = if self.protection.changes_recommended {
             self.protection.recommendation_changes.clone().unwrap()
@@ -137,56 +138,56 @@ impl Manager {
             };
             let target = row.extension.clone();
             let label = format!("{extension} · {} · {description}", row.provider);
-            list = list.child(
-                div()
-                    .id(SharedString::from(format!(
-                        "protection-change-row-{target}"
-                    )))
-                    .role(Role::Group)
-                    .aria_label(label.clone())
-                    .border_b_1()
-                    .border_color(colors.border)
-                    .py_2()
-                    .flex()
-                    .flex_wrap()
-                    .items_center()
-                    .gap_2()
-                    .child(div().flex_1().min_w_0().child(label))
-                    .child(
-                        theme::button(
-                            SharedString::from(format!("protection-change-edit-{target}")),
-                            cx,
-                        )
-                        .small()
-                        .label(self.text("編集", "Edit"))
-                        .disabled_elevated(self.protection.source(&target).is_none())
-                        .on_click(cx.listener(
-                            move |this, _, window, cx| {
-                                this.protection.changes_open = false;
-                                this.protection.filter = Filter::All;
-                                this.protection.pinned.clear();
-                                if let Some(source) = this.protection.source(&target) {
-                                    let group = source.group_id();
-                                    this.protection.collapsed.remove(&group);
-                                }
-                                this.reset_protection_list();
-                                if let Some(index) =
-                                    this.protection.visible_rows.iter().position(|ix| {
-                                        this.protection.rows[*ix].extension == target
-                                    })
-                                    && let Some(list) = &this.protection.list
-                                {
-                                    list.scroll_to(ListOffset {
-                                        item_ix: index,
-                                        offset_in_item: px(0.),
-                                    });
-                                }
-                                this.focus.focus(window, cx);
-                                cx.notify();
-                            },
-                        )),
-                    ),
-            );
+            let row_element = div()
+                .id(SharedString::from(format!(
+                    "protection-change-row-{target}"
+                )))
+                .role(Role::Group)
+                .aria_label(label.clone())
+                .border_b_1()
+                .border_color(colors.border)
+                .py_2()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap_2()
+                .child(div().flex_1().min_w_0().child(label))
+                .child(
+                    theme::button(
+                        SharedString::from(format!("protection-change-edit-{target}")),
+                        cx,
+                    )
+                    .small()
+                    .label(self.text("編集", "Edit"))
+                    .disabled_elevated(self.protection.source(&target).is_none())
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.protection.changes_open = false;
+                        this.protection.filter = Filter::All;
+                        this.protection.pinned.clear();
+                        if let Some(source) = this.protection.source(&target) {
+                            let group = source.group_id();
+                            this.protection.collapsed.remove(&group);
+                        }
+                        this.reset_protection_list();
+                        if let Some(index) = this
+                            .protection
+                            .visible_rows
+                            .iter()
+                            .position(|ix| this.protection.rows[*ix].extension == target)
+                            && let Some(list) = &this.protection.list
+                        {
+                            list.scroll_to(ListOffset {
+                                item_ix: index,
+                                offset_in_item: px(0.),
+                            });
+                        }
+                        this.focus.focus(window, cx);
+                        cx.notify();
+                    })),
+                );
+            #[cfg(feature = "test-support")]
+            let row_element = row_element.test_support();
+            list = list.child(row_element);
             if !self.protection.changes_recommended
                 && let Some(source) = self.protection.source(&row.extension)
             {
@@ -248,6 +249,11 @@ impl Manager {
                 .small()
                 .label(self.text("保存予定", "Pending save"))
                 .selected(!self.protection.changes_recommended)
+                .when(!self.protection.changes_recommended, |button| {
+                    button
+                        .icon(IconName::Check)
+                        .font_weight(FontWeight::SEMIBOLD)
+                })
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.protection.changes_recommended = false;
                     cx.notify();
@@ -258,6 +264,11 @@ impl Manager {
                 .small()
                 .label(self.text("直前のおすすめ操作", "Last recommended action"))
                 .selected(self.protection.changes_recommended)
+                .when(self.protection.changes_recommended, |button| {
+                    button
+                        .icon(IconName::Check)
+                        .font_weight(FontWeight::SEMIBOLD)
+                })
                 .disabled_elevated(self.protection.recommendation_changes.is_none())
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.protection.changes_recommended = true;

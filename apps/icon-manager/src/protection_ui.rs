@@ -311,7 +311,25 @@ impl Manager {
         self.protection.previews_loading = true;
         let executor = cx.background_executor().clone();
         let include_saved = self.protection.open;
-        let retained = self.protection.retained.iter().cloned().collect();
+        let mut retained: Vec<_> = self.protection.retained.iter().cloned().collect();
+        if include_saved {
+            retained.extend(
+                self.settings
+                    .icon_protection_rules
+                    .extensions
+                    .keys()
+                    .cloned(),
+            );
+            retained.extend(
+                self.settings
+                    .icon_protection_rules
+                    .providers
+                    .values()
+                    .flat_map(|rules| rules.keys().cloned()),
+            );
+            retained.sort();
+            retained.dedup();
+        }
         let task = executor.spawn(async move {
             service.inspect_icon_sources(id.as_deref(), enabled, rules, include_saved, retained)
         });
@@ -1036,7 +1054,7 @@ impl Manager {
                     theme::button("protection-review-changes", cx)
                         .small()
                         .label(self.text("変更内容を見る", "View changes"))
-                        .disabled_elevated(blocked || !dirty)
+                        .disabled_elevated(blocked || self.protection.error.is_some() || !dirty)
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.protection.changes_recommended = false;
                             this.protection.changes_open = true;

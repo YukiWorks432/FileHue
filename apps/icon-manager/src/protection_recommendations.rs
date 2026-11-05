@@ -56,19 +56,15 @@ impl Manager {
         }
         self.pin_visible_protection_rows();
         let rules = recommended_rules(self.protection.rules.clone(), &self.protection.sources);
-        self.protection.recommendation_changes = Some(super::changes::compare(
+        let changes = super::changes::compare(
             &self.protection.sources,
             self.protection.draft,
             &self.protection.rules,
             true,
             &rules,
-        ));
-        let (released, protected, choices) = self
-            .protection
-            .recommendation_changes
-            .as_ref()
-            .unwrap()
-            .counts();
+        );
+        let (released, protected, choices) = changes.counts();
+        self.protection.recommendation_changes = Some(changes);
         let unchanged = self.protection.draft && rules == self.protection.rules;
         let review = self
             .protection

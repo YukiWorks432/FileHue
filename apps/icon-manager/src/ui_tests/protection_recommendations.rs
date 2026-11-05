@@ -152,6 +152,37 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(!load().unwrap().icon_protection_rules.extensions["mts"].protect);
     assert!(load().unwrap().preserve_existing_icons);
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_sources::reveal(w, "pack-icon-m2ts", cx);
+        w.click("pack-icon-m2ts", cx);
+        w.render_frame(cx);
+        w.click("protection-save", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(!load().unwrap().icon_protection_rules.extensions["m2ts"].protect);
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_sources::reveal(w, "default-icon-m2ts", cx);
+        w.click("default-icon-m2ts", cx);
+        w.render_frame(cx);
+        w.click("protection-refresh", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("protection-review-changes", cx);
+        w.render_frame(cx);
+        assert!(
+            w.find("protection-change-row-m2ts")
+                .label()
+                .unwrap()
+                .contains("パック許可 → 保護")
+        );
+    })
+    .unwrap();
 }
 
 #[test]
@@ -181,6 +212,13 @@ fn recommended_visual_probe() {
                     .timer(std::time::Duration::from_secs(2))
                     .await;
                 manager.update(cx, |this, _| this.protection.visual_sources(sources));
+                window
+                    .update(cx, |_, w, cx| {
+                        w.render_frame(cx);
+                        w.click("protection-recommended", cx);
+                        w.render_frame(cx);
+                    })
+                    .unwrap();
                 for (language, mode, width, font) in [
                     ("ja", ThemeMode::Dark, 1120., 16.),
                     ("en", ThemeMode::Light, 1120., 16.),
@@ -200,8 +238,6 @@ fn recommended_visual_probe() {
                             });
                             w.resize(size(px(width), px(640.)));
                             w.render_frame(cx);
-                            w.click("protection-recommended", cx);
-                            w.render_frame(cx);
                             w.click("protection-recommended-changes", cx);
                             w.render_frame(cx);
                         })
@@ -215,6 +251,12 @@ fn recommended_visual_probe() {
                             w.render_to_image()
                                 .unwrap()
                                 .save(output.join(format!("recommended-{language}-{width}.png")))
+                                .unwrap();
+                            w.click("protection-changes-pending", cx);
+                            w.render_frame(cx);
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join(format!("pending-{language}-{width}.png")))
                                 .unwrap();
                         })
                         .unwrap();
