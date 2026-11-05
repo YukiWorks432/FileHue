@@ -2,6 +2,8 @@
 use super::*;
 use file_icons_windows::{ExistingIcon, IconExclusion, IconProtectionRules, ProtectionReason};
 use gpui_kit::prelude::FluentBuilder;
+#[path = "protection_recommendations.rs"]
+mod recommendations;
 #[path = "protection_sources.rs"]
 mod sources;
 use gpui_kit::component::{
@@ -71,6 +73,7 @@ pub(super) struct Editor {
     details: bool,
     previous_focus: Option<FocusHandle>,
     pub(super) inspection: u64,
+    recommendation_notice: Option<String>,
     picker: Option<Entity<SelectState<Vec<PackOption>>>>,
     picker_subscription: Option<Subscription>,
 }
@@ -276,6 +279,7 @@ impl Manager {
     }
 
     pub(super) fn inspect_protection(&mut self, cx: &mut Context<Self>) {
+        self.protection.recommendation_notice = None;
         self.targets.invalidate();
         self.protection.inspection += 1;
         let inspection = self.protection.inspection;
@@ -451,6 +455,7 @@ impl Manager {
             .collect();
     }
     pub(super) fn refresh_protection_policy(&mut self, cx: &mut Context<Self>) {
+        self.protection.recommendation_notice = None;
         self.targets.invalidate();
         for source in &mut self.protection.sources {
             source.update_protection(&self.protection.rules, self.protection.draft);
@@ -663,13 +668,24 @@ impl Manager {
                     .placeholder(self.text("パックがありません", "No icon packs")),
             );
         }
+        packs = packs.child(
+            theme::button("protection-recommended", cx)
+                .small()
+                .flex_shrink_0()
+                .ml_2()
+                .label(self.text("おすすめ設定", "Recommended settings"))
+                .disabled_elevated(blocked || self.protection.error.is_some())
+                .on_click(cx.listener(|this, _, _, cx| this.apply_recommended_protection(cx))),
+        );
         settings = settings.child(packs);
         let current = if self.protection.pack.as_ref() == self.settings.active.as_ref() {
             self.protection.current_rows.len()
         } else {
             0
         };
-        let summary = if self.protection.loading {
+        let summary = if let Some(notice) = &self.protection.recommendation_notice {
+            notice.clone()
+        } else if self.protection.loading {
             self.text("調査中…", "Checking…").into()
         } else if self.protection.pack.is_none() {
             self.text("パックなし", "No pack").into()
@@ -684,6 +700,10 @@ impl Manager {
                 format!("このパック: 保護 {kept}・パック許可 {replaced} / 適用中の除外: {current}")
             }
         };
+        let summary = format!("{} {summary}", self.text(
+            "おすすめ設定は全体保護をオンにし、VS Code・開発用の個別指定をパック優先にします。",
+            "Recommended settings enable default protection and prefer pack icons for VS Code and development types, replacing their overrides.",
+        ));
         if self.protection.previews_loading {
             settings = settings.child(
                 div()

@@ -1,6 +1,7 @@
 /target/
 /work/
 /dist/
+/plans/
 # 個別の監査結果はPR・CIの成果物またはwork/へ保存する。
 /docs/evidence/dependency-update-*.json
 /.env
