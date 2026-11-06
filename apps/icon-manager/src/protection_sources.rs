@@ -11,6 +11,7 @@ use gpui_kit::{
 enum SampleDisplay {
     Original,
     Pack(std::path::PathBuf),
+    ByName,
     Unknown,
 }
 
@@ -35,6 +36,30 @@ impl Editor {
             })
             .count()
     }
+
+    fn set_provider(&mut self, provider: &str, protect: Option<bool>) {
+        // 独立表示前に保存された拡張子なしの提供元指定も、別グループの操作では保持する。
+        let extensionless = self
+            .rules
+            .providers
+            .get(provider)
+            .and_then(|rules| rules.get(""))
+            .cloned();
+        let sources = self
+            .sources
+            .iter()
+            .filter(|row| !row.registration.extension.is_empty())
+            .cloned()
+            .collect::<Vec<_>>();
+        self.rules.set_provider(&sources, provider, protect);
+        if let Some(rule) = extensionless {
+            self.rules
+                .providers
+                .entry(provider.into())
+                .or_default()
+                .insert(String::new(), rule);
+        }
+    }
 }
 
 impl Manager {
@@ -50,10 +75,8 @@ impl Manager {
             return SampleDisplay::Unknown;
         };
         let extension = &source.registration.extension;
-        let sample = if extension.is_empty() {
-            "sample".to_owned()
-        } else {
-            format!("sample.{extension}")
+        let Some(sample) = sample_name(pack, extension) else {
+            return SampleDisplay::ByName;
         };
         let default_selection = file_icons_core::selection::Selection::default();
         let selection = if after_save {
@@ -129,6 +152,14 @@ impl Manager {
                 ),
             ),
             SampleDisplay::Pack(path) => (self.text("パックのアイコン", "Pack icon"), Some(path), ""),
+            SampleDisplay::ByName => (
+                self.text("ファイル名で確認", "Check a filename"),
+                None,
+                self.text(
+                    "名前パターンによって結果が変わります。「適用対象を選ぶ」で具体的なファイル名を確認してください。",
+                    "The result depends on the filename pattern. Check a specific filename in Choose targets.",
+                ),
+            ),
             SampleDisplay::Unknown => (
                 self.text("確認できません", "Unavailable"),
                 None,
@@ -147,12 +178,18 @@ impl Manager {
         } else {
             self.text("現在の見本", "Current preview")
         };
-        let sample = if extension.is_empty() {
-            "sample".into()
+        let sample = self.settings.active.as_ref().and_then(|active| {
+            self.settings
+                .packs
+                .iter()
+                .find(|pack| &pack.id == active)
+                .and_then(|pack| sample_name(pack, extension))
+        });
+        let label = if let Some(sample) = sample {
+            format!("{prefix} ({sample}): {name}")
         } else {
-            format!("sample.{extension}")
+            format!("{prefix}: {name}")
         };
-        let label = format!("{prefix} ({sample}): {name}");
         let icon = if let Some(path) = path {
             div().size_5().child(img(path).size_5()).into_any_element()
         } else {
@@ -203,8 +240,8 @@ impl Manager {
             .checked_sub(1)
             .and_then(|i| self.protection_rows().get(i))
             .and_then(|r| self.protection.source(&r.extension));
-        if previous.is_none_or(|p| p.group_id() != source.group_id()) {
-            let group_id = source.group_id();
+        if previous.is_none_or(|p| display_group(p) != display_group(source)) {
+            let group_id = display_group(source);
             let expanded = !self.protection.collapsed.contains(&group_id);
             let count = self
                 .protection
@@ -235,10 +272,19 @@ impl Manager {
                 let icon = icon.test_support();
                 heading = heading.child(icon);
             }
-            let name = source
-                .provider_name
-                .clone()
-                .unwrap_or_else(|| self.text("提供元不明", "Unknown provider").into());
+            let extensionless = source.registration.extension.is_empty();
+            let name = if extensionless {
+                self.text(
+                    "拡張子のないファイルなど",
+                    "Extensionless files and patterns",
+                )
+                .into()
+            } else {
+                source
+                    .provider_name
+                    .clone()
+                    .unwrap_or_else(|| self.text("提供元不明", "Unknown provider").into())
+            };
             use gpui_kit::{assets::IconName, component::Icon};
             heading = heading
                 .child(
@@ -254,7 +300,7 @@ impl Manager {
                         .flex_1()
                         .min_w_0()
                         .text_left()
-                        .truncate()
+                        .when(!extensionless, |name| name.truncate())
                         .child(name.clone()),
                 );
             let count_label = div()
@@ -334,6 +380,7 @@ impl Manager {
                 }));
             let mut group = div().flex().flex_col().child(div().p_2().child(trigger));
             if let Some(provider) = &source.provider_id
+                && !source.registration.extension.is_empty()
                 && expanded
             {
                 let original = self
@@ -348,10 +395,9 @@ impl Manager {
                     .iter()
                     .find(|p| Some(&p.id) == self.protection.pack.as_ref())
                     .and_then(|p| {
-                        p.theme
-                            .resolve(&format!("sample.{}", source.registration.extension))
-                    })
-                    .map(|p| p.to_path_buf());
+                        let sample = sample_name(p, &source.registration.extension)?;
+                        p.theme.resolve(&sample).map(|p| p.to_path_buf())
+                    });
                 let inherited = if self.protection.draft {
                     original.clone()
                 } else {
@@ -366,7 +412,7 @@ impl Manager {
                         self.text("このソフトのアイコンをまとめて保護します。種類ごとの個別指定は優先されます。", "Protect this software's icons. File type overrides take priority."),
                         self.text("ソフトの代表アイコンを取得できません。", "Software preview unavailable.")), cx))
                     .child(self.protection_preview(source, "provider-pack", pack,
-                        (self.text("パックのアイコン", "Pack icon"),
+                        (self.text("パックのアイコンを許可", "Allow pack icons"),
                         self.text("このソフトにパックのアイコンをまとめて許可します。種類ごとの個別指定と常時保護は優先されます。", "Allow pack icons for this software. File type overrides and mandatory protection take priority."),
                         self.text("代表画像です。各種類にはそれぞれ対応するパックのアイコンを使用します。", "Each file type uses its own corresponding pack icon.")), cx))
                     .child(self.protection_preview(source, "provider-default", inherited,
@@ -399,7 +445,9 @@ impl Manager {
                         .disabled_elevated(
                             blocked
                                 || (overrides == 0
-                                    && !self.protection.rules.providers.contains_key(provider)),
+                                    && !self.protection.rules.providers.get(provider).is_some_and(
+                                        |rules| rules.keys().any(|extension| !extension.is_empty()),
+                                    )),
                         )
                         .on_click(cx.listener(move |this, event, window, cx| {
                             this.confirm_reset_provider(&reset_source, event, window, cx);
@@ -430,12 +478,17 @@ impl Manager {
             .packs
             .iter()
             .find(|p| Some(&p.id) == self.protection.pack.as_ref())
-            .and_then(|p| p.theme.resolve(&format!("sample.{extension}")))
-            .map(|p| p.to_path_buf());
-        let inherited = self
-            .protection
-            .rules
-            .inherited_protection(source, self.protection.draft);
+            .and_then(|p| {
+                let sample = sample_name(p, &extension)?;
+                p.theme.resolve(&sample).map(|p| p.to_path_buf())
+            });
+        let inherited = if extension.is_empty() {
+            source.always_protected || self.protection.draft
+        } else {
+            self.protection
+                .rules
+                .inherited_protection(source, self.protection.draft)
+        };
         let inherited_path = if inherited {
             original.clone()
         } else {
@@ -560,11 +613,11 @@ impl Manager {
                     self.text("元のアイコンを維持します（保護）", "Keep the original icon (protected)"),
                     self.text("元アイコンの見本を取得できません。専用の処理やファイル固有の画像は表示できない場合があります。", "Original preview unavailable. Dynamic handlers and per-file images may not provide a preview.")), cx))
                 .child(self.protection_preview(source, "pack", pack,
-                    (self.text("パックのアイコン", "Pack icon"),
+                    (self.text("パックのアイコンを許可", "Allow pack icons"),
                     self.text("パックのアイコンへの変更を許可します", "Allow the icon pack to replace this icon"),
                     self.text("この種類に対応するパックの見本がありません。未対応のファイルには元の表示を使用します。", "No representative pack icon is available. Unsupported files keep their original appearance.")), cx))
                 .child(self.protection_preview(source, "default", inherited_path,
-                    (self.text("基本設定に従う", "Use software setting"),
+                    (if extension.is_empty() { self.text("全体設定に従う", "Use global setting") } else { self.text("基本設定に従う", "Use software setting") },
                     if inherits_original { self.text("個別設定を解除して基本設定に従います。結果は元のアイコンです。", "Remove the file type override. The inherited result keeps the original icon.") }
                     else { self.text("個別設定を解除して基本設定に従います。結果はパックのアイコンです。", "Remove the file type override. The inherited result uses the pack icon.") },
                     self.text("継承結果の見本を取得できません。", "Inherited preview unavailable.")), cx))
@@ -601,13 +654,14 @@ impl Manager {
             let assigned = source
                 .provider_id
                 .as_ref()
-                .and_then(|id| self.protection.rules.providers.get(id));
+                .and_then(|id| self.protection.rules.providers.get(id))
+                .filter(|rules| rules.keys().any(|extension| !extension.is_empty()));
             match choice {
                 None => assigned.is_none(),
                 Some(protect) => self
                     .protection
                     .groups
-                    .get(&source.group_id())
+                    .get(&display_group(source))
                     .into_iter()
                     .flatten()
                     .map(|index| &self.protection.sources[*index])
@@ -624,6 +678,18 @@ impl Manager {
                 .rules
                 .extensions
                 .get(extension)
+                .or_else(|| {
+                    extension
+                        .is_empty()
+                        .then(|| {
+                            source
+                                .provider_id
+                                .as_ref()
+                                .and_then(|provider| self.protection.rules.providers.get(provider))
+                                .and_then(|rules| rules.get(extension))
+                        })
+                        .flatten()
+                })
                 .filter(|rule| rule.fingerprint == source.fingerprint)
                 .map(|rule| rule.protect)
                 == choice
@@ -661,7 +727,7 @@ impl Manager {
         }
         let row = source.clone();
         let id = if provider_scope {
-            format!("provider-{kind}-{}", source.group_id())
+            format!("provider-{kind}-{}", display_group(source))
         } else {
             format!("{kind}-icon-{extension}")
         };
@@ -724,14 +790,19 @@ impl Manager {
                 this.pin_visible_protection_rows();
                 if provider_scope {
                     if let Some(provider) = &row.provider_id {
-                        this.protection.rules.set_provider(
-                            &this.protection.sources,
-                            provider,
-                            choice,
-                        );
+                        this.protection.set_provider(provider, choice);
                     }
                 } else {
                     this.protection.rules.set_extension(&row, choice);
+                    if row.registration.extension.is_empty() && choice.is_none() {
+                        for rules in this.protection.rules.providers.values_mut() {
+                            rules.remove("");
+                        }
+                        this.protection
+                            .rules
+                            .providers
+                            .retain(|_, rules| !rules.is_empty());
+                    }
                 }
                 this.refresh_protection_policy(cx);
             }));
@@ -740,11 +811,11 @@ impl Manager {
 
     fn reset_provider_protection(&mut self, provider: &str, cx: &mut Context<Self>) {
         self.pin_visible_protection_rows();
-        self.protection
-            .rules
-            .set_provider(&self.protection.sources, provider, None);
+        self.protection.set_provider(provider, None);
         for row in &self.protection.sources {
-            if row.provider_id.as_deref() == Some(provider) {
+            if row.provider_id.as_deref() == Some(provider)
+                && !row.registration.extension.is_empty()
+            {
                 self.protection.rules.set_extension(row, None);
             }
         }
@@ -814,4 +885,20 @@ impl Manager {
                 })
         });
     }
+}
+
+fn sample_name(pack: &file_icons_core::ImportedPack, extension: &str) -> Option<String> {
+    if !extension.is_empty() {
+        return Some(format!("sample.{extension}"));
+    }
+    let rules = pack.theme.rules();
+    rules
+        .files
+        .keys()
+        .chain(rules.language_files.keys())
+        .find(|name| {
+            std::path::Path::new(name.as_str()).extension().is_none()
+                && pack.theme.resolve(name).is_some()
+        })
+        .cloned()
 }
