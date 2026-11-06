@@ -68,6 +68,21 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        w.click("protection-view-select", cx);
+        for _ in 0..3 {
+            w.press("down", cx);
+        }
+        w.press("enter", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        assert_eq!(w.find("protection-view-select").value(), Some("要確認"));
+        w.click("protection-show-all", cx);
+        w.render_frame(cx);
+        assert_eq!(w.find("protection-view-select").value(), Some("すべて"));
+        assert!(w.find("protection-row-").visible());
     })
     .unwrap();
     cx.simulate_window_resize(window, size(px(1120.), px(640.)));

@@ -1021,6 +1021,7 @@ impl Manager {
                             .label(self.text("すべて表示", "Show all"))
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.protection.filter = Filter::All;
+                                this.protection.view_picker = None;
                                 this.protection.pinned.clear();
                                 this.reset_protection_list();
                                 cx.notify();
