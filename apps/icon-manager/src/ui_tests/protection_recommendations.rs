@@ -151,6 +151,23 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("保護 → パック許可")
         );
+        for (heading, cell) in [
+            (
+                "protection-change-before-heading",
+                "protection-change-before-mts",
+            ),
+            (
+                "protection-change-after-heading",
+                "protection-change-after-mts",
+            ),
+        ] {
+            let heading = w.find(heading).bounds().left();
+            let cell = w.find(cell).bounds().left();
+            assert!(
+                cell >= heading - px(1.) && cell <= heading + px(1.),
+                "比較列を見出しと揃える"
+            );
+        }
         w.click("protection-change-edit-mts", cx);
         w.render_frame(cx);
         super::protection_sources::reveal(w, "original-icon-mts", cx);
@@ -445,10 +462,6 @@ fn recommended_visual_probe() {
                                     this.settings.language = language.into();
                                     cx.notify();
                                 });
-                                w.render_frame(cx);
-                                w.click("protection-changes-basis", cx);
-                                w.press("down", cx);
-                                w.press("enter", cx);
                                 w.resize(size(px(width), px(640.)));
                                 w.render_frame(cx);
                             })
@@ -459,6 +472,25 @@ fn recommended_visual_probe() {
                         window
                             .update(cx, |_, w, cx| {
                                 w.render_frame(cx);
+                                w.click("protection-changes-basis", cx);
+                                w.press("down", cx);
+                                w.press("enter", cx);
+                            })
+                            .unwrap();
+                        cx.background_executor()
+                            .timer(std::time::Duration::from_millis(100))
+                            .await;
+                        window
+                            .update(cx, |_, w, cx| {
+                                w.render_frame(cx);
+                                assert_eq!(
+                                    w.find("protection-changes-basis").value(),
+                                    Some(if language == "ja" {
+                                        "直前のおすすめ操作"
+                                    } else {
+                                        "Last recommended action"
+                                    })
+                                );
                                 let save = w.find("protection-save");
                                 assert!(
                                     save.visible()
@@ -489,6 +521,14 @@ fn recommended_visual_probe() {
                         window
                             .update(cx, |_, w, cx| {
                                 w.render_frame(cx);
+                                assert_eq!(
+                                    w.find("protection-changes-basis").value(),
+                                    Some(if language == "ja" {
+                                        "保存予定"
+                                    } else {
+                                        "Pending save"
+                                    })
+                                );
                                 w.render_to_image()
                                     .unwrap()
                                     .save(output.join(format!(
@@ -501,6 +541,15 @@ fn recommended_visual_probe() {
                                     && width == 1120.
                                 {
                                     w.click("protection-change-details-mts", cx);
+                                    w.render_frame(cx);
+                                    w.scroll(
+                                        "protection-change-row-mts",
+                                        gpui_kit::ScrollDelta::Pixels(gpui_kit::point(
+                                            px(0.),
+                                            px(-250.),
+                                        )),
+                                        cx,
+                                    );
                                     w.render_frame(cx);
                                     w.render_to_image()
                                         .unwrap()

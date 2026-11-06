@@ -282,11 +282,13 @@ impl Manager {
                             .gap_3()
                             .child(div().text_sm().child(self.text("比較する内容", "Compare")))
                             .child(
-                                Select::new(self.protection.basis_picker.as_ref().unwrap())
-                                    .id("protection-changes-basis")
-                                    .small()
-                                    .w_64()
-                                    .accessibility_label(self.text("比較する内容", "Compare")),
+                                div().w_64().min_w_0().child(
+                                    Select::new(self.protection.basis_picker.as_ref().unwrap())
+                                        .id("protection-changes-basis")
+                                        .small()
+                                        .w_full()
+                                        .accessibility_label(self.text("比較する内容", "Compare")),
+                                ),
                             ),
                     )
                     .child(
@@ -378,6 +380,20 @@ impl Manager {
                 ));
             }
             if !compact && count > 0 {
+                let before_heading = div()
+                    .id("protection-change-before-heading")
+                    .flex_1()
+                    .min_w_0()
+                    .child(self.text("変更前", "Before"));
+                let after_heading = div()
+                    .id("protection-change-after-heading")
+                    .flex_1()
+                    .min_w_0()
+                    .child(self.text("変更後", "After"));
+                #[cfg(feature = "test-support")]
+                let before_heading = before_heading.test_support();
+                #[cfg(feature = "test-support")]
+                let after_heading = after_heading.test_support();
                 panel = panel.child(
                     div()
                         .px_3()
@@ -390,13 +406,8 @@ impl Manager {
                         .text_xs()
                         .text_color(colors.muted_foreground)
                         .child(div().flex_1().min_w_0().child(self.text("対象", "Target")))
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .child(self.text("変更前", "Before")),
-                        )
-                        .child(div().flex_1().min_w_0().child(self.text("変更後", "After")))
+                        .child(before_heading)
+                        .child(after_heading)
                         .child(div().w_32().child(self.text("変更の種類", "Change")))
                         .child(div().w_32()),
                 );
@@ -616,6 +627,10 @@ impl Manager {
                 )
             });
         let before_column = div()
+            .id(SharedString::from(format!(
+                "protection-change-before-{}",
+                row.extension
+            )))
             .flex_1()
             .min_w_0()
             .when(compact, |p| {
@@ -628,6 +643,10 @@ impl Manager {
             })
             .child(before.clone());
         let after_column = div()
+            .id(SharedString::from(format!(
+                "protection-change-after-{}",
+                row.extension
+            )))
             .flex_1()
             .min_w_0()
             .when(compact, |p| {
@@ -639,6 +658,10 @@ impl Manager {
                 )
             })
             .child(after.clone());
+        #[cfg(feature = "test-support")]
+        let before_column = before_column.test_support();
+        #[cfg(feature = "test-support")]
+        let after_column = after_column.test_support();
         let label = format!(
             "{extension}: {before} → {after} · {kind} · {} → {}",
             self.protection_state_text(row.before.effective),
@@ -651,6 +674,8 @@ impl Manager {
             )))
             .role(Role::Group)
             .aria_label(label)
+            .w_full()
+            .min_w_0()
             .border_b_1()
             .border_color(colors.border)
             .flex()
@@ -658,6 +683,7 @@ impl Manager {
             .text_sm()
             .child(if compact {
                 div()
+                    .w_full()
                     .p_3()
                     .flex()
                     .flex_col()
@@ -674,6 +700,7 @@ impl Manager {
                     .child(kind)
             } else {
                 div()
+                    .w_full()
                     .p_3()
                     .flex()
                     .gap_3()

@@ -669,6 +669,12 @@ impl Manager {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let compact = window.viewport_size().width < window.rem_size() * 62.;
+        if !compact && let Some(picker) = self.protection.view_picker.take() {
+            if picker.read(cx).focus_handle(cx).is_focused(window) {
+                self.focus.focus(window, cx);
+            }
+            self.protection.view_subscription = None;
+        }
         let is_changes = self.protection.filter == Filter::Changes;
         let metrics = (window.rem_size(), self.settings.language.clone());
         if self.protection.text_metrics.as_ref() != Some(&metrics) {
@@ -1019,9 +1025,10 @@ impl Manager {
                         theme::button("protection-show-all", cx)
                             .small()
                             .label(self.text("すべて表示", "Show all"))
-                            .on_click(cx.listener(|this, _, _, cx| {
+                            .on_click(cx.listener(|this, _, window, cx| {
                                 this.protection.filter = Filter::All;
                                 this.protection.view_picker = None;
+                                this.focus.focus(window, cx);
                                 this.protection.pinned.clear();
                                 this.reset_protection_list();
                                 cx.notify();
