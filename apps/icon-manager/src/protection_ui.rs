@@ -92,7 +92,7 @@ impl Editor {
                 .or_default();
             class.push(index);
             self.groups
-                .entry(source.group_id())
+                .entry(display_group(source))
                 .or_default()
                 .push(index);
         }
@@ -110,6 +110,14 @@ impl Editor {
             .into_iter()
             .flat_map(|indices| indices.iter())
             .map(|index| &self.sources[*index])
+    }
+}
+
+fn display_group(source: &ExistingIcon) -> String {
+    if source.registration.extension.is_empty() {
+        "extensionless".into()
+    } else {
+        source.group_id()
     }
 }
 
@@ -153,7 +161,7 @@ impl Manager {
         if collapse {
             self.protection
                 .collapsed
-                .extend(self.protection.sources.iter().map(ExistingIcon::group_id));
+                .extend(self.protection.sources.iter().map(display_group));
             self.reset_protection_list();
             self.protection.collapsed.clear();
         }
@@ -369,7 +377,11 @@ impl Manager {
             source.update_protection(&self.protection.rules, self.protection.draft);
         }
         sources.sort_by_cached_key(|source| {
-            (source.group_id(), source.registration.extension.clone())
+            (
+                !source.registration.extension.is_empty(),
+                display_group(source),
+                source.registration.extension.clone(),
+            )
         });
         self.protection.rows = sources.iter().map(|r| r.registration.clone()).collect();
         self.protection.sources = sources;
@@ -380,9 +392,10 @@ impl Manager {
         let by_extension = &self.protection.source_by_extension;
         self.protection.current_rows.sort_by_cached_key(|r| {
             (
+                !r.extension.is_empty(),
                 by_extension
                     .get(&r.extension)
-                    .map(|i| sources[*i].group_id()),
+                    .map(|i| display_group(&sources[*i])),
                 r.extension.clone(),
             )
         });
@@ -552,7 +565,7 @@ impl Manager {
             .iter()
             .filter_map(|row| self.protection.source(&row.extension))
             .fold(std::collections::BTreeMap::new(), |mut counts, source| {
-                *counts.entry(source.group_id()).or_default() += 1;
+                *counts.entry(display_group(source)).or_default() += 1;
                 counts
             });
         self.protection.visible_rows = self
@@ -562,7 +575,7 @@ impl Manager {
             .filter_map(|(ix, row)| {
                 let source = self.protection.source(&row.extension);
                 let visible = source.is_none_or(|source| {
-                    let group = source.group_id();
+                    let group = display_group(source);
                     let first = seen.insert(group.clone());
                     first || !self.protection.collapsed.contains(&group)
                 });
@@ -860,9 +873,9 @@ impl Manager {
                                 .label(self.text("すべて閉じる", "Collapse all"))
                                 .disabled_elevated(blocked || !has_expanded_group)
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.protection.collapsed.extend(
-                                        this.protection.sources.iter().map(ExistingIcon::group_id),
-                                    );
+                                    this.protection
+                                        .collapsed
+                                        .extend(this.protection.sources.iter().map(display_group));
                                     this.reset_protection_list();
                                     cx.notify();
                                 })),
@@ -1063,8 +1076,8 @@ impl Manager {
         };
         let extension = if row.extension.is_empty() {
             self.text(
-                "拡張子なし・名前パターン",
-                "Extensionless files and name patterns",
+                "拡張子のないファイルなど",
+                "Extensionless files and patterns",
             )
             .into()
         } else {
@@ -1083,15 +1096,14 @@ impl Manager {
             .role(Role::Group)
             .aria_label(label)
             .text_sm();
-        let group =
-            |row: &IconExclusion| self.protection.source(&row.extension).map(|s| s.group_id());
+        let group = |row: &IconExclusion| self.protection.source(&row.extension).map(display_group);
         let first = ix == 0 || group(&self.protection_rows()[ix - 1]) != group(row);
         if first && ix != 0 {
             row_element = row_element.border_t_1();
         }
         if let Some(source) = self.protection.source(&row.extension) {
             row_element = row_element.child(self.protection_source_header(source, ix, cx));
-            if self.protection.collapsed.contains(&source.group_id()) {
+            if self.protection.collapsed.contains(&display_group(source)) {
                 #[cfg(feature = "test-support")]
                 let row_element = row_element.test_support();
                 return row_element.into_any_element();
@@ -1103,21 +1115,37 @@ impl Manager {
             .min_w_0()
             .border_t_1()
             .border_color(colors.border);
-        content = content.child(
-            div()
-                .flex()
-                .items_start()
-                .gap_3()
-                .child(
-                    div()
-                        .w_32()
-                        .flex_shrink_0()
-                        .truncate()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(extension),
-                )
-                .child(div().flex_1().min_w_0()),
-        );
+        if row.extension.is_empty() {
+            let scope = self.text(
+                "全パック共通。パックの名前規則に一致するファイルだけに適用します。ファイル名によってアイコンが変わります。",
+                "Applies to all packs. Only matching filenames use pack icons; the icon depends on the name.",
+            );
+            let scope = div()
+                .id("protection-extensionless-scope")
+                .role(Role::Status)
+                .aria_label(scope)
+                .text_sm()
+                .child(scope);
+            #[cfg(feature = "test-support")]
+            let scope = scope.test_support();
+            content = content.child(scope);
+        } else {
+            content = content.child(
+                div()
+                    .flex()
+                    .items_start()
+                    .gap_3()
+                    .child(
+                        div()
+                            .w_32()
+                            .flex_shrink_0()
+                            .truncate()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(extension),
+                    )
+                    .child(div().flex_1().min_w_0()),
+            );
+        }
         if let Some(source) = self.protection.source(&row.extension) {
             content = content.child(self.protection_source_controls(source, cx));
         }
@@ -1130,6 +1158,26 @@ impl Manager {
                 row.source
             );
             if let Some(source) = self.protection.source(&row.extension) {
+                if row.extension.is_empty() {
+                    let provider = format!(
+                        "{}: {}",
+                        self.text("元アイコンの提供元", "Original icon provider"),
+                        source
+                            .provider_name
+                            .as_deref()
+                            .unwrap_or_else(|| self.text("提供元不明", "Unknown provider")),
+                    );
+                    detail.push_str(&format!("\n{provider}"));
+                    let provider = div()
+                        .id("protection-extensionless-provider")
+                        .role(Role::Status)
+                        .aria_label(provider.clone())
+                        .text_xs()
+                        .child(provider);
+                    #[cfg(feature = "test-support")]
+                    let provider = provider.test_support();
+                    content = content.child(provider);
+                }
                 detail.push_str(&format!(
                     "\n{}: {}\n{}: {}\n{}: {}",
                     self.text("提供元の識別", "Provider identity"),

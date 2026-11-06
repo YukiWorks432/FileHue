@@ -248,7 +248,7 @@ impl Manager {
             .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child(
                 if source.registration.extension.is_empty() {
                     self.text(
-                        "拡張子なし・名前パターンの保護（全パック共通）",
+                        "拡張子のないファイルなどの保護（全パック共通）",
                         "Protection for extensionless files and patterns (all packs)",
                     )
                 } else {
