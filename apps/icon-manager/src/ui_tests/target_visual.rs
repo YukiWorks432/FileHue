@@ -480,7 +480,15 @@ fn provider_reset_visual_probe() {
                             });
                             w.resize(size(px(width), px(height)));
                             w.render_frame(cx);
-                            w.click("protection-planned", cx);
+                            if w.try_find("protection-planned").is_some() {
+                                w.click("protection-planned", cx);
+                            } else {
+                                w.click("protection-view-select", cx);
+                                for _ in 0..5 {
+                                    w.press("up", cx);
+                                }
+                                w.press("enter", cx);
+                            }
                             w.render_frame(cx);
                             w.scroll(
                                 "protection-rows",
@@ -541,7 +549,16 @@ fn provider_reset_visual_probe() {
                                     }
                                     "reset" => w.within("dialog").click("ok", cx),
                                     "filtered" => {
-                                        w.click("protection-protected", cx);
+                                        if w.try_find("protection-protected").is_some() {
+                                            w.click("protection-protected", cx);
+                                        } else {
+                                            w.click("protection-view-select", cx);
+                                            for _ in 0..5 {
+                                                w.press("up", cx);
+                                            }
+                                            w.press("down", cx);
+                                            w.press("enter", cx);
+                                        }
                                         w.scroll(
                                             "protection-rows",
                                             gpui_kit::ScrollDelta::Pixels(gpui_kit::point(

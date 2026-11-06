@@ -244,9 +244,8 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
             w.render_frame(cx);
             for id in [
                 "protection-toggle",
-                "protection-current",
+                "protection-view-select",
                 "protection-pack",
-                "protection-planned",
                 "protection-details",
                 "protection-save",
                 "protection-back",
