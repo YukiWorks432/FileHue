@@ -56,7 +56,8 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         assert!(w.find("protection-changes").visible());
         let save = w.find("protection-save");
         assert!(save.visible() && save.bounds().bottom() <= w.viewport_size().height);
-        assert_eq!(save.disabled(), Some(true));
+        w.click("protection-save", cx);
+        assert!(!manager.read(cx).operation.busy());
         w.click("protection-view-select", cx);
         for _ in 0..5 {
             w.press("up", cx);
@@ -177,7 +178,8 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        assert_eq!(w.find("protection-save").disabled(), Some(true));
+        w.click("protection-save", cx);
+        assert!(!manager.read(cx).operation.busy());
         assert!(
             w.find("protection-changes-status")
                 .label()
