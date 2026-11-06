@@ -39,6 +39,39 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     .unwrap();
     cx.run_until_parked();
     let inspection = cx.read(|cx| manager.read(cx).protection.inspection);
+    // 狭幅でも六つの表示を一つの選択欄から選べ、保存帯を見失わない。
+    cx.simulate_window_resize(window, size(px(640.), px(640.)));
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("protection-view-select", cx);
+        for _ in 0..5 {
+            w.press("down", cx);
+        }
+        w.press("enter", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        assert!(w.find("protection-changes").visible());
+        let save = w.find("protection-save");
+        assert!(save.visible() && save.bounds().bottom() <= w.viewport_size().height);
+        assert_eq!(save.disabled(), Some(true));
+        w.click("protection-view-select", cx);
+        for _ in 0..5 {
+            w.press("up", cx);
+        }
+        w.press("enter", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+    })
+    .unwrap();
+    cx.simulate_window_resize(window, size(px(1120.), px(640.)));
+    assert_eq!(serde_json::to_value(load().unwrap()).unwrap(), before);
+
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("protection-toggle", cx);
@@ -86,7 +119,15 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.click("protection-recommended", cx);
         w.render_frame(cx);
-        w.click("protection-recommended-changes", cx);
+        w.click("protection-view-changes", cx);
+        w.render_frame(cx);
+        w.click("protection-changes-basis", cx);
+        w.press("down", cx);
+        w.press("enter", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         assert!(
             w.find("protection-change-row-mts")
@@ -99,28 +140,49 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         super::protection_sources::reveal(w, "original-icon-mts", cx);
         w.click("original-icon-mts", cx);
         w.render_frame(cx);
-        w.click("protection-review-changes", cx);
+        w.click("protection-view-changes", cx);
+        w.render_frame(cx);
+        w.click("protection-changes-basis", cx);
+        w.press("up", cx);
+        w.press("enter", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         assert!(
             w.find("protection-change-row-mts")
                 .label()
                 .unwrap()
-                .contains("指定のみ変更")
+                .contains("指定更新")
         );
-        w.click("protection-changes-recommended", cx);
+        w.click("protection-changes-basis", cx);
+        w.press("down", cx);
+        w.press("enter", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         manager.update(cx, |this, cx| {
             this.protection.error = Some("inspection failed".into());
             cx.notify();
         });
         w.render_frame(cx);
-        w.click("protection-changes-pending", cx);
+        w.click("protection-changes-basis", cx);
+        w.press("up", cx);
+        w.press("enter", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        assert_eq!(w.find("protection-save").disabled(), Some(true));
         assert!(
-            w.find("protection-change-row-mts")
+            w.find("protection-changes-status")
                 .label()
                 .unwrap()
-                .contains("保護 → パック許可")
+                .contains("確認できません")
         );
         manager.update(cx, |this, cx| {
             this.protection.error = None;
@@ -185,7 +247,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        w.click("protection-review-changes", cx);
+        w.click("protection-view-changes", cx);
         w.render_frame(cx);
         assert!(
             w.find("protection-change-row-m2ts")
@@ -193,8 +255,78 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("パック許可 → 保護")
         );
+        w.click("protection-change-edit-m2ts", cx);
+        w.render_frame(cx);
+        w.click("protection-recommended", cx);
+        w.render_frame(cx);
+        super::protection_sources::reveal(w, "original-icon-mts", cx);
+        w.click("original-icon-mts", cx);
+        w.render_frame(cx);
+        w.click("protection-view-changes", cx);
+        w.render_frame(cx);
+        w.click("protection-changes-basis", cx);
+        w.press("down", cx);
+        w.press("enter", cx);
     })
     .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        assert!(w.find("protection-save").visible());
+        w.click("protection-save", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(
+        load().unwrap().icon_protection_rules.extensions["mts"].protect,
+        "操作記録の許可ではなく、手動編集した現在の下書きを保存する"
+    );
+    let saved = serde_json::to_value(load().unwrap()).unwrap();
+    cx.update_window(window, |_, w, cx| {
+        manager.update(cx, |this, cx| {
+            let template = this.protection.source("mts").unwrap().clone();
+            let sources = (0..192)
+                .map(|index| {
+                    let mut source = template.clone();
+                    source.registration.extension = format!("review-{index:03}");
+                    source.provider_name =
+                        Some("Example provider with a long display name for comparison".into());
+                    source
+                })
+                .collect();
+            this.settings.icon_protection_rules = Default::default();
+            this.protection.rules = Default::default();
+            this.protection.draft = true;
+            this.protection.visual_sources(sources);
+            cx.notify();
+        });
+        w.render_frame(cx);
+        w.click("protection-planned", cx);
+        w.render_frame(cx);
+        w.click("protection-toggle", cx);
+        w.render_frame(cx);
+        w.click("protection-view-changes", cx);
+        w.render_frame(cx);
+        w.click("protection-changes-basis", cx);
+        w.press("up", cx);
+        w.press("enter", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("protection-change-details-review-000", cx);
+        w.render_frame(cx);
+        w.press("end", cx);
+        w.render_frame(cx);
+        assert!(w.find("protection-change-row-review-191").visible());
+        assert!(w.find("protection-save").visible());
+        w.press("home", cx);
+        w.render_frame(cx);
+        assert!(w.find("protection-change-row-review-000").visible());
+    })
+    .unwrap();
+    assert_eq!(serde_json::to_value(load().unwrap()).unwrap(), saved);
 }
 
 #[test]
@@ -229,49 +361,140 @@ fn recommended_visual_probe() {
                         w.render_frame(cx);
                         w.click("protection-recommended", cx);
                         w.render_frame(cx);
+                        w.click("protection-view-changes", cx);
+                        w.render_frame(cx);
                     })
                     .unwrap();
-                for (language, mode, width, font) in [
-                    ("ja", ThemeMode::Dark, 1120., 16.),
-                    ("en", ThemeMode::Light, 1120., 16.),
-                    ("ja", ThemeMode::Dark, 640., 18.),
-                    ("en", ThemeMode::Light, 640., 18.),
-                ] {
-                    window
-                        .update(cx, |_, w, cx| {
-                            theme::apply(mode, cx);
-                            gpui_kit::component::theme::Theme::update(cx, |theme| {
-                                theme.font_size = px(font)
-                            });
-                            manager.update(cx, |this, cx| {
-                                this.settings.language = language.into();
-                                this.protection.changes_open = false;
-                                cx.notify();
-                            });
-                            w.resize(size(px(width), px(640.)));
-                            w.render_frame(cx);
-                            w.click("protection-recommended-changes", cx);
-                            w.render_frame(cx);
-                        })
-                        .unwrap();
-                    cx.background_executor()
-                        .timer(std::time::Duration::from_millis(350))
-                        .await;
-                    window
-                        .update(cx, |_, w, cx| {
-                            w.render_frame(cx);
-                            w.render_to_image()
-                                .unwrap()
-                                .save(output.join(format!("recommended-{language}-{width}.png")))
-                                .unwrap();
-                            w.click("protection-changes-pending", cx);
-                            w.render_frame(cx);
-                            w.render_to_image()
-                                .unwrap()
-                                .save(output.join(format!("pending-{language}-{width}.png")))
-                                .unwrap();
-                        })
-                        .unwrap();
+                for scenario in ["mixed", "choices"] {
+                    if scenario == "choices" {
+                        manager.update(cx, |this, cx| {
+                            let template = this.protection.source("mts").unwrap().clone();
+                            let sources = [
+                                "c", "cc", "cpp", "go", "h", "java", "js", "jsx", "py", "rb", "tsx",
+                            ]
+                            .into_iter()
+                            .map(|extension| {
+                                let mut source = template.clone();
+                                source.registration.extension = extension.into();
+                                source.fingerprint = extension.into();
+                                source.provider_id = Some("example-code".into());
+                                source.provider_name = Some(
+                                    "Visual Studio Code — Example development installation".into(),
+                                );
+                                source.provider_location = Some(file_icons_windows::IconLocation {
+                                    path: r"C:\Apps\Code.exe".into(),
+                                    index: 0,
+                                });
+                                source
+                            })
+                            .collect::<Vec<_>>();
+                            let mut rules = file_icons_windows::IconProtectionRules::default();
+                            rules.set_provider(&sources, "example-code", Some(false));
+                            for source in &sources {
+                                rules.set_extension(source, Some(false));
+                            }
+                            this.settings.icon_protection_rules = rules.clone();
+                            this.settings.preserve_existing_icons = true;
+                            this.protection.rules = rules;
+                            this.protection.draft = true;
+                            this.protection.visual_sources(sources);
+                            cx.notify();
+                        });
+                        window
+                            .update(cx, |_, w, cx| {
+                                w.render_frame(cx);
+                                w.click("protection-recommended", cx);
+                                w.render_frame(cx);
+                            })
+                            .unwrap();
+                    }
+                    for (language, mode, width, font) in [
+                        ("ja", ThemeMode::Dark, 1120., 16.),
+                        ("ja", ThemeMode::Light, 1120., 16.),
+                        ("en", ThemeMode::Dark, 1120., 16.),
+                        ("en", ThemeMode::Light, 1120., 16.),
+                        ("ja", ThemeMode::Dark, 640., 18.),
+                        ("ja", ThemeMode::Light, 640., 18.),
+                        ("en", ThemeMode::Dark, 640., 18.),
+                        ("en", ThemeMode::Light, 640., 18.),
+                    ] {
+                        window
+                            .update(cx, |_, w, cx| {
+                                theme::apply(mode, cx);
+                                gpui_kit::component::theme::Theme::update(cx, |theme| {
+                                    theme.font_size = px(font)
+                                });
+                                manager.update(cx, |this, cx| {
+                                    this.settings.language = language.into();
+                                    cx.notify();
+                                });
+                                w.render_frame(cx);
+                                w.click("protection-changes-basis", cx);
+                                w.press("down", cx);
+                                w.press("enter", cx);
+                                w.resize(size(px(width), px(640.)));
+                                w.render_frame(cx);
+                            })
+                            .unwrap();
+                        cx.background_executor()
+                            .timer(std::time::Duration::from_millis(350))
+                            .await;
+                        window
+                            .update(cx, |_, w, cx| {
+                                w.render_frame(cx);
+                                let save = w.find("protection-save");
+                                assert!(
+                                    save.visible()
+                                        && save.bounds().bottom() <= w.viewport_size().height
+                                );
+                                if scenario == "choices" {
+                                    assert!(
+                                        w.find("protection-changes-summary")
+                                            .label()
+                                            .unwrap()
+                                            .contains("11")
+                                    );
+                                }
+                                w.render_to_image()
+                                    .unwrap()
+                                    .save(output.join(format!(
+                                        "{scenario}-recommended-{language}-{mode:?}-{width}.png"
+                                    )))
+                                    .unwrap();
+                                w.click("protection-changes-basis", cx);
+                                w.press("up", cx);
+                                w.press("enter", cx);
+                            })
+                            .unwrap();
+                        cx.background_executor()
+                            .timer(std::time::Duration::from_millis(100))
+                            .await;
+                        window
+                            .update(cx, |_, w, cx| {
+                                w.render_frame(cx);
+                                w.render_to_image()
+                                    .unwrap()
+                                    .save(output.join(format!(
+                                        "{scenario}-pending-{language}-{mode:?}-{width}.png"
+                                    )))
+                                    .unwrap();
+                                if scenario == "mixed"
+                                    && language == "ja"
+                                    && mode == ThemeMode::Dark
+                                    && width == 1120.
+                                {
+                                    w.click("protection-change-details-mts", cx);
+                                    w.render_frame(cx);
+                                    w.render_to_image()
+                                        .unwrap()
+                                        .save(output.join("mixed-detail-ja-Dark-1120.png"))
+                                        .unwrap();
+                                    w.click("protection-change-details-mts", cx);
+                                    w.render_frame(cx);
+                                }
+                            })
+                            .unwrap();
+                    }
                 }
                 cx.update(|cx| cx.quit());
             })

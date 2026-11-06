@@ -17,14 +17,18 @@ use gpui_kit::component::{
 };
 
 #[derive(Clone)]
-struct PackOption {
+struct ProtectionOption {
     id: String,
     label: SharedString,
+    disabled: bool,
 }
-impl SelectItem for PackOption {
+impl SelectItem for ProtectionOption {
     type Value = String;
     fn title(&self) -> SharedString {
         self.label.clone()
+    }
+    fn disabled(&self) -> bool {
+        self.disabled
     }
     fn value(&self) -> &String {
         &self.id
@@ -39,6 +43,39 @@ enum Filter {
     Allowed,
     Review,
     Current,
+    Changes,
+}
+
+impl Filter {
+    const ALL: [Self; 6] = [
+        Self::All,
+        Self::Protected,
+        Self::Allowed,
+        Self::Review,
+        Self::Current,
+        Self::Changes,
+    ];
+    fn id(self) -> &'static str {
+        match self {
+            Self::All => "protection-planned",
+            Self::Protected => "protection-protected",
+            Self::Allowed => "protection-allowed",
+            Self::Review => "protection-review",
+            Self::Current => "protection-current",
+            Self::Changes => "protection-view-changes",
+        }
+    }
+    fn label(self, manager: &Manager) -> &'static str {
+        let (ja, en) = match self {
+            Self::All => ("すべて", "All"),
+            Self::Protected => ("保護", "Protected"),
+            Self::Allowed => ("パック許可", "Allowed"),
+            Self::Review => ("要確認", "Review"),
+            Self::Current => ("適用中の除外", "Excluded"),
+            Self::Changes => ("変更内容", "Changes"),
+        };
+        manager.text(ja, en)
+    }
 }
 
 #[derive(Default)]
@@ -76,16 +113,25 @@ pub(super) struct Editor {
     previous_focus: Option<FocusHandle>,
     pub(super) inspection: u64,
     recommendation_notice: Option<String>,
-    pub(super) changes_open: bool,
     changes_recommended: bool,
     recommendation_changes: Option<changes::Changes>,
-    changes_scroll: ScrollHandle,
-    picker: Option<Entity<SelectState<Vec<PackOption>>>>,
+    changes_list: Option<ListState>,
+    changes_expanded: std::collections::BTreeSet<String>,
+    changes_data: Option<changes::Changes>,
+    changes_pending: Option<changes::Changes>,
+    changes_metrics: Option<(Pixels, Pixels, String)>,
+    view_picker: Option<Entity<SelectState<Vec<ProtectionOption>>>>,
+    view_subscription: Option<Subscription>,
+    basis_picker: Option<Entity<SelectState<Vec<ProtectionOption>>>>,
+    basis_subscription: Option<Subscription>,
+    picker: Option<Entity<SelectState<Vec<ProtectionOption>>>>,
     picker_subscription: Option<Subscription>,
 }
 
 impl Editor {
     fn rebuild_index(&mut self) {
+        // 調査結果と方針の更新はここを通り、保存予定の比較も更新する。
+        self.changes_pending = None;
         self.source_by_extension.clear();
         self.classes.clear();
         self.groups.clear();
@@ -207,7 +253,10 @@ impl Manager {
         // 未表示行も測定し、ホイールとスクロールバーが全件の高さを参照できるようにする。
         self.protection.list = Some(ListState::new(0, ListAlignment::Top, px(0.)).measure_all());
         self.protection.open = true;
-        self.protection.changes_open = false;
+        self.protection.changes_recommended = false;
+        self.protection.view_picker = None;
+        self.protection.basis_picker = None;
+        self.protection.changes_expanded.clear();
         self.protection.recommendation_changes = None;
         if !from_targets {
             self.protection.draft = self.settings.preserve_existing_icons;
@@ -228,9 +277,10 @@ impl Manager {
             .settings
             .packs
             .iter()
-            .map(|pack| PackOption {
+            .map(|pack| ProtectionOption {
                 id: pack.id.clone(),
                 label: pack.label.clone().into(),
+                disabled: false,
             })
             .collect::<Vec<_>>();
         let selected = items
@@ -574,7 +624,7 @@ impl Manager {
                     .pinned
                     .contains(&source.registration.extension)
                     || match self.protection.filter {
-                        Filter::All => true,
+                        Filter::All | Filter::Changes => true,
                         Filter::Protected => source.protect,
                         Filter::Allowed => !source.protect,
                         Filter::Review => source.needs_review,
@@ -618,14 +668,15 @@ impl Manager {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        if self.protection.changes_open {
-            return self.protection_changes_panel(cx);
-        }
+        let compact = window.viewport_size().width < window.rem_size() * 62.;
+        let is_changes = self.protection.filter == Filter::Changes;
         let metrics = (window.rem_size(), self.settings.language.clone());
         if self.protection.text_metrics.as_ref() != Some(&metrics) {
             if let Some(list) = &self.protection.list {
                 list.remeasure();
             }
+            self.protection.view_picker = None;
+            self.protection.basis_picker = None;
             self.protection.text_metrics = Some(metrics);
         }
         use gpui_kit::{assets::IconName, component::button::ButtonGroup};
@@ -643,7 +694,11 @@ impl Manager {
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                 if event.keystroke.key == "escape" {
                     this.close_protection(window, cx);
-                } else if let Some(list) = &this.protection.list {
+                } else if let Some(list) = if this.protection.filter == Filter::Changes {
+                    &this.protection.changes_list
+                } else {
+                    &this.protection.list
+                } {
                     match event.keystroke.key.as_str() {
                         "home" => list.scroll_to(ListOffset::default()),
                         "end" => list.scroll_to_end(),
@@ -719,17 +774,6 @@ impl Manager {
                 .disabled_elevated(blocked || self.protection.error.is_some())
                 .on_click(cx.listener(|this, _, _, cx| this.apply_recommended_protection(cx))),
         );
-        packs = packs.child(
-            theme::button("protection-recommended-changes", cx)
-                .small()
-                .label(self.text("変更内容を見る", "View changes"))
-                .disabled_elevated(blocked || self.protection.recommendation_changes.is_none())
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.protection.changes_recommended = true;
-                    this.protection.changes_open = true;
-                    cx.notify();
-                })),
-        );
         settings = settings.child(packs);
         let current = if self.protection.pack.as_ref() == self.settings.active.as_ref() {
             self.protection.current_rows.len()
@@ -770,46 +814,20 @@ impl Manager {
         }
         let mut filters = ButtonGroup::new("protection-view")
             .small()
-            .disabled(blocked);
-        for (id, label, filter) in [
-            (
-                "protection-planned",
-                self.text("すべて", "All"),
-                Filter::All,
-            ),
-            (
-                "protection-protected",
-                self.text("保護", "Protected"),
-                Filter::Protected,
-            ),
-            (
-                "protection-allowed",
-                self.text("パック許可", "Allowed"),
-                Filter::Allowed,
-            ),
-            (
-                "protection-review",
-                self.text("要確認", "Review"),
-                Filter::Review,
-            ),
-            (
-                "protection-current",
-                self.text("適用中の除外", "Excluded"),
-                Filter::Current,
-            ),
-        ] {
+            .disabled(self.operation.busy());
+        for filter in Filter::ALL {
             let selected = self.protection.filter == filter;
             filters = filters.child(
-                theme::button(id, cx)
-                    .label(label)
+                theme::button(filter.id(), cx)
+                    .label(filter.label(self))
                     .selected(selected)
-                    .disabled_elevated(blocked)
+                    .disabled_elevated(self.operation.busy())
                     .when(selected, |b| b.icon(IconName::Check))
                     .when(selected, |b| b.font_weight(FontWeight::SEMIBOLD)),
             );
         }
-        panel = panel.child(
-            settings.child(
+        if !is_changes {
+            settings = settings.child(
                 div()
                     .text_xs()
                     .text_color(colors.muted_foreground)
@@ -817,8 +835,9 @@ impl Manager {
                     .role(Role::Status)
                     .aria_label(summary.clone())
                     .child(summary),
-            ),
-        );
+            );
+        }
+        panel = panel.child(settings);
         let has_expanded_group = self
             .protection
             .group_counts
@@ -838,46 +857,46 @@ impl Manager {
                 .px_4()
                 .pb_2()
                 .gap_2()
-                .child(
-                    filters.on_click(cx.listener(|this, selected: &Vec<usize>, _, cx| {
-                        let Some(filter) = selected.first().and_then(|index| {
-                            [
-                                Filter::All,
-                                Filter::Protected,
-                                Filter::Allowed,
-                                Filter::Review,
-                                Filter::Current,
-                            ]
-                            .get(*index)
-                            .copied()
-                        }) else {
-                            return;
-                        };
-                        this.protection.filter = filter;
-                        this.protection.pinned.clear();
-                        this.reset_protection_list();
-                        cx.notify();
-                    })),
-                )
-                .child(
-                    theme::button("protection-details", cx)
-                        .small()
-                        .label(self.text("登録の詳細", "Registration details"))
-                        .selected(self.protection.details)
-                        .toggled(self.protection.details)
-                        .when(self.protection.details, |b| b.icon(IconName::Check))
-                        .tooltip(self.text(
-                            "登録情報の詳細を表示・非表示",
-                            "Show or hide registration details",
-                        ))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.protection.details = !this.protection.details;
-                            if let Some(list) = &this.protection.list {
-                                list.remeasure();
-                            }
+                .child(if compact {
+                    self.protection_view_select(window, cx)
+                } else {
+                    filters
+                        .on_click(cx.listener(|this, selected: &Vec<usize>, _, cx| {
+                            let Some(filter) = selected
+                                .first()
+                                .and_then(|index| Filter::ALL.get(*index).copied())
+                            else {
+                                return;
+                            };
+                            this.protection.filter = filter;
+                            this.protection.view_picker = None;
+                            this.protection.pinned.clear();
+                            this.reset_protection_list();
                             cx.notify();
-                        })),
-                )
+                        }))
+                        .into_any_element()
+                })
+                .when(!is_changes, |bar| {
+                    bar.child(
+                        theme::button("protection-details", cx)
+                            .small()
+                            .label(self.text("登録の詳細", "Registration details"))
+                            .selected(self.protection.details)
+                            .toggled(self.protection.details)
+                            .when(self.protection.details, |b| b.icon(IconName::Check))
+                            .tooltip(self.text(
+                                "登録情報の詳細を表示・非表示",
+                                "Show or hide registration details",
+                            ))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.protection.details = !this.protection.details;
+                                if let Some(list) = &this.protection.list {
+                                    list.remeasure();
+                                }
+                                cx.notify();
+                            })),
+                    )
+                })
                 .child(
                     theme::button("protection-refresh", cx)
                         .ml_2()
@@ -889,41 +908,46 @@ impl Manager {
                             this.inspect_protection(cx);
                         })),
                 )
-                .child(
-                    div()
-                        .flex()
-                        .flex_1()
-                        .min_w_72()
-                        .justify_end()
-                        .gap_2()
-                        .child(
-                            theme::button("protection-expand-all", cx)
-                                .small()
-                                .label(self.text("すべて開く", "Expand all"))
-                                .disabled_elevated(blocked || !has_collapsed_group)
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.protection.collapsed.clear();
-                                    this.reset_protection_list();
-                                    cx.notify();
-                                })),
-                        )
-                        .child(
-                            theme::button("protection-collapse-all", cx)
-                                .small()
-                                .label(self.text("すべて閉じる", "Collapse all"))
-                                .disabled_elevated(blocked || !has_expanded_group)
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.protection
-                                        .collapsed
-                                        .extend(this.protection.sources.iter().map(display_group));
-                                    this.reset_protection_list();
-                                    cx.notify();
-                                })),
-                        ),
-                ),
+                .when(!is_changes, |bar| {
+                    bar.child(
+                        div()
+                            .flex()
+                            .flex_1()
+                            .min_w_72()
+                            .justify_end()
+                            .gap_2()
+                            .child(
+                                theme::button("protection-expand-all", cx)
+                                    .small()
+                                    .label(self.text("すべて開く", "Expand all"))
+                                    .disabled_elevated(blocked || !has_collapsed_group)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.protection.collapsed.clear();
+                                        this.reset_protection_list();
+                                        cx.notify();
+                                    })),
+                            )
+                            .child(
+                                theme::button("protection-collapse-all", cx)
+                                    .small()
+                                    .label(self.text("すべて閉じる", "Collapse all"))
+                                    .disabled_elevated(blocked || !has_expanded_group)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.protection.collapsed.extend(
+                                            this.protection.sources.iter().map(display_group),
+                                        );
+                                        this.reset_protection_list();
+                                        cx.notify();
+                                    })),
+                            ),
+                    )
+                }),
         );
-        if !self.protection.pinned.is_empty() {
-            panel = panel.child(
+        if is_changes {
+            panel = panel.child(self.protection_changes_panel(compact, window, cx));
+        } else {
+            if !self.protection.pinned.is_empty() {
+                panel = panel.child(
                 div()
                     .px_4()
                     .pb_2()
@@ -934,111 +958,112 @@ impl Manager {
                         "The list stays visible while editing. Select a filter again to update it.",
                     )),
             );
-        }
-        let shown = self.protection_rows();
-        if let Some(error) = &self.protection.error {
-            panel = panel.child(
-                div()
-                    .id("protection-error")
-                    .px_4()
-                    .py_2()
-                    .child(self.text(
-                        "調査できませんでした。「再調査」でやり直してください。",
-                        "Could not inspect registrations. Choose Refresh to retry.",
-                    ))
-                    .text_color(cx.theme().colors.danger)
-                    .child(error.clone()),
-            );
-        }
-        let mut rows = theme::card(cx)
-            .id("protection-rows")
-            .mx_4()
-            .mb_3()
-            .overflow_hidden()
-            .flex_1()
-            .min_h_0()
-            .flex()
-            .flex_col();
-        if shown.is_empty() && !self.protection.loading && self.protection.error.is_none() {
-            let message = if self.protection.pack.is_none() {
-                self.text(
-                    "パックを追加すると、保護する種類を確認できます。",
-                    "Add an icon pack to inspect protected file types.",
-                )
-            } else if self.protection.filter == Filter::Current
-                && (self.settings.active.is_none()
-                    || self.protection.pack.as_ref() != self.settings.active.as_ref())
-            {
-                self.text(
-                    "このパックは適用されていません。",
-                    "This pack is not active.",
-                )
-            } else if self.protection.filter != Filter::All {
-                self.text(
-                    "絞り込みに一致する種類はありません。",
-                    "No file types match this filter.",
-                )
-            } else {
-                self.text(
-                    "既存のアイコン指定はありません。",
-                    "No existing icon registrations.",
-                )
-            };
-            let mut empty = div()
-                .px_4()
-                .py_4()
-                .text_sm()
-                .text_color(colors.muted_foreground)
-                .child(message);
-            if self.protection.filter != Filter::All {
-                empty = empty.child(
-                    theme::button("protection-show-all", cx)
-                        .small()
-                        .label(self.text("すべて表示", "Show all"))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.protection.filter = Filter::All;
-                            this.protection.pinned.clear();
-                            this.reset_protection_list();
-                            cx.notify();
-                        })),
+            }
+            let shown = self.protection_rows();
+            if let Some(error) = &self.protection.error {
+                panel = panel.child(
+                    div()
+                        .id("protection-error")
+                        .px_4()
+                        .py_2()
+                        .child(self.text(
+                            "調査できませんでした。「再調査」でやり直してください。",
+                            "Could not inspect registrations. Choose Refresh to retry.",
+                        ))
+                        .text_color(cx.theme().colors.danger)
+                        .child(error.clone()),
                 );
             }
-            rows = rows.child(empty);
-        }
-        if self.protection.loading {
-            rows = rows.child(
-                div()
+            let mut rows = theme::card(cx)
+                .id("protection-rows")
+                .mx_4()
+                .mb_3()
+                .overflow_hidden()
+                .flex_1()
+                .min_h_0()
+                .flex()
+                .flex_col();
+            if shown.is_empty() && !self.protection.loading && self.protection.error.is_none() {
+                let message = if self.protection.pack.is_none() {
+                    self.text(
+                        "パックを追加すると、保護する種類を確認できます。",
+                        "Add an icon pack to inspect protected file types.",
+                    )
+                } else if self.protection.filter == Filter::Current
+                    && (self.settings.active.is_none()
+                        || self.protection.pack.as_ref() != self.settings.active.as_ref())
+                {
+                    self.text(
+                        "このパックは適用されていません。",
+                        "This pack is not active.",
+                    )
+                } else if self.protection.filter != Filter::All {
+                    self.text(
+                        "絞り込みに一致する種類はありません。",
+                        "No file types match this filter.",
+                    )
+                } else {
+                    self.text(
+                        "既存のアイコン指定はありません。",
+                        "No existing icon registrations.",
+                    )
+                };
+                let mut empty = div()
                     .px_4()
                     .py_4()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(Spinner::new().small())
-                    .child(self.text("登録を調査中…", "Inspecting registrations…")),
-            );
+                    .text_sm()
+                    .text_color(colors.muted_foreground)
+                    .child(message);
+                if self.protection.filter != Filter::All {
+                    empty = empty.child(
+                        theme::button("protection-show-all", cx)
+                            .small()
+                            .label(self.text("すべて表示", "Show all"))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.protection.filter = Filter::All;
+                                this.protection.pinned.clear();
+                                this.reset_protection_list();
+                                cx.notify();
+                            })),
+                    );
+                }
+                rows = rows.child(empty);
+            }
+            if self.protection.loading {
+                rows = rows.child(
+                    div()
+                        .px_4()
+                        .py_4()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(Spinner::new().small())
+                        .child(self.text("登録を調査中…", "Inspecting registrations…")),
+                );
+            }
+            if !shown.is_empty()
+                && let Some(state) = &self.protection.list
+            {
+                let view = cx.entity().downgrade();
+                rows = rows.child(
+                    list(state.clone(), move |ix, _, cx| {
+                        view.update(cx, |this, cx| this.protection_row(ix, cx))
+                            .unwrap_or_else(|_| div().into_any_element())
+                    })
+                    .with_sizing_behavior(ListSizingBehavior::Auto)
+                    .w_full()
+                    .flex_1()
+                    .min_h_0(),
+                );
+            }
+            #[cfg(feature = "test-support")]
+            let rows = rows.test_support();
+            panel = panel.child(if let Some(state) = &self.protection.list {
+                rows.relative().vertical_scrollbar(state)
+            } else {
+                rows
+            });
         }
-        if !shown.is_empty()
-            && let Some(state) = &self.protection.list
-        {
-            let view = cx.entity().downgrade();
-            rows = rows.child(
-                list(state.clone(), move |ix, _, cx| {
-                    view.update(cx, |this, cx| this.protection_row(ix, cx))
-                        .unwrap_or_else(|_| div().into_any_element())
-                })
-                .with_sizing_behavior(ListSizingBehavior::Auto)
-                .w_full()
-                .flex_1()
-                .min_h_0(),
-            );
-        }
-        #[cfg(feature = "test-support")]
-        let rows = rows.test_support();
-        panel = panel.child(if let Some(state) = &self.protection.list {
-            rows.relative().vertical_scrollbar(state)
-        } else {
-            rows
-        });
         panel = panel.child(
             div()
                 .flex_shrink_0()
@@ -1062,17 +1087,6 @@ impl Manager {
                         } else {
                             self.text("保存済み", "Saved")
                         }),
-                )
-                .child(
-                    theme::button("protection-review-changes", cx)
-                        .small()
-                        .label(self.text("変更内容を見る", "View changes"))
-                        .disabled_elevated(blocked || self.protection.error.is_some() || !dirty)
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.protection.changes_recommended = false;
-                            this.protection.changes_open = true;
-                            cx.notify();
-                        })),
                 )
                 .child(
                     theme::button("protection-back", cx)

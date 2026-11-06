@@ -152,12 +152,14 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
         // 独立した拡張子なしの項目を閉じても、変更一覧から編集に戻ると展開される。
         w.click("provider-toggle-extensionless", cx);
         w.render_frame(cx);
-        w.click("protection-review-changes", cx);
+        w.click("protection-view-changes", cx);
         w.render_frame(cx);
         let row = w.find("protection-change-row-");
         let change = row.label().unwrap();
         assert!(change.contains("拡張子のないファイルなど"));
         assert!(change.contains("保護 → パック許可"));
+        w.click("protection-change-details-", cx);
+        w.render_frame(cx);
         assert!(
             w.find("protection-result-after-")
                 .label()

@@ -65,6 +65,7 @@ impl Manager {
         );
         let (released, protected, choices) = changes.counts();
         self.protection.recommendation_changes = Some(changes);
+        self.protection.basis_picker = None;
         let unchanged = self.protection.draft && rules == self.protection.rules;
         let review = self
             .protection
