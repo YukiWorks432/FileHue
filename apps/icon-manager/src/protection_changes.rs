@@ -125,8 +125,11 @@ impl Manager {
         }
         for row in &changes.rows {
             let extension = if row.extension.is_empty() {
-                self.text("拡張子なし・名前パターン", "Extensionless and patterns")
-                    .to_string()
+                self.text(
+                    "拡張子のないファイルなど",
+                    "Extensionless files and patterns",
+                )
+                .to_string()
             } else {
                 format!(".{}", row.extension)
             };
@@ -137,7 +140,11 @@ impl Manager {
                 format!("{} → {}", state(row.before), state(row.after))
             };
             let target = row.extension.clone();
-            let label = format!("{extension} · {} · {description}", row.provider);
+            let label = if row.extension.is_empty() {
+                format!("{extension} · {description}")
+            } else {
+                format!("{extension} · {} · {description}", row.provider)
+            };
             let row_element = div()
                 .id(SharedString::from(format!(
                     "protection-change-row-{target}"
@@ -165,7 +172,7 @@ impl Manager {
                         this.protection.filter = Filter::All;
                         this.protection.pinned.clear();
                         if let Some(source) = this.protection.source(&target) {
-                            let group = source.group_id();
+                            let group = display_group(source);
                             this.protection.collapsed.remove(&group);
                         }
                         this.reset_protection_list();
