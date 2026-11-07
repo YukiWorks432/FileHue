@@ -279,8 +279,18 @@ impl Manager {
                             .flex()
                             .flex_wrap()
                             .items_center()
+                            .justify_between()
                             .gap_3()
-                            .child(div().text_sm().child(self.text("比較する内容", "Compare")))
+                            .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(
+                                if self.protection.changes_recommended {
+                                    self.text(
+                                        "おすすめ操作の変更記録",
+                                        "Recommendation change record",
+                                    )
+                                } else {
+                                    self.text("保存後のアイコン", "Icons after saving")
+                                },
+                            ))
                             .child(
                                 div().w_64().min_w_0().child(
                                     Select::new(self.protection.basis_picker.as_ref().unwrap())
@@ -353,18 +363,15 @@ impl Manager {
                 .px_3()
                 .pb_3()
                 .text_sm()
-                .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(
-                    if self.protection.changes_recommended {
-                        self.text("おすすめ操作の変更記録", "Recommendation change record")
-                    } else {
-                        self.text("保存後のアイコン", "Icons after saving")
-                    },
-                ))
                 .child(format!(
-                    "{}: {count}",
-                    self.text("変更する種類", "Changed file types")
-                ))
-                .child(summary);
+                    "{}: {count}{}",
+                    self.text("変更する種類", "Changed file types"),
+                    if summary.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" · {summary}")
+                    }
+                ));
             #[cfg(feature = "test-support")]
             let summary = summary.test_support();
             panel = panel.child(summary);
