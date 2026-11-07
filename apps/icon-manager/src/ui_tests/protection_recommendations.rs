@@ -396,6 +396,9 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        assert!(w.try_find("protection-change-row-review-000").is_none());
+        w.click("protection-changes-show-same", cx);
+        w.render_frame(cx);
         w.click("protection-change-details-review-000", cx);
         w.render_frame(cx);
         w.press("end", cx);
