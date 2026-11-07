@@ -170,6 +170,10 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 "比較列を見出しと揃える"
             );
         }
+        if w.try_find("protection-change-row-mts").is_none() {
+            w.click("protection-changes-show-same", cx);
+            w.render_frame(cx);
+        }
         if w.try_find("protection-change-edit-mts").is_none() {
             w.click("protection-change-details-mts", cx);
             w.render_frame(cx);
@@ -195,19 +199,17 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        assert!(w.try_find("protection-change-row-mts").is_none());
+        assert!(w.try_find("protection-change-before-heading").is_none());
+        w.click("protection-changes-show-same", cx);
+        w.render_frame(cx);
         assert!(
             w.find("protection-change-row-mts")
                 .label()
                 .unwrap()
                 .contains("指定更新")
         );
-        // パック未適用では、おすすめ操作で許可しても表示は元のまま。
-        for id in [
-            "protection-result-current-mts",
-            "protection-result-after-mts",
-        ] {
-            assert!(w.find(id).label().unwrap().contains("元の表示"));
-        }
+        assert_eq!(serde_json::to_value(load().unwrap()).unwrap(), before);
         w.click("protection-changes-basis", cx);
         w.press("down", cx);
         w.press("enter", cx);
@@ -242,6 +244,10 @@ fn recommended_in_child(cx: &mut TestAppContext) {
             cx.notify();
         });
         w.render_frame(cx);
+        if w.try_find("protection-change-row-mts").is_none() {
+            w.click("protection-changes-show-same", cx);
+            w.render_frame(cx);
+        }
         if w.try_find("protection-change-edit-mts").is_none() {
             w.click("protection-change-details-mts", cx);
             w.render_frame(cx);
@@ -312,6 +318,10 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.click("protection-view-changes", cx);
         w.render_frame(cx);
+        if w.try_find("protection-change-row-m2ts").is_none() {
+            w.click("protection-changes-show-same", cx);
+            w.render_frame(cx);
+        }
         assert!(
             w.find("protection-change-row-m2ts")
                 .label()

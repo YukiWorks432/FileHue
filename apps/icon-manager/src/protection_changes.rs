@@ -180,7 +180,8 @@ impl Manager {
         } else {
             self.protection.changes_pending.as_ref().unwrap()
         };
-        if self.protection.changes_data.as_ref() != Some(data) {
+        let data_changed = self.protection.changes_data.as_ref() != Some(data);
+        if data_changed {
             let count = data.rows.len();
             self.protection.changes_data = Some(data.clone());
             if let Some(list) = &self.protection.changes_list {
@@ -195,6 +196,30 @@ impl Manager {
         let default = data.default;
         let count = data.rows.len();
         let review = data.review;
+        let same = if self.protection.changes_recommended {
+            Vec::new()
+        } else {
+            data.rows
+                .iter()
+                .enumerate()
+                .filter_map(|(ix, row)| {
+                    (self.protection_appearance_changed(&row.extension) == Some(false))
+                        .then_some(ix)
+                })
+                .collect::<Vec<_>>()
+        };
+        let visible = (0..count)
+            .filter(|ix| self.protection.changes_show_same || !same.contains(ix))
+            .collect::<Vec<_>>();
+        let visible_count = visible.len();
+        if data_changed || self.protection.changes_visible != visible {
+            self.protection
+                .changes_list
+                .as_ref()
+                .unwrap()
+                .reset(visible_count);
+            self.protection.changes_visible = visible;
+        }
         let unavailable = !self.protection.changes_recommended
             && (self.protection.loading || self.protection.error.is_some() || !self.valid);
         if self.protection.basis_picker.is_none() {
@@ -225,6 +250,7 @@ impl Manager {
                 Some(cx.subscribe(&picker, |this, _, event, cx| {
                     if let SelectEvent::Confirm(Some(id)) = event {
                         this.protection.changes_recommended = id == "recommended";
+                        this.protection.changes_show_same = false;
                         this.protection.changes_expanded.clear();
                         this.protection.changes_data = None;
                         cx.notify();
@@ -365,7 +391,7 @@ impl Manager {
                 .text_sm()
                 .child(format!(
                     "{}: {count}{}",
-                    self.text("変更する種類", "Changed file types"),
+                    self.text("設定変更の種類", "File types with settings changes"),
                     if summary.is_empty() {
                         String::new()
                     } else {
@@ -401,7 +427,56 @@ impl Manager {
                     },
                 ));
             }
-            if !compact && count > 0 {
+            if !self.protection.changes_recommended {
+                let changed = data
+                    .rows
+                    .iter()
+                    .filter(|row| self.protection_appearance_changed(&row.extension) == Some(true))
+                    .count();
+                let unknown = count - changed - same.len();
+                if changed > 0 || unknown > 0 {
+                    panel = panel.child(div().px_3().pb_2().child(format!(
+                        "{}: {changed} · {}: {unknown}",
+                        self.text("アイコン変更", "Icon changes"),
+                        self.text("判定不能", "Undetermined")
+                    )));
+                }
+            }
+            if !self.protection.changes_recommended
+                && count == same.len()
+                && (count > 0 || default.is_some())
+            {
+                panel = panel.child(
+                    div()
+                        .p_3()
+                        .child(self.text("アイコンの変更はありません", "No icon changes")),
+                );
+            }
+            if !same.is_empty() {
+                let open = self.protection.changes_show_same;
+                panel = panel.child(
+                    div().px_3().pb_3().child(
+                        theme::button("protection-changes-show-same", cx)
+                            .small()
+                            .label(format!(
+                                "{}: {} {}",
+                                self.text(
+                                    "表示が変わらない設定変更",
+                                    "Settings with unchanged appearance"
+                                ),
+                                same.len(),
+                                if open { "▾" } else { "▸" }
+                            ))
+                            .selected(open)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.protection.changes_show_same =
+                                    !this.protection.changes_show_same;
+                                cx.notify();
+                            })),
+                    ),
+                );
+            }
+            if !compact && visible_count > 0 {
                 let before_heading = div()
                     .id("protection-change-before-heading")
                     .flex_1()
@@ -459,6 +534,7 @@ impl Manager {
                 self.protection.changes_metrics = Some(metrics);
             }
             let view = cx.entity().downgrade();
+            let indices = self.protection.changes_visible.clone();
             let list_area = div()
                 .id("protection-changes-rows")
                 .relative()
@@ -468,8 +544,10 @@ impl Manager {
                 .min_h_0()
                 .child(
                     list(state.clone(), move |ix, _, cx| {
-                        view.update(cx, |this, cx| this.protection_change_row(ix, compact, cx))
-                            .unwrap_or_else(|_| div().into_any_element())
+                        view.update(cx, |this, cx| {
+                            this.protection_change_row(indices[ix], compact, cx)
+                        })
+                        .unwrap_or_else(|_| div().into_any_element())
                     })
                     .w_full()
                     .flex_1()
@@ -479,11 +557,25 @@ impl Manager {
                 .vertical_scrollbar(&state);
             #[cfg(feature = "test-support")]
             let list_area = list_area.test_support();
-            panel = panel.child(list_area);
+            if visible_count > 0 {
+                panel = panel.child(list_area);
+            }
         }
         #[cfg(feature = "test-support")]
         let panel = panel.test_support();
         panel.into_any_element()
+    }
+    // 解決できない表示は、同じ代替画像でも「変化なし」にしない。
+    fn protection_appearance_changed(&self, extension: &str) -> Option<bool> {
+        use super::sources::SampleDisplay;
+        let source = self.protection.source(extension)?;
+        let before = self.protection_sample(source, false);
+        let after = self.protection_sample(source, true);
+        match (&before, &after) {
+            (SampleDisplay::Unknown | SampleDisplay::ByName, _)
+            | (_, SampleDisplay::Unknown | SampleDisplay::ByName) => None,
+            _ => Some(before != after),
+        }
     }
     fn protection_state_text(&self, protect: bool) -> &'static str {
         if protect {
@@ -670,6 +762,11 @@ impl Manager {
                 div()
                     .child(self.text("画像の記録なし", "No image recorded"))
                     .into_any_element()
+            } else if self.protection_appearance_changed(&row.extension) == Some(false) {
+                div()
+                    .child(self.text("変更前の設定", "Previous settings"))
+                    .child(before.clone())
+                    .into_any_element()
             } else if let Some(source) = self.protection.source(&row.extension) {
                 self.protection_result(source, false, true, cx)
             } else {
@@ -696,6 +793,11 @@ impl Manager {
             .child(if self.protection.changes_recommended {
                 div()
                     .child(self.text("画像の記録なし", "No image recorded"))
+                    .into_any_element()
+            } else if self.protection_appearance_changed(&row.extension) == Some(false) {
+                div()
+                    .child(self.text("変更後の設定", "New settings"))
+                    .child(after.clone())
                     .into_any_element()
             } else if let Some(source) = self.protection.source(&row.extension) {
                 self.protection_result(source, true, true, cx)

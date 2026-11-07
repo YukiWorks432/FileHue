@@ -117,6 +117,8 @@ pub(super) struct Editor {
     recommendation_changes: Option<changes::Changes>,
     changes_list: Option<ListState>,
     changes_expanded: std::collections::BTreeSet<String>,
+    changes_show_same: bool,
+    changes_visible: Vec<usize>,
     changes_data: Option<changes::Changes>,
     changes_pending: Option<changes::Changes>,
     changes_metrics: Option<(Pixels, Pixels, String)>,
