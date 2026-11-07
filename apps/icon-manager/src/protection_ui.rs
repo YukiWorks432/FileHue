@@ -175,6 +175,23 @@ fn display_group(source: &ExistingIcon) -> String {
 
 #[cfg(test)]
 impl Editor {
+    #[cfg(test)]
+    pub(super) fn visual_applied(&mut self, rows: &[ExistingIcon]) {
+        self.active_extensions = rows
+            .iter()
+            .map(|r| r.registration.extension.clone())
+            .collect();
+        self.active_classes = rows
+            .iter()
+            .map(|r| r.registration.class.to_lowercase())
+            .collect();
+        self.active_excluded_extensions = rows
+            .iter()
+            .filter(|r| r.protect)
+            .map(|r| r.registration.extension.clone())
+            .collect();
+    }
+    #[cfg(test)]
     pub(super) fn visual_sources(&mut self, rows: Vec<ExistingIcon>) {
         self.previews = super::original_icons::generate(&rows).ok();
         self.visual_rows(rows.iter().map(|r| r.registration.clone()).collect());

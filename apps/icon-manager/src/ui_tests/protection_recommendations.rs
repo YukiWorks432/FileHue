@@ -151,6 +151,8 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("保護 → パック許可")
         );
+        // 操作記録へ現在の画像を流用しない。
+        assert!(w.try_find("protection-result-current-mts").is_none());
         for (heading, cell) in [
             (
                 "protection-change-before-heading",
@@ -168,6 +170,16 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 "比較列を見出しと揃える"
             );
         }
+        if w.try_find("protection-change-edit-mts").is_none() {
+            w.click("protection-change-details-mts", cx);
+            w.render_frame(cx);
+        }
+        super::protection_sources::reveal_in(
+            w,
+            "protection-change-edit-mts",
+            "protection-changes",
+            cx,
+        );
         w.click("protection-change-edit-mts", cx);
         w.render_frame(cx);
         super::protection_sources::reveal(w, "original-icon-mts", cx);
@@ -189,6 +201,13 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("指定更新")
         );
+        // パック未適用では、おすすめ操作で許可しても表示は元のまま。
+        for id in [
+            "protection-result-current-mts",
+            "protection-result-after-mts",
+        ] {
+            assert!(w.find(id).label().unwrap().contains("元の表示"));
+        }
         w.click("protection-changes-basis", cx);
         w.press("down", cx);
         w.press("enter", cx);
@@ -223,6 +242,16 @@ fn recommended_in_child(cx: &mut TestAppContext) {
             cx.notify();
         });
         w.render_frame(cx);
+        if w.try_find("protection-change-edit-mts").is_none() {
+            w.click("protection-change-details-mts", cx);
+            w.render_frame(cx);
+        }
+        super::protection_sources::reveal_in(
+            w,
+            "protection-change-edit-mts",
+            "protection-changes",
+            cx,
+        );
         w.click("protection-change-edit-mts", cx);
         w.render_frame(cx);
         super::protection_sources::reveal(w, "pack-icon-mts", cx);
@@ -288,6 +317,14 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 .label()
                 .unwrap()
                 .contains("パック許可 → 保護")
+        );
+        w.click("protection-change-details-m2ts", cx);
+        w.render_frame(cx);
+        super::protection_sources::reveal_in(
+            w,
+            "protection-change-edit-m2ts",
+            "protection-changes",
+            cx,
         );
         w.click("protection-change-edit-m2ts", cx);
         w.render_frame(cx);
@@ -389,7 +426,12 @@ fn recommended_visual_probe() {
                 cx.background_executor()
                     .timer(std::time::Duration::from_secs(2))
                     .await;
-                manager.update(cx, |this, _| this.protection.visual_sources(sources));
+                manager.update(cx, |this, _| {
+                    // 保存はせず、適用中パックと保護済み登録を再現する。
+                    this.settings.active = Some(this.settings.packs[0].id.clone());
+                    this.protection.visual_applied(&sources);
+                    this.protection.visual_sources(sources);
+                });
                 window
                     .update(cx, |_, w, cx| {
                         w.render_frame(cx);

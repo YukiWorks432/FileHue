@@ -8,7 +8,8 @@ use gpui_kit::{
     prelude::FluentBuilder,
 };
 
-enum SampleDisplay {
+#[derive(PartialEq, Eq)]
+pub(super) enum SampleDisplay {
     Original,
     Pack(std::path::PathBuf),
     ByName,
@@ -64,7 +65,11 @@ impl Editor {
 
 impl Manager {
     /// 拡張子を代表するファイル名で、適用中または保存後の設定を解決する。
-    fn protection_sample(&self, source: &ExistingIcon, after_save: bool) -> SampleDisplay {
+    pub(super) fn protection_sample(
+        &self,
+        source: &ExistingIcon,
+        after_save: bool,
+    ) -> SampleDisplay {
         if self.conflict_attention || !self.valid {
             return SampleDisplay::Unknown;
         }
@@ -130,6 +135,7 @@ impl Manager {
         &self,
         source: &ExistingIcon,
         after_save: bool,
+        large: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         use gpui_kit::{
@@ -185,27 +191,42 @@ impl Manager {
                 .find(|pack| &pack.id == active)
                 .and_then(|pack| sample_name(pack, extension))
         });
-        let label = if let Some(sample) = sample {
+        let label = if large {
+            if let Some(sample) = sample {
+                format!("{sample}: {name}")
+            } else {
+                name.to_string()
+            }
+        } else if let Some(sample) = sample {
             format!("{prefix} ({sample}): {name}")
         } else {
             format!("{prefix}: {name}")
         };
+        let has_preview = path.is_some();
         let icon = if let Some(path) = path {
-            div().size_5().child(img(path).size_5()).into_any_element()
+            div()
+                .size(if large { px(48.) } else { px(20.) })
+                .child(img(path).size(if large { px(48.) } else { px(20.) }))
+                .into_any_element()
         } else {
             div()
                 .id(SharedString::from(format!(
                     "protection-preview-fallback-{}-{extension}",
                     if after_save { "after" } else { "current" }
                 )))
-                .size_5()
+                .size(if large { px(48.) } else { px(20.) })
                 .child(
                     Icon::new(IconName::TriangleAlert)
-                        .size_5()
+                        .size(if large { px(48.) } else { px(20.) })
                         .text_color(colors.muted_foreground),
                 )
                 .tooltip(move |window, cx| Tooltip::new(missing_tip).build(window, cx))
                 .into_any_element()
+        };
+        let label = if large && !has_preview {
+            format!("{label}\n{missing_tip}")
+        } else {
+            label
         };
         let result = div()
             .id(SharedString::from(format!(
@@ -215,7 +236,8 @@ impl Manager {
             .role(Role::Status)
             .aria_label(label.clone())
             .flex()
-            .items_center()
+            .when(large, |p| p.flex_col().items_start())
+            .when(!large, |p| p.items_center())
             .gap_2()
             .min_w_0()
             .text_sm()
@@ -570,8 +592,8 @@ impl Manager {
             .items_center()
             .gap_3()
             .child(saved)
-            .child(self.protection_result(source, false, cx))
-            .child(self.protection_result(source, true, cx));
+            .child(self.protection_result(source, false, false, cx))
+            .child(self.protection_result(source, true, false, cx));
         let mut area = div()
             .mt_2()
             .flex()

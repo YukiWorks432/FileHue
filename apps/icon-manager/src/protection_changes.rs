@@ -336,12 +336,16 @@ impl Manager {
             let status = status.test_support();
             panel = panel.child(status);
         } else {
-            let summary = format!(
-                "{} {released}  ·  {} {protected}  ·  {} {choices}",
-                self.text("保護解除", "Released"),
-                self.text("保護追加", "Protected"),
-                self.text("指定更新", "Choices updated")
-            );
+            let summary = [
+                (self.text("保護解除", "Released"), released),
+                (self.text("保護追加", "Protected"), protected),
+                (self.text("指定更新", "Choices updated"), choices),
+            ]
+            .into_iter()
+            .filter(|(_, count)| *count > 0)
+            .map(|(label, count)| format!("{label} {count}"))
+            .collect::<Vec<_>>()
+            .join(" · ");
             let summary = div()
                 .id("protection-changes-summary")
                 .role(Role::Status)
@@ -349,6 +353,17 @@ impl Manager {
                 .px_3()
                 .pb_3()
                 .text_sm()
+                .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(
+                    if self.protection.changes_recommended {
+                        self.text("おすすめ操作の変更記録", "Recommendation change record")
+                    } else {
+                        self.text("保存後のアイコン", "Icons after saving")
+                    },
+                ))
+                .child(format!(
+                    "{}: {count}",
+                    self.text("変更する種類", "Changed file types")
+                ))
                 .child(summary);
             #[cfg(feature = "test-support")]
             let summary = summary.test_support();
@@ -384,12 +399,20 @@ impl Manager {
                     .id("protection-change-before-heading")
                     .flex_1()
                     .min_w_0()
-                    .child(self.text("変更前", "Before"));
+                    .child(if self.protection.changes_recommended {
+                        self.text("操作前", "Before action")
+                    } else {
+                        self.text("現在の表示", "Current appearance")
+                    });
                 let after_heading = div()
                     .id("protection-change-after-heading")
                     .flex_1()
                     .min_w_0()
-                    .child(self.text("変更後", "After"));
+                    .child(if self.protection.changes_recommended {
+                        self.text("操作後", "After action")
+                    } else {
+                        self.text("保存後の見込み", "After saving")
+                    });
                 #[cfg(feature = "test-support")]
                 let before_heading = before_heading.test_support();
                 #[cfg(feature = "test-support")]
@@ -405,8 +428,14 @@ impl Manager {
                         .gap_3()
                         .text_xs()
                         .text_color(colors.muted_foreground)
-                        .child(div().flex_1().min_w_0().child(self.text("対象", "Target")))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .child(self.text("拡張子", "Extension")),
+                        )
                         .child(before_heading)
+                        .child(div().w_6().flex_shrink_0())
                         .child(after_heading)
                         .child(div().w_32().child(self.text("変更の種類", "Change")))
                         .child(div().w_32()),
@@ -547,6 +576,26 @@ impl Manager {
                 self.text("は継続", " unchanged")
             )
         };
+        let appearance = if self.protection.changes_recommended {
+            self.text("設定の変更記録", "Settings change record")
+        } else if let Some(source) = self.protection.source(&row.extension) {
+            use super::sources::SampleDisplay;
+            let old = self.protection_sample(source, false);
+            let new = self.protection_sample(source, true);
+            match (&old, &new) {
+                (SampleDisplay::Unknown | SampleDisplay::ByName, _)
+                | (_, SampleDisplay::Unknown | SampleDisplay::ByName) => {
+                    self.text("表示を確認できません", "Appearance unavailable")
+                }
+                _ if old == new => self.text("表示予定は同じ", "Same appearance expected"),
+                (_, SampleDisplay::Pack(_)) => {
+                    self.text("パックのアイコンへ変更", "Switch to pack icon")
+                }
+                _ => self.text("元の表示へ変更", "Switch to original appearance"),
+            }
+        } else {
+            self.text("表示を確認できません", "Appearance unavailable")
+        };
         let target = row.extension.clone();
         let expanded = self.protection.changes_expanded.contains(&target);
         let actions = div()
@@ -555,41 +604,6 @@ impl Manager {
             .flex()
             .flex_col()
             .gap_2()
-            .child(
-                theme::button(
-                    SharedString::from(format!("protection-change-edit-{target}")),
-                    cx,
-                )
-                .small()
-                .label(self.text("設定を開く", "Open settings"))
-                .disabled_elevated(
-                    self.protection.source(&target).is_none() || self.operation.busy(),
-                )
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.protection.filter = Filter::All;
-                    this.protection.view_picker = None;
-                    this.protection.pinned.clear();
-                    if let Some(source) = this.protection.source(&target) {
-                        let group = display_group(source);
-                        this.protection.collapsed.remove(&group);
-                    }
-                    this.reset_protection_list();
-                    if let Some(index) = this
-                        .protection
-                        .visible_rows
-                        .iter()
-                        .position(|ix| this.protection.rows[*ix].extension == target)
-                        && let Some(list) = &this.protection.list
-                    {
-                        list.scroll_to(ListOffset {
-                            item_ix: index,
-                            offset_in_item: px(0.),
-                        });
-                    }
-                    this.focus.focus(window, cx);
-                    cx.notify();
-                })),
-            )
             .child({
                 let target = row.extension.clone();
                 theme::button(
@@ -616,6 +630,7 @@ impl Manager {
             .child(
                 div()
                     .font_weight(FontWeight::SEMIBOLD)
+                    .text_lg()
                     .child(extension.clone()),
             )
             .when(!row.extension.is_empty(), |p| {
@@ -634,14 +649,25 @@ impl Manager {
             .flex_1()
             .min_w_0()
             .when(compact, |p| {
-                p.child(
-                    div()
-                        .text_xs()
-                        .text_color(colors.muted_foreground)
-                        .child(self.text("変更前", "Before")),
-                )
+                p.child(div().text_xs().text_color(colors.muted_foreground).child(
+                    if self.protection.changes_recommended {
+                        self.text("操作前", "Before action")
+                    } else {
+                        self.text("現在の表示", "Current appearance")
+                    },
+                ))
             })
-            .child(before.clone());
+            .child(if self.protection.changes_recommended {
+                div()
+                    .child(self.text("画像の記録なし", "No image recorded"))
+                    .into_any_element()
+            } else if let Some(source) = self.protection.source(&row.extension) {
+                self.protection_result(source, false, true, cx)
+            } else {
+                div()
+                    .child(self.text("確認できません", "Unavailable"))
+                    .into_any_element()
+            });
         let after_column = div()
             .id(SharedString::from(format!(
                 "protection-change-after-{}",
@@ -650,14 +676,25 @@ impl Manager {
             .flex_1()
             .min_w_0()
             .when(compact, |p| {
-                p.child(
-                    div()
-                        .text_xs()
-                        .text_color(colors.muted_foreground)
-                        .child(self.text("変更後", "After")),
-                )
+                p.child(div().text_xs().text_color(colors.muted_foreground).child(
+                    if self.protection.changes_recommended {
+                        self.text("操作後", "After action")
+                    } else {
+                        self.text("保存後の見込み", "After saving")
+                    },
+                ))
             })
-            .child(after.clone());
+            .child(if self.protection.changes_recommended {
+                div()
+                    .child(self.text("画像の記録なし", "No image recorded"))
+                    .into_any_element()
+            } else if let Some(source) = self.protection.source(&row.extension) {
+                self.protection_result(source, true, true, cx)
+            } else {
+                div()
+                    .child(self.text("確認できません", "Unavailable"))
+                    .into_any_element()
+            });
         #[cfg(feature = "test-support")]
         let before_column = before_column.test_support();
         #[cfg(feature = "test-support")]
@@ -695,9 +732,10 @@ impl Manager {
                             .gap_3()
                             .min_w_0()
                             .child(before_column)
+                            .child(div().w_6().flex_shrink_0().child("→"))
                             .child(after_column),
                     )
-                    .child(kind)
+                    .child(appearance)
             } else {
                 div()
                     .w_full()
@@ -707,29 +745,54 @@ impl Manager {
                     .items_start()
                     .child(identity)
                     .child(before_column)
+                    .child(div().w_6().flex_shrink_0().child("→"))
                     .child(after_column)
-                    .child(div().w_32().flex_shrink_0().child(kind))
+                    .child(div().w_32().flex_shrink_0().child(appearance))
                     .child(actions)
             });
         if expanded {
             let mut detail = theme::inset(cx).p_3().flex().flex_col().gap_2().text_xs();
-            if !self.protection.changes_recommended
-                && let Some(source) = self.protection.source(&row.extension)
-            {
-                detail = detail.child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap_3()
-                        .child(self.protection_result(source, false, cx))
-                        .child(self.protection_result(source, true, cx)),
-                );
-            } else {
-                detail = detail.child(self.text(
-                    "操作記録には画像を保存していません。",
-                    "Images are not stored in the action snapshot.",
-                ));
-            }
+            detail = detail.child(format!(
+                "{}\n{}: {before}\n{}: {after}",
+                kind,
+                self.text("変更前の設定", "Previous settings"),
+                self.text("変更後の設定", "New settings")
+            ));
+            detail = detail.child(
+                theme::button(
+                    SharedString::from(format!("protection-change-edit-{target}")),
+                    cx,
+                )
+                .small()
+                .label(self.text("設定を開く", "Open settings"))
+                .disabled_elevated(
+                    self.protection.source(&target).is_none() || self.operation.busy(),
+                )
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.protection.filter = Filter::All;
+                    this.protection.view_picker = None;
+                    this.protection.pinned.clear();
+                    if let Some(source) = this.protection.source(&target) {
+                        let group = display_group(source);
+                        this.protection.collapsed.remove(&group);
+                    }
+                    this.reset_protection_list();
+                    if let Some(index) = this
+                        .protection
+                        .visible_rows
+                        .iter()
+                        .position(|ix| this.protection.rows[*ix].extension == target)
+                        && let Some(list) = &this.protection.list
+                    {
+                        list.scroll_to(ListOffset {
+                            item_ix: index,
+                            offset_in_item: px(0.),
+                        });
+                    }
+                    this.focus.focus(window, cx);
+                    cx.notify();
+                })),
+            );
             detail = detail.child(format!(
                 "{}: {}\n{}: {}\n{}: {}",
                 self.text("クラス", "Class"),
