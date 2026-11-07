@@ -273,6 +273,7 @@ impl Manager {
         self.protection.list = Some(ListState::new(0, ListAlignment::Top, px(0.)).measure_all());
         self.protection.open = true;
         self.protection.changes_recommended = false;
+        self.protection.changes_show_same = false;
         self.protection.view_picker = None;
         self.protection.basis_picker = None;
         self.protection.changes_expanded.clear();

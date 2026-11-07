@@ -197,7 +197,7 @@ impl Manager {
         let count = data.rows.len();
         let review = data.review;
         let same = if self.protection.changes_recommended {
-            Vec::new()
+            std::collections::BTreeSet::new()
         } else {
             data.rows
                 .iter()
@@ -206,7 +206,7 @@ impl Manager {
                     (self.protection_appearance_changed(&row.extension) == Some(false))
                         .then_some(ix)
                 })
-                .collect::<Vec<_>>()
+                .collect::<std::collections::BTreeSet<_>>()
         };
         let visible = (0..count)
             .filter(|ix| self.protection.changes_show_same || !same.contains(ix))
