@@ -452,25 +452,27 @@ impl Manager {
                 self.protection.changes_metrics = Some(metrics);
             }
             let view = cx.entity().downgrade();
-            panel = panel.child(
-                div()
-                    .relative()
-                    .flex()
-                    .flex_col()
+            let list_area = div()
+                .id("protection-changes-rows")
+                .relative()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .min_h_0()
+                .child(
+                    list(state.clone(), move |ix, _, cx| {
+                        view.update(cx, |this, cx| this.protection_change_row(ix, compact, cx))
+                            .unwrap_or_else(|_| div().into_any_element())
+                    })
+                    .w_full()
                     .flex_1()
                     .min_h_0()
-                    .child(
-                        list(state.clone(), move |ix, _, cx| {
-                            view.update(cx, |this, cx| this.protection_change_row(ix, compact, cx))
-                                .unwrap_or_else(|_| div().into_any_element())
-                        })
-                        .w_full()
-                        .flex_1()
-                        .min_h_0()
-                        .with_sizing_behavior(ListSizingBehavior::Auto),
-                    )
-                    .vertical_scrollbar(&state),
-            );
+                    .with_sizing_behavior(ListSizingBehavior::Auto),
+                )
+                .vertical_scrollbar(&state);
+            #[cfg(feature = "test-support")]
+            let list_area = list_area.test_support();
+            panel = panel.child(list_area);
         }
         #[cfg(feature = "test-support")]
         let panel = panel.test_support();

@@ -177,7 +177,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         super::protection_sources::reveal_in(
             w,
             "protection-change-edit-mts",
-            "protection-changes",
+            "protection-changes-rows",
             cx,
         );
         w.click("protection-change-edit-mts", cx);
@@ -249,7 +249,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         super::protection_sources::reveal_in(
             w,
             "protection-change-edit-mts",
-            "protection-changes",
+            "protection-changes-rows",
             cx,
         );
         w.click("protection-change-edit-mts", cx);
@@ -323,7 +323,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         super::protection_sources::reveal_in(
             w,
             "protection-change-edit-m2ts",
-            "protection-changes",
+            "protection-changes-rows",
             cx,
         );
         w.click("protection-change-edit-m2ts", cx);
