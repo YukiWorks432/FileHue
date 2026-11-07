@@ -590,6 +590,23 @@ fn recommended_visual_probe() {
                                         "{scenario}-pending-{language}-{mode:?}-{width}.png"
                                     )))
                                     .unwrap();
+                                if scenario == "choices"
+                                    && language == "ja"
+                                    && mode == ThemeMode::Dark
+                                    && width == 1120.
+                                {
+                                    assert!(
+                                        w.try_find("protection-change-before-heading").is_none()
+                                    );
+                                    w.click("protection-changes-show-same", cx);
+                                    w.render_frame(cx);
+                                    w.render_to_image()
+                                        .unwrap()
+                                        .save(output.join("choices-expanded-ja-Dark-1120.png"))
+                                        .unwrap();
+                                    w.click("protection-changes-show-same", cx);
+                                    w.render_frame(cx);
+                                }
                                 if scenario == "mixed"
                                     && language == "ja"
                                     && mode == ThemeMode::Dark
