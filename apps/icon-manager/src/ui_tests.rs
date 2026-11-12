@@ -1011,7 +1011,7 @@ fn download_gui_in_child(cx: &mut TestAppContext) {
             window.render_frame(cx);
             let toolbar = window.find("import").bounds();
             let footer = window.find("status").bounds();
-            for target in ["import", "appearance", "restore", "cleanup-shell"] {
+            for target in ["import", "appearance", "restore"] {
                 let control = window.find(target);
                 assert!(control.visible(), "{target}");
                 assert!(control.bounds().right() <= px(640.), "{target}");
@@ -1152,6 +1152,8 @@ fn shell_cleanup_gui_in_child(cx: &mut TestAppContext) {
     .unwrap();
     cx.run_until_parked();
     cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("about-open", cx);
         window.render_frame(cx);
         window.click("cleanup-shell", cx);
     })

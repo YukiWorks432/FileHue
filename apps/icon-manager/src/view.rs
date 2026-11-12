@@ -63,12 +63,12 @@ impl Manager {
             return;
         }
         if self.screen == Screen::Thumbnails {
-            self.screen = Screen::Packs;
+            self.screen = self.thumbnails.return_to.take().unwrap_or(Screen::Packs);
             self.focus.focus(window, cx);
             cx.notify();
         } else if self.screen == Screen::About {
             if self.about.license_text.take().is_none() {
-                self.screen = Screen::Packs;
+                self.screen = self.about.return_to.take().unwrap_or(Screen::Packs);
             }
             self.about.scroll.set_offset(point(px(0.), px(0.)));
             self.focus.focus(window, cx);
@@ -108,6 +108,13 @@ impl Manager {
     }
     pub(super) fn header(&self, cx: &mut Context<Self>) -> Div {
         let colors = cx.theme().colors;
+        let brand = div()
+            .id("app-brand")
+            .text_lg()
+            .font_weight(FontWeight::SEMIBOLD)
+            .child("FileHue");
+        #[cfg(feature = "test-support")]
+        let brand = brand.test_support();
         div()
             .flex_shrink_0()
             .flex()
@@ -125,33 +132,12 @@ impl Manager {
                     .flex()
                     .items_center()
                     .gap_3()
-                    .when(
-                        self.screen != Screen::Packs
-                            || self.browsing
-                            || self.selected.is_some()
-                            || self.pending.is_some(),
-                        |row| {
-                            row.child(self.back_button(
-                                if self.screen == Screen::Targets {
-                                    "target-back"
-                                } else {
-                                    "navigate-back"
-                                },
-                                cx,
-                            ))
-                        },
-                    )
                     .child(
                         Icon::new(IconName::PanelsTopLeft)
                             .size_5()
                             .text_color(colors.primary),
                     )
-                    .child(
-                        div()
-                            .text_lg()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("FileHue"),
-                    ),
+                    .child(brand),
             )
             .child(
                 div()
@@ -198,50 +184,110 @@ impl Manager {
                             })),
                     )
                     .child(
-                        theme::button("conflicts-open", cx)
-                            .icon(IconName::TriangleAlert)
+                        theme::button("about-open", cx)
                             .small()
-                            .when(self.conflict_attention, |button| button.warning())
-                            .label(if self.conflict_attention {
-                                self.text("競合あり・確認", "Conflicts detected · Review")
-                            } else {
-                                self.text("競合を確認", "Review conflicts")
-                            })
-                            .selected(self.screen == Screen::Recovery)
+                            .icon(IconName::Info)
+                            .label(self.text("アプリ情報", "About"))
                             .disabled_elevated(
-                                matches!(self.screen, Screen::About | Screen::Thumbnails)
-                                    || self.operation.busy()
-                                    || self._guard.is_none()
-                                    || matches!(self.screen, Screen::Recovery | Screen::Protection),
+                                self.operation.busy()
+                                    || matches!(
+                                        self.screen,
+                                        Screen::Targets | Screen::Protection | Screen::Recovery
+                                    ),
                             )
                             .on_click(cx.listener(|this, _, window, cx| {
-                                this.open_conflicts(
-                                    file_icons_windows::conflict::Strategy::PreserveExternal,
-                                    window,
-                                    cx,
-                                )
+                                if this.screen != Screen::About {
+                                    this.about.return_to = Some(this.screen);
+                                    this.about.license_text = None;
+                                    this.screen = Screen::About;
+                                    this.about.scroll.set_offset(point(px(0.), px(0.)));
+                                    this.focus.focus(window, cx);
+                                    cx.notify();
+                                }
                             })),
-                    )
-                    .child(
-                        theme::button("protection-open", cx)
-                            .icon(IconName::ShieldCheck)
-                            .small()
-                            .label(self.text("アイコンの保護", "Icon protection"))
-                            .disabled_elevated(
-                                matches!(self.screen, Screen::About | Screen::Thumbnails)
-                                    || self.operation.busy()
-                                    || !self.valid
-                                    || self.screen == Screen::Protection,
-                            )
-                            .on_click(
-                                cx.listener(|this, _, window, cx| this.open_protection(window, cx)),
-                            ),
                     ),
             )
     }
 
-    fn toolbar(&self, cx: &mut Context<Self>) -> Div {
-        let blocked = self.operation.busy() || !self.valid;
+    pub(super) fn import_button(&self, cx: &mut Context<Self>) -> Button {
+        theme::button("import", cx)
+            .small()
+            .icon(IconName::FolderOpen)
+            .label(self.text("パックを取り込む…", "Import pack…"))
+            .tooltip(self.text("手元のパックを取り込みます。", "Import a local pack."))
+            .disabled_elevated(self.operation.busy() || !self.valid)
+            .on_click(cx.listener(|this, _, _, cx| this.choose(cx)))
+    }
+
+    fn pack_heading(&self, cx: &mut Context<Self>) -> Div {
+        div()
+            .flex_shrink_0()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_2()
+            .px_4()
+            .py_2()
+            .child(Icon::new(IconName::Library).size_4())
+            .child(
+                div()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(if self.browsing {
+                        self.text("パックを探す", "Browse packs")
+                    } else {
+                        self.text("取得済みパック", "Your packs")
+                    }),
+            )
+            .when(!self.browsing, |row| {
+                row.child(
+                    div()
+                        .text_sm()
+                        .text_color(cx.theme().colors.muted_foreground)
+                        .child(self.settings.packs.len().to_string()),
+                )
+            })
+            .child(div().flex_1())
+            .child(self.import_button(cx))
+    }
+
+    pub(super) fn toolbar(&self, compact: bool, cx: &mut Context<Self>) -> Div {
+        if compact && self.screen == Screen::Targets {
+            return div();
+        }
+        if compact && self.screen == Screen::Protection {
+            return div()
+                .flex_shrink_0()
+                .px_4()
+                .py_1()
+                .text_sm()
+                .child(self.text("既存アイコンの保護", "Existing icon protection"));
+        }
+        if compact && self.screen == Screen::Recovery {
+            return div()
+                .flex_shrink_0()
+                .flex()
+                .flex_wrap()
+                .gap_2()
+                .px_4()
+                .py_1()
+                .child(
+                    theme::button("protection-open", cx)
+                        .small()
+                        .icon(IconName::ShieldCheck)
+                        .label(self.text("アイコンの保護", "Icon protection"))
+                        .disabled_elevated(self.operation.busy() || !self.valid)
+                        .on_click(
+                            cx.listener(|this, _, window, cx| this.open_protection(window, cx)),
+                        ),
+                );
+        }
+        // 復旧・対象編集・保護の途中では、戻る操作で現在の作業を明示的に閉じる。
+        let locked = self.operation.busy()
+            || matches!(
+                self.screen,
+                Screen::Targets | Screen::Protection | Screen::Recovery
+            );
+        let packs = self.screen == Screen::Packs;
         div()
             .flex_shrink_0()
             .flex()
@@ -257,64 +303,88 @@ impl Manager {
                         theme::button("library", cx)
                             .icon(IconName::Library)
                             .label(self.text("取得済み", "Downloaded packs"))
-                            .selected(!self.browsing)
-                            .when(!self.browsing, |button| {
-                                button
-                                    .primary()
+                            .selected(packs && !self.browsing)
+                            .disabled_elevated(locked)
+                            .when(packs && !self.browsing, |b| {
+                                b.primary()
                                     .icon(IconName::Check)
                                     .font_weight(FontWeight::SEMIBOLD)
                             })
                             .on_click(cx.listener(|this, _, window, cx| {
-                                this.show_library(false, window, cx)
+                                this.screen = Screen::Packs;
+                                this.show_library(false, window, cx);
                             })),
                     )
                     .child(
                         theme::button("browse", cx)
                             .icon(IconName::Search)
                             .label(self.text("パックを探す", "Browse packs"))
-                            .selected(self.browsing)
-                            .when(self.browsing, |button| {
-                                button
-                                    .primary()
+                            .selected(packs && self.browsing)
+                            .disabled_elevated(locked)
+                            .when(packs && self.browsing, |b| {
+                                b.primary()
                                     .icon(IconName::Check)
                                     .font_weight(FontWeight::SEMIBOLD)
                             })
                             .on_click(cx.listener(|this, _, window, cx| {
-                                this.show_library(true, window, cx)
+                                this.screen = Screen::Packs;
+                                this.show_library(true, window, cx);
                             })),
                     ),
             )
             .child(
-                theme::button("import", cx)
-                    .ml_4()
-                    .small()
-                    .icon(IconName::FolderOpen)
-                    .label(self.text("パックを取り込む…", "Import pack…"))
-                    .tooltip(self.text(
-                        "package.jsonを含むVS Code拡張フォルダーを選択",
-                        "Choose a VS Code extension folder containing package.json",
-                    ))
-                    .disabled_elevated(blocked)
-                    .on_click(cx.listener(|this, _, _, cx| this.choose(cx))),
-            )
-            .child(
                 theme::button("thumbnails-open", cx)
                     .small()
-                    .label(self.text("内容のサムネイル", "Content thumbnails"))
-                    .disabled_elevated(self.operation.busy() || self._guard.is_none())
-                    .on_click(cx.listener(|this, _, _, cx| this.open_thumbnails(cx))),
+                    .ml_4()
+                    .icon(IconName::FileImage)
+                    .label(self.text("ファイルのプレビュー", "File previews"))
+                    .tooltip(self.text(
+                        "エクスプローラーで内容を表示するファイル形式を選びます。",
+                        "Choose file types to preview in Explorer.",
+                    ))
+                    .selected(self.screen == Screen::Thumbnails)
+                    .when(self.screen == Screen::Thumbnails, |b| b.primary())
+                    .disabled_elevated(locked || self._guard.is_none())
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        if this.screen != Screen::Thumbnails {
+                            this.open_thumbnails(cx);
+                        }
+                    })),
             )
             .child(
-                theme::button("about-open", cx)
+                theme::button("protection-open", cx)
                     .small()
-                    .icon(IconName::Info)
-                    .label(self.text("アプリ情報", "About"))
-                    .disabled_elevated(self.operation.busy())
+                    .icon(IconName::ShieldCheck)
+                    .label(self.text("アイコンの保護", "Icon protection"))
+                    .selected(self.screen == Screen::Protection)
+                    .when(self.screen == Screen::Protection, |b| b.primary())
+                    .disabled_elevated(
+                        self.operation.busy() || !self.valid || self.screen == Screen::Protection,
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| this.open_protection(window, cx))),
+            )
+            .child(
+                theme::button("conflicts-open", cx)
+                    .small()
+                    .icon(IconName::TriangleAlert)
+                    .when(self.conflict_attention, |b| b.warning())
+                    .label(if self.conflict_attention {
+                        self.text("競合あり・確認", "Conflicts detected · Review")
+                    } else {
+                        self.text("競合を確認", "Review conflicts")
+                    })
+                    .selected(self.screen == Screen::Recovery)
+                    .disabled_elevated(
+                        self.operation.busy()
+                            || self._guard.is_none()
+                            || matches!(self.screen, Screen::Recovery | Screen::Protection),
+                    )
                     .on_click(cx.listener(|this, _, window, cx| {
-                        this.screen = Screen::About;
-                        this.about.scroll.set_offset(point(px(0.), px(0.)));
-                        this.focus.focus(window, cx);
-                        cx.notify();
+                        this.open_conflicts(
+                            file_icons_windows::conflict::Strategy::PreserveExternal,
+                            window,
+                            cx,
+                        )
                     })),
             )
     }
@@ -334,21 +404,51 @@ impl Manager {
             self.text("Windowsの元の表示", "Original Windows icons")
                 .to_owned()
         };
-        div().flex().items_center().flex_wrap().gap_3().px_4().py_3()
-            .flex_shrink_0().bg(colors.group_box).border_b_1().border_color(colors.border)
-            .child(Icon::new(if active.is_some() { IconName::Check } else { IconName::Monitor }).size_4())
+        div()
+            .flex()
+            .items_center()
+            .flex_wrap()
+            .gap_3()
+            .px_4()
+            .py_3()
+            .flex_shrink_0()
+            .bg(colors.group_box)
+            .border_b_1()
+            .border_color(colors.border)
+            .child(
+                Icon::new(if active.is_some() {
+                    IconName::Check
+                } else {
+                    IconName::Monitor
+                })
+                .size_4(),
+            )
             .child(div().flex_1().min_w_0().child(label))
-            .child(theme::button("restore", cx).small().icon(IconName::RotateCcw)
-                .label(if self.valid { self.text("Windows標準に戻す", "Restore Windows defaults") }
-                    else { self.text("設定を退避して元に戻す", "Back up settings and restore") })
-                .disabled_elevated(self.operation.busy() || self._guard.is_none() || (self.settings.journal.is_empty() && self.settings.active.is_none()))
-                .on_click(cx.listener(|this, _, _, cx| {
-                    let Some(manager) = this._guard.clone() else { return; };
-                    this.start(Kind::Restore, move || manager.restore(true), true, None, cx);
-                })))
-            .child(theme::button("restart-help", cx).small().icon(IconName::Info)
-                .accessibility_label(self.text("アイコンが変わらない場合", "If icons do not update"))
-                .tooltip(self.text("表示が変わらない場合は、コピーなどを終えてからタスク マネージャーでExplorerを再起動し、フォルダーを開き直してください。", "If icons do not update, finish file operations, restart Windows Explorer in Task Manager, then reopen folders.")))
+            .child(
+                theme::button("restore", cx)
+                    .small()
+                    .icon(IconName::RotateCcw)
+                    .label(if self.valid {
+                        self.text("Windows標準に戻す", "Restore Windows defaults")
+                    } else {
+                        self.text("設定を退避して元に戻す", "Back up settings and restore")
+                    })
+                    .tooltip(self.text(
+                        "元のアイコン設定に戻します。表示が変わらない場合は、ファイル操作を終えてからタスク マネージャーでExplorerを再起動し、フォルダーを開き直してください。",
+                        "Restore the original icon settings. If icons do not update, finish file operations, restart Windows Explorer in Task Manager, then reopen folders.",
+                    ))
+                    .disabled_elevated(
+                        self.operation.busy()
+                            || self._guard.is_none()
+                            || (self.settings.journal.is_empty() && self.settings.active.is_none()),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        let Some(manager) = this._guard.clone() else {
+                            return;
+                        };
+                        this.start(Kind::Restore, move || manager.restore(true), true, None, cx);
+                    })),
+            )
     }
 
     fn footer(&self, cx: &mut Context<Self>) -> Div {
@@ -455,9 +555,33 @@ impl Manager {
                     })),
             );
         }
-        let cleanup = theme::button("cleanup-shell", cx)
+        footer = footer.child(
+            div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap_3()
+                .when(
+                    self.screen == Screen::About
+                        || (self.screen == Screen::Packs
+                            && (self.browsing
+                                || self.selected.is_some()
+                                || self.pending.is_some())),
+                    |row| row.child(self.back_button("navigate-back", cx)),
+                )
+                .child(status)
+                .when(self.operation.progress().is_some(), |row| {
+                    row.child(actions)
+                }),
+        );
+        footer
+    }
+
+    pub(super) fn cleanup_button(&self, cx: &mut Context<Self>) -> Button {
+        theme::button("cleanup-shell", cx)
             .small()
             .icon(IconName::BrushCleaning)
+            .label(self.text("不要なアプリ用ファイルを整理", "Clean up unused app files"))
             .accessibility_label(
                 self.text("不要なアプリ用ファイルを整理", "Clean up unused app files"),
             )
@@ -476,49 +600,39 @@ impl Manager {
                     return;
                 };
                 this.run(Kind::Cleanup, move || manager.cleanup(), cx);
-            }));
-        footer = footer.child(
-            div()
-                .flex()
-                .items_center()
-                .gap_3()
-                .child(status)
-                .child(cleanup),
-        );
-        if self.operation.progress().is_some() {
-            footer = footer.child(actions);
-        }
-        footer
+            }))
     }
 }
 
 impl Render for Manager {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let compact = window.viewport_size().width < window.rem_size() * 64.;
         if self.screen == Screen::Thumbnails {
             return self
                 .standard_root(cx)
                 .child(self.header(cx))
-                .child(self.thumbnail_panel(cx))
-                .child(self.footer(cx));
+                .child(self.toolbar(compact, cx))
+                .child(self.thumbnail_panel(cx));
         }
         if self.screen == Screen::About {
             return self
                 .standard_root(cx)
                 .child(self.header(cx))
-                .child(self.about_panel(cx));
+                .child(self.toolbar(compact, cx))
+                .child(self.about_panel(cx))
+                .child(self.footer(cx));
         }
         if self.screen == Screen::Protection {
             return self
                 .screen_root(cx)
                 .flex()
                 .flex_col()
-                .child(self.protection_panel(window, cx))
-                .when(self.operation.busy() || self.operation.failed(), |root| {
-                    root.child(self.footer(cx))
-                });
+                .child(self.header(cx))
+                .child(self.toolbar(compact, cx))
+                .child(self.protection_panel(window, cx));
         }
         if self.screen == Screen::Recovery {
-            return self.screen_root(cx).child(self.recovery_panel(cx));
+            return self.screen_root(cx).child(self.recovery_panel(compact, cx));
         }
         if self.screen == Screen::Targets
             && let Some(panel) = self.target_panel(window, cx)
@@ -544,8 +658,9 @@ impl Render for Manager {
         let scroll = scroll.test_support();
         self.standard_root(cx)
             .child(self.header(cx))
+            .child(self.toolbar(compact, cx))
             .child(self.registration(cx))
-            .child(self.toolbar(cx))
+            .child(self.pack_heading(cx))
             .child(scroll)
             .child(self.footer(cx))
     }

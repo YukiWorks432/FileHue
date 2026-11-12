@@ -2,7 +2,7 @@
 
 The GUI and auxiliary CLI target Windows 11 x64. See the [0.1.0 overview](releases/0.1.0.en.md) for supported scope and limitations. Keep both `file_icons_shell.dll` and `file_icons_thumbnail_shell.dll` alongside the executables. Downloading and previewing do not change Shell registration. Applying affects matching files for the current user, so review restoration before applying.
 
-[Content thumbnails](thumbnails.en.md) lets you select six extensions and apply or restore previews separately from icons.
+[File previews](thumbnails.en.md) lets you select six extensions and apply or restore previews separately from icons.
 
 Select “About” to see the application version and open the application and third-party licenses. Choose “Open distribution page” to view published versions and downloads on GitHub Releases. Individual icon-pack terms are available in each pack's details.
 
@@ -67,7 +67,7 @@ If an operation fails, retain its details and recovery records. Keep the old ver
 
 Switch away from an active pack or restore Windows defaults before choosing **Remove…**. Check the pack name and removal scope, then choose **Remove** to proceed. **Cancel** or Esc keeps the pack and its files. Shared files and files needed for restoration are preserved. When files are in use or unknown files are present, the removal request is saved. Resolve the reported issue, such as closing an application holding a file or moving your own files elsewhere, then choose **Retry removing remaining pack files**. Original import folders and staged Shell DLLs are preserved.
 
-After restoring Windows defaults, choose **Clean up unused app files** to remove staged Shell DLLs from the managed storage. Existing registration or unfinished recovery records prevent cleanup. Files in use, modified DLLs, unknown files, and links are preserved. Read the details, close applications holding the files or sign in to Windows again, and retry. The application never forcibly closes Explorer. This action preserves packs, settings, recovery backups, and files in the folder containing the running application.
+After restoring Windows defaults, open **About** and choose **Clean up unused app files** to remove staged Shell DLLs from the managed storage. Existing registration or unfinished recovery records prevent cleanup. Files in use, modified DLLs, unknown files, and links are preserved. Read the details, close applications holding the files or sign in to Windows again, and retry. The application never forcibly closes Explorer. This action preserves packs, settings, recovery backups, and files in the folder containing the running application.
 
 To remove the application, first choose **Restore Windows defaults**, then review the result of **Clean up unused app files**. Close the application and delete its extracted folder. Settings, packs, and recovery backups in the user's managed storage remain after deleting that folder. If you choose to remove those separately, first confirm restoration and preserve any backups you need. The application cannot recreate deleted recovery records.
 

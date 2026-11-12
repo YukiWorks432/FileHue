@@ -785,26 +785,7 @@ impl Manager {
                     cx.stop_propagation();
                     cx.notify();
                 }
-            }))
-            .child(
-                div()
-                    .flex_shrink_0()
-                    .px_4()
-                    .py_2()
-                    .border_b_1()
-                    .border_color(colors.border)
-                    .flex()
-                    .flex_wrap()
-                    .items_center()
-                    .gap_3()
-                    .child(self.back_button("navigate-back", cx))
-                    .child(
-                        div()
-                            .text_lg()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(self.text("既存アイコンの保護", "Existing icon protection")),
-                    ),
-            );
+            }));
         let mut settings = theme::card(cx).mx_4().mt_3().mb_2().p_3()
             .flex_shrink_0().flex().flex_col().gap_2()
             .child(div().flex().items_center().gap_2()
@@ -1170,22 +1151,11 @@ impl Manager {
                 .flex()
                 .items_center()
                 .flex_wrap()
-                .justify_end()
                 .gap_2()
-                .child(
-                    div()
-                        .id("protection-dirty")
-                        .text_sm()
-                        .text_color(colors.muted_foreground)
-                        .child(if dirty {
-                            self.text("未保存の変更", "Unsaved changes")
-                        } else {
-                            self.text("保存済み", "Saved")
-                        }),
-                )
                 .child(
                     theme::button("protection-back", cx)
                         .small()
+                        .icon(IconName::ArrowLeft)
                         .label(if dirty {
                             self.text("変更を破棄して戻る", "Discard and return")
                         } else {
@@ -1195,6 +1165,28 @@ impl Manager {
                         .on_click(
                             cx.listener(|this, _, window, cx| this.close_protection(window, cx)),
                         ),
+                )
+                .child(
+                    div()
+                        .id("protection-dirty")
+                        .role(Role::Status)
+                        .flex_1()
+                        .min_w_0()
+                        .text_sm()
+                        .text_color(if self.operation.failed() {
+                            colors.danger
+                        } else {
+                            colors.muted_foreground
+                        })
+                        .child(if self.operation.busy() || self.operation.failed() {
+                            self.operation
+                                .status()
+                                .render(self.settings.language == "en")
+                        } else if dirty {
+                            self.text("未保存の変更", "Unsaved changes").to_owned()
+                        } else {
+                            self.text("保存済み", "Saved").to_owned()
+                        }),
                 )
                 .child(
                     theme::button("protection-save", cx)

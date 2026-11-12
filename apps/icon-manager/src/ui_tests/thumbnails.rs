@@ -49,14 +49,18 @@ fn selection_in_child(cx: &mut TestAppContext) {
         )
         .unwrap()
     });
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        window.click("thumbnails-open", cx);
-    })
-    .unwrap();
+    let brand_origin = cx
+        .update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let origin = window.find("app-brand").bounds().origin;
+            window.click("thumbnails-open", cx);
+            origin
+        })
+        .unwrap();
     cx.run_until_parked();
     cx.update_window(window, |_, window, cx| {
         window.render_frame(cx);
+        assert_eq!(window.find("app-brand").bounds().origin, brand_origin);
         window.click("thumbnail-.ai", cx);
         window.click("thumbnail-.eps", cx);
         manager.update(cx, |view, _| {
@@ -67,6 +71,32 @@ fn selection_in_child(cx: &mut TestAppContext) {
         });
         assert!(!home().unwrap().join("thumbnail-settings.json").exists());
         assert!(!home().unwrap().join("thumbnail-recovery.json").exists());
+        // アプリ情報から戻った時は、元の画面と下書きを保つ。
+        window.render_frame(cx);
+        window.click("about-open", cx);
+        window.render_frame(cx);
+        assert_eq!(window.find("app-brand").bounds().origin, brand_origin);
+        window.click("navigate-back", cx);
+        window.render_frame(cx);
+        assert!(window.find("thumbnail-.ai").visible());
+        manager.update(cx, |view, _| assert!(view.thumbnails.draft.contains(".ai")));
+        // 上部の画面切り替えでも保存せず、下書きを残して戻れる。
+        window.render_frame(cx);
+        window.click("library", cx);
+        window.render_frame(cx);
+        window.click("thumbnails-open", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        manager.update(cx, |view, _| {
+            assert_eq!(
+                view.thumbnails.draft,
+                [".ai".into(), ".eps".into()].into_iter().collect()
+            )
+        });
+        assert!(!home().unwrap().join("thumbnail-settings.json").exists());
         window.scroll(
             "thumbnail-scroll",
             gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-900.))),

@@ -11,6 +11,7 @@ use std::collections::BTreeSet;
 
 #[derive(Default)]
 pub(super) struct Editor {
+    pub(super) return_to: Option<Screen>,
     pub(super) draft: BTreeSet<String>,
     initialized: bool,
     pub(super) status: Option<ThumbnailStatus>,
@@ -24,6 +25,7 @@ impl Manager {
         if self.operation.busy() || self._guard.is_none() {
             return;
         }
+        self.thumbnails.return_to = Some(self.screen);
         self.screen = Screen::Thumbnails;
         self.thumbnails.plan = None;
         self.thumbnail_operation(|_| Ok(()), !self.thumbnails.initialized, false, cx);
@@ -183,11 +185,45 @@ impl Manager {
                     .child(div().text_sm().child(applied)),
             );
         }
+        let heading = div()
+            .flex_shrink_0()
+            .px_4()
+            .pt_4()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_2()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(self.text("ファイルのプレビュー", "File previews")),
+            )
+            .child(div().flex_1())
+            .child(
+                theme::button("thumbnail-restore", cx)
+                    .label(self.text("すべて元に戻す", "Restore all"))
+                    .disabled_elevated(
+                        busy || self._guard.is_none()
+                            || self
+                                .thumbnails
+                                .status
+                                .as_ref()
+                                .is_some_and(|status| status.missing_recovery),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.thumbnail_operation(
+                            |manager| manager.restore_thumbnails(),
+                            true,
+                            true,
+                            cx,
+                        );
+                    })),
+            );
         let mut panel = div().flex().flex_col().gap_4().p_4()
-            .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(self.text("内容のサムネイル", "Content thumbnails")))
             .child(div().text_sm().text_color(colors.muted_foreground).child(self.text(
-                "表示する拡張子を選び、適用してください。アイコンと既定のアプリは変更しません。",
-                "Choose extensions and apply. Icons and default apps are unchanged.",
+                "エクスプローラーで内容をプレビューするファイル形式を選びます。アイコンと既定のアプリは変更しません。",
+                "Choose file types to preview in Explorer. Icons and default apps are unchanged.",
             )))
             .child(div().text_sm().text_color(colors.muted_foreground).child(self.text(
                 "AI・PSD・PSB・EPS は表示に必要なプレビュー情報がある場合に表示します。",
@@ -315,6 +351,27 @@ impl Manager {
                 }
             }
         }
+        let message = self
+            .operation
+            .status()
+            .render(self.settings.language == "en");
+        let status = div()
+            .id("status")
+            .role(Role::Status)
+            .aria_label(message.clone())
+            .flex_1()
+            .min_w_0()
+            .max_h_24()
+            .overflow_y_scroll()
+            .text_sm()
+            .text_color(if self.operation.failed() {
+                colors.danger
+            } else {
+                colors.muted_foreground
+            })
+            .child(message);
+        #[cfg(feature = "test-support")]
+        let status = status.test_support();
         let actions = div()
             .flex()
             .flex_wrap()
@@ -323,6 +380,24 @@ impl Manager {
             .bg(colors.sidebar)
             .border_t_1()
             .border_color(colors.border)
+            .child(self.back_button("navigate-back", cx))
+            .child(status)
+            .child(
+                theme::button("thumbnail-discard", cx)
+                    .label(self.text("変更を破棄", "Discard changes"))
+                    .disabled_elevated(busy || failed || self.thumbnails.status.is_none())
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.thumbnails.plan = None;
+                        this.thumbnails.draft = this
+                            .thumbnails
+                            .status
+                            .as_ref()
+                            .and_then(|status| status.recovery.as_ref())
+                            .and_then(|record| record.selected_extensions().ok())
+                            .unwrap_or_default();
+                        cx.notify();
+                    })),
+            )
             .child(
                 theme::button("thumbnail-apply", cx)
                     .primary()
@@ -363,42 +438,6 @@ impl Manager {
                             cx,
                         );
                     })),
-            )
-            .child(
-                theme::button("thumbnail-discard", cx)
-                    .label(self.text("変更を破棄", "Discard changes"))
-                    .disabled_elevated(busy || failed || self.thumbnails.status.is_none())
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.thumbnails.plan = None;
-                        this.thumbnails.draft = this
-                            .thumbnails
-                            .status
-                            .as_ref()
-                            .and_then(|status| status.recovery.as_ref())
-                            .and_then(|record| record.selected_extensions().ok())
-                            .unwrap_or_default();
-                        cx.notify();
-                    })),
-            )
-            .child(
-                theme::button("thumbnail-restore", cx)
-                    .label(self.text("すべて元に戻す", "Restore all"))
-                    .disabled_elevated(
-                        busy || self._guard.is_none()
-                            || self
-                                .thumbnails
-                                .status
-                                .as_ref()
-                                .is_some_and(|status| status.missing_recovery),
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.thumbnail_operation(
-                            |manager| manager.restore_thumbnails(),
-                            true,
-                            true,
-                            cx,
-                        );
-                    })),
             );
         let scroll = div()
             .id("thumbnail-scroll")
@@ -422,6 +461,7 @@ impl Manager {
             .min_h_0()
             .flex()
             .flex_col()
+            .child(heading)
             .child(viewport)
             .child(actions)
     }

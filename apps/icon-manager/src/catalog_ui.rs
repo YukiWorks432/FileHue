@@ -35,24 +35,15 @@ impl Manager {
 
     pub(super) fn catalog(&self, cx: &mut Context<Self>) -> Div {
         let colors = cx.theme().colors;
-        let mut section = div()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .child(
-                div()
-                    .text_lg()
-                    .child(self.text("パックを探す", "Browse packs")),
-            )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(colors.muted_foreground)
-                    .child(self.text(
-                        "公式配布元の確認済みバージョンです。取得後に適用できます。",
-                        "Reviewed versions from official releases. Download, then apply.",
-                    )),
-            );
+        let mut section = div().flex().flex_col().gap_3().child(
+            div()
+                .text_sm()
+                .text_color(colors.muted_foreground)
+                .child(self.text(
+                    "公式配布元の確認済みバージョンです。取得後に適用できます。",
+                    "Reviewed versions from official releases. Download, then apply.",
+                )),
+        );
         for (index, entry) in CATALOG.iter().enumerate() {
             let installed = entry.themes.iter().all(|theme| {
                 self.settings

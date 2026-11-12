@@ -145,24 +145,7 @@ impl Manager {
     pub(super) fn installed_packs(&self, cx: &mut Context<Self>) -> Div {
         let colors = cx.theme().colors;
         let blocked = self.operation.busy() || !self.valid;
-        let mut list = div().flex().flex_col().gap_3().child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(Icon::new(IconName::Library).size_4())
-                .child(
-                    div()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(self.text("取得済みパック", "Your packs")),
-                )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(colors.muted_foreground)
-                        .child(self.settings.packs.len().to_string()),
-                ),
-        );
+        let mut list = div().flex().flex_col().gap_3();
         if self.settings.packs.is_empty() {
             list = list.child(
                 div()
@@ -209,6 +192,27 @@ impl Manager {
             });
             let active = self.settings.active.as_ref() == Some(&pack.id);
             let expanded = self.selected.as_ref() == Some(&pack.id);
+            let default_selection = file_icons_core::selection::Selection::default();
+            let selection = self
+                .settings
+                .selections
+                .get(&pack.id)
+                .unwrap_or(&default_selection);
+            let samples = [
+                "sample.js",
+                "sample.ts",
+                "sample.py",
+                "sample.rs",
+                "sample.html",
+            ]
+            .into_iter()
+            .filter_map(|name| {
+                selection
+                    .resolve(&pack.theme, name)
+                    .map(|(path, _)| (name, path.to_path_buf()))
+            })
+            .collect::<Vec<_>>();
+            let has_samples = !samples.is_empty();
             let metadata = format!(
                 "{} · {} {} · {} {}",
                 pack.version,
@@ -262,8 +266,9 @@ impl Manager {
                 let warning = warning.test_support();
                 title = title.child(warning);
             }
-            let identity = div()
+            let mut identity = div()
                 .flex()
+                .flex_wrap()
                 .items_center()
                 .gap_3()
                 .child(
@@ -281,36 +286,96 @@ impl Manager {
                             .child(self.text("適用中", "Applied")),
                     )
                 });
-            let actions = div().flex().items_center().flex_wrap().gap_2()
+            if has_samples {
+                let mut preview = div().flex().flex_wrap().items_center().gap_2();
+                for (name, path) in samples {
+                    let sample = div()
+                        .id(pack_control(&format!("sample:{name}"), &pack.id))
+                        .role(Role::Image)
+                        .aria_label(name)
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .gap_1()
+                        .child(img(path).size_6())
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(colors.muted_foreground)
+                                .child(name.trim_start_matches("sample").to_owned()),
+                        );
+                    #[cfg(feature = "test-support")]
+                    let sample = sample.test_support();
+                    preview = preview.child(sample);
+                }
+                identity = identity.child(preview);
+            }
+            let actions = div()
+                .flex()
+                .items_center()
+                .flex_wrap()
+                .gap_2()
                 .child(
-                    theme::button(pack_control("apply", &pack.id), cx).small()
+                    theme::button(pack_control("apply", &pack.id), cx)
+                        .small()
                         .primary()
-                        .icon(if active { IconName::Check } else { IconName::Monitor })
-                        .label(if active { self.text("適用中", "Applied") } else { self.text("適用する", "Apply") })
+                        .icon(if active {
+                            IconName::Check
+                        } else {
+                            IconName::Monitor
+                        })
+                        .label(if active {
+                            self.text("適用中", "Applied")
+                        } else {
+                            self.text("適用する", "Apply")
+                        })
                         .disabled_elevated(blocked || active)
                         .on_click(cx.listener(move |this, _, _, cx| this.apply(id.clone(), cx))),
                 )
                 .child(
-                    theme::button(pack_control("details", &pack.id), cx).small()
-                        .icon(if expanded { IconName::ChevronUp } else { IconName::ChevronDown })
+                    theme::button(pack_control("details", &pack.id), cx)
+                        .small()
+                        .icon(if expanded {
+                            IconName::ChevronUp
+                        } else {
+                            IconName::ChevronDown
+                        })
                         .label(self.text("プレビュー・利用条件", "Preview and licenses"))
-                        .selected(expanded).toggled(expanded)
+                        .selected(expanded)
+                        .toggled(expanded)
                         .disabled_elevated(self.operation.busy() && !expanded)
-                        .on_click(cx.listener(move |this, _, _, cx| this.select_details(&detail_id, cx))),
+                        .on_click(
+                            cx.listener(move |this, _, _, cx| this.select_details(&detail_id, cx)),
+                        ),
                 )
                 .child(
-                    theme::button(pack_control("targets", &pack.id), cx).small()
+                    theme::button(pack_control("targets", &pack.id), cx)
+                        .small()
                         .label(self.text("適用対象を選ぶ…", "Choose targets…"))
                         .disabled_elevated(blocked)
-                        .on_click(cx.listener(move |this, _, window, cx| { this.open_targets(&target_id, cx); this.focus.focus(window, cx); })),
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.open_targets(&target_id, cx);
+                            this.focus.focus(window, cx);
+                        })),
                 )
                 .child(div().flex_1())
                 .child(
-                    theme::button(pack_control("remove-pack", &pack.id), cx).small()
-                        .icon(IconName::Trash).label(self.text("削除…", "Remove…"))
-                        .tooltip(self.text("パックとアプリ内の変換素材を削除します。元の取り込みフォルダーは保持します。適用中は削除できません。", "Remove this pack and its converted files. Original source files are kept. Applied packs cannot be removed."))
+                    theme::button(pack_control("remove-pack", &pack.id), cx)
+                        .small()
+                        .icon(IconName::Trash)
+                        .label(self.text("削除…", "Remove…"))
+                        .tooltip(if active {
+                            self.text(
+                                "適用中は削除できません。",
+                                "Applied packs cannot be removed.",
+                            )
+                        } else {
+                            self.text("パックを削除します。", "Remove this pack.")
+                        })
                         .disabled_elevated(blocked || active)
-                        .on_click(cx.listener(move |this, _, window, cx| this.confirm_remove(&id_for_remove, window, cx))),
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.confirm_remove(&id_for_remove, window, cx)
+                        })),
                 );
             let mut row = theme::card(cx)
                 .p_4()
@@ -321,6 +386,14 @@ impl Manager {
                 .flex_shrink_0()
                 .child(identity)
                 .child(actions);
+            if has_samples {
+                row = row.child(div().text_xs().text_color(colors.muted_foreground).child(
+                    self.text(
+                        "見本には保護設定を含みません。",
+                        "Samples do not include icon protection.",
+                    ),
+                ));
+            }
             if has_previous {
                 row = row.child(theme::inset(cx).p_3().flex().flex_col().gap_2()
                     .child(div().text_sm().child(self.text(

@@ -173,7 +173,7 @@ impl Manager {
         }
     }
 
-    pub(super) fn recovery_panel(&self, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn recovery_panel(&self, compact: bool, cx: &mut Context<Self>) -> AnyElement {
         let colors = cx.theme().colors;
         let completed = self.recovery.completed;
         let title = if completed {
@@ -218,6 +218,7 @@ impl Manager {
             .flex()
             .flex_col()
             .child(self.header(cx))
+            .child(self.toolbar(compact, cx))
             .child(scroll)
             .child(self.recovery_footer(cx))
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {

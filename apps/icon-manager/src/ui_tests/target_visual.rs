@@ -684,7 +684,7 @@ fn library_visual_probe() {
         fixture.join("theme.json"),
         r#"{
         "iconDefinitions":{"icon":{"iconPath":"icon.svg"}},
-        "fileExtensions":{"json":"icon","md":"icon","rs":"icon"},
+        "fileExtensions":{"json":"icon","md":"icon","js":"icon","ts":"icon","py":"icon","rs":"icon","html":"icon"},
         "fileNames":{"Cargo.toml":"icon","package.json":"icon","README.md":"icon"}}
     "#,
     )
@@ -857,6 +857,46 @@ fn library_visual_probe() {
                                 w.press("escape", cx);
                                 w.render_frame(cx);
                             }
+                        })
+                        .unwrap();
+                }
+                for active in [false, true, false] {
+                    window
+                        .update(cx, |_, w, cx| {
+                            theme::apply(ThemeMode::Dark, cx);
+                            manager.update(cx, |view, cx| {
+                                view.settings.language = "ja".into();
+                                view.browsing = false;
+                                view.conflict_attention = false;
+                                view.pending = None;
+                                view.operation = crate::operation::Operation::default();
+                                view.settings.active =
+                                    active.then(|| view.settings.packs[0].id.clone());
+                                cx.notify();
+                            });
+                            w.resize(size(px(1000.), px(760.)));
+                            w.render_frame(cx);
+                            w.hover("app-brand", cx);
+                            w.render_frame(cx);
+                            w.hover(pack_button(&manager, cx, "remove-pack", 0), cx);
+                            w.render_frame(cx);
+                        })
+                        .unwrap();
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(1000))
+                        .await;
+                    window
+                        .update(cx, |_, w, cx| {
+                            w.render_frame(cx);
+                            let name = if active {
+                                "remove-tooltip-active"
+                            } else {
+                                "remove-tooltip-normal"
+                            };
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join(format!("{name}.png")))
+                                .unwrap();
                         })
                         .unwrap();
                 }
