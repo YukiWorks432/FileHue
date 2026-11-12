@@ -357,7 +357,7 @@ impl Manager {
                                 let actual = manager
                                     .preview_thumbnail_selection(reviewed.selected.clone())?;
                                 anyhow::ensure!(actual == reviewed, "{changed}");
-                                manager.set_thumbnail_selection(reviewed.selected)
+                                manager.apply_reviewed_thumbnail_selection(reviewed)
                             },
                             true,
                             true,

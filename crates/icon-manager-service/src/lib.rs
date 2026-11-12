@@ -3,12 +3,7 @@ use anyhow::{Context, Result, ensure};
 pub use file_icons_catalog::Progress;
 use file_icons_core::{ImportedPack, registry::Registry};
 use file_icons_windows::{Settings, home, load, save};
-use std::{
-    collections::BTreeSet,
-    fs,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{collections::BTreeSet, fs, path::Path, sync::Arc};
 pub type DownloadSource = fn(&str, &Path, Arc<Progress>) -> Result<Vec<ImportedPack>>;
 
 #[derive(Debug)]
@@ -88,14 +83,6 @@ pub struct ThumbnailStatus {
     pub group_errors: Vec<Option<String>>,
 }
 
-#[derive(Debug)]
-pub struct ThumbnailPlan {
-    pub selected: BTreeSet<String>,
-    pub recovery: file_icons_windows::thumbnails::Recovery,
-    pub source: PathBuf,
-    pub destination: PathBuf,
-}
-
 /// 適用前に確認する選択差分と、影響する登録の調査結果。
 #[derive(Debug, PartialEq, Eq, serde::Serialize)]
 pub struct ThumbnailSelectionPlan {
@@ -165,185 +152,82 @@ impl Manager {
         file_icons_windows::thumbnails::Recovery::load(&home()?.join("thumbnail-recovery.json"))
     }
 
-    /// 現在の登録を調査し、まだ有効化されていない種類の初回適用を準備する。
-    pub fn preview_initial_thumbnails(&self, selected: BTreeSet<String>) -> Result<ThumbnailPlan> {
-        use file_icons_windows::thumbnails::{
-            Recovery, Settings as ThumbnailSettings,
-            inventory::{Inspector, WindowsSource, plan_selection},
-        };
-        let root = home()?;
-        ensure!(
-            Recovery::load(&root.join("thumbnail-recovery.json"))?.is_none(),
-            "thumbnail recovery already exists"
-        );
-        ensure!(
-            ThumbnailSettings::load(&root.join("thumbnail-settings.json"))?
-                .is_none_or(|settings| settings.selected.is_empty()),
-            "thumbnail recovery missing for saved selection"
-        );
-        let source = std::env::current_exe()?
-            .parent()
-            .context("executable parent missing")?
-            .join("file_icons_thumbnail_shell.dll");
-        let destination = file_icons_windows::planned_thumbnail_shell(&source)?;
-        let inspector = Inspector(WindowsSource::new()?);
-        let registry = file_icons_windows::UserRegistry;
-        let recovery = plan_selection(&registry, &inspector, &selected, &destination)?;
-        Ok(ThumbnailPlan {
-            selected,
-            recovery,
-            source,
-            destination,
-        })
+    /// 指定した拡張子の集合へ変更する。途中失敗時は適用できた組の記録を保持する。
+    pub fn set_thumbnail_selection(&self, selected: BTreeSet<String>) -> Result<()> {
+        let reviewed = self.preview_thumbnail_selection(selected)?;
+        self.apply_reviewed_thumbnail_selection(reviewed)
     }
 
-    /// 初回適用を実行する。途中失敗時は独立した復元記録を残す。
-    pub fn apply_initial_thumbnails(&self, selected: BTreeSet<String>) -> Result<()> {
+    /// 確認済みの登録先と以前の値をそのまま使用し、適用前に再照合する。
+    pub fn apply_reviewed_thumbnail_selection(
+        &self,
+        reviewed: ThumbnailSelectionPlan,
+    ) -> Result<()> {
         use file_icons_windows::thumbnails::{
-            Settings as ThumbnailSettings,
+            Format, Settings as ThumbnailSettings,
             inventory::{Inspector, WindowsSource},
         };
-        let plan = self.preview_initial_thumbnails(selected)?;
-        let root = home()?;
-        let settings_path = root.join("thumbnail-settings.json");
-        let previous = ThumbnailSettings::load(&settings_path)?;
-        let installed = file_icons_windows::stage_thumbnail_shell(&plan.source)?;
         ensure!(
-            plan.destination.canonicalize()? == installed,
-            "thumbnail module differs from plan"
+            self.preview_thumbnail_selection(reviewed.selected.clone())? == reviewed,
+            "thumbnail registration changed after review"
         );
-        let inspector = Inspector(WindowsSource::new()?);
-        let mut registry = file_icons_windows::UserRegistry;
-        plan.recovery.apply_new(
-            &root.join("thumbnail-recovery.json"),
-            &mut registry,
-            &inspector,
-        )?;
-        let settings = ThumbnailSettings {
-            selected: plan.selected,
-            ..ThumbnailSettings::default()
-        };
-        settings.save(&settings_path, previous.as_ref())
-    }
-
-    /// 既存の組と共有しない種類を、復元記録を拡張して追加する。
-    pub fn append_thumbnail_formats(&self, requested: BTreeSet<String>) -> Result<()> {
-        use file_icons_windows::thumbnails::{
-            Recovery, Settings as ThumbnailSettings,
-            inventory::{Inspector, WindowsSource, plan_selection},
-        };
-        let validated = ThumbnailSettings {
-            selected: requested.clone(),
-            ..ThumbnailSettings::default()
-        };
-        validated.validate()?;
         let root = home()?;
-        let settings_path = root.join("thumbnail-settings.json");
-        let previous = ThumbnailSettings::load(&settings_path)?;
         let path = root.join("thumbnail-recovery.json");
-        let mut record = Recovery::load(&path)?.context("thumbnail recovery missing")?;
-        let inspector = Inspector(WindowsSource::new()?);
-        let mut registry = file_icons_windows::UserRegistry;
-        if record.transition.is_some() {
-            record = record.finish_transition(&path, &mut registry, &inspector)?;
-        }
-        let existing = record.selected_extensions()?;
-        let additions: BTreeSet<_> = requested.difference(&existing).cloned().collect();
-        if additions.is_empty() {
-            for index in 0..record.groups.len() {
-                record.check_applied_group(index, &registry, &inspector)?;
-            }
-        } else {
-            ensure!(
-                !record.groups.iter().any(|group| additions
-                    .iter()
-                    .any(|extension| group.members.contains(extension))),
-                "thumbnail format belongs to an existing shared group"
-            );
+        let settings_path = root.join("thumbnail-settings.json");
+        if let Some(additional) = &reviewed.new_groups {
             let source = std::env::current_exe()?
                 .parent()
                 .context("executable parent missing")?
                 .join("file_icons_thumbnail_shell.dll");
             let destination = file_icons_windows::planned_thumbnail_shell(&source)?;
-            let addition = plan_selection(&registry, &inspector, &additions, &destination)?;
             let installed = file_icons_windows::stage_thumbnail_shell(&source)?;
             ensure!(
                 destination.canonicalize()? == installed,
                 "thumbnail module differs from plan"
             );
-            record = record.append_groups(&path, &addition, &mut registry, &inspector)?;
-        }
-        let settings = ThumbnailSettings {
-            selected: record.selected_extensions()?,
-            ..ThumbnailSettings::default()
-        };
-        if previous.as_ref() != Some(&settings) {
-            settings.save(&settings_path, previous.as_ref())?;
-        }
-        Ok(())
-    }
-
-    /// 一種類を有効にし、共有設定の有無に応じて安全な経路を選ぶ。
-    pub fn enable_thumbnail(&self, format: file_icons_windows::thumbnails::Format) -> Result<()> {
-        let selected = [format.extension().to_owned()].into_iter().collect();
-        let Some(record) = self.thumbnail_recovery()? else {
-            return self.apply_initial_thumbnails(selected);
-        };
-        if record
-            .groups
-            .iter()
-            .any(|group| group.class.is_some() && group.members.contains(format.extension()))
-        {
-            self.set_shared_thumbnail(format, true)
-        } else {
-            self.append_thumbnail_formats(selected)
-        }
-    }
-
-    /// 指定した拡張子の集合へ変更する。途中失敗時は適用できた組の記録を保持する。
-    pub fn set_thumbnail_selection(&self, selected: BTreeSet<String>) -> Result<()> {
-        use file_icons_windows::thumbnails::{Format, Settings as ThumbnailSettings};
-        let target = ThumbnailSettings {
-            selected: selected.clone(),
-            ..ThumbnailSettings::default()
-        };
-        target.validate()?;
-        let status = self.thumbnail_status()?;
-        ensure!(
-            !status.missing_recovery,
-            "thumbnail recovery missing for saved selection"
-        );
-        let Some(record) = status.recovery else {
-            if selected.is_empty() {
-                if status.settings != target {
-                    target.save(
-                        &home()?.join("thumbnail-settings.json"),
-                        Some(&status.settings),
-                    )?;
-                }
-                return Ok(());
-            }
-            return self.apply_initial_thumbnails(selected);
-        };
-        ensure!(
-            status.group_errors.iter().all(Option::is_none),
-            "thumbnail registration requires recovery"
-        );
-        let current = record.selected_extensions()?;
-        for format in Format::ALL {
-            if selected.contains(format.extension()) && !current.contains(format.extension()) {
-                self.enable_thumbnail(format)?;
+            let inspector = Inspector(WindowsSource::new()?);
+            let mut registry = file_icons_windows::UserRegistry;
+            let applied = apply_reviewed_groups(
+                &path,
+                reviewed.existing_groups.as_ref(),
+                additional,
+                &mut registry,
+                &inspector,
+            )?;
+            let settings = ThumbnailSettings {
+                selected: applied.selected_extensions()?,
+                ..ThumbnailSettings::default()
+            };
+            let previous = ThumbnailSettings::load(&settings_path)?;
+            if previous.as_ref() != Some(&settings) {
+                settings.save(&settings_path, previous.as_ref())?;
             }
         }
         for format in Format::ALL {
-            if !selected.contains(format.extension()) && current.contains(format.extension()) {
+            if reviewed.additions.contains(format.extension())
+                && reviewed.existing_groups.as_ref().is_some_and(|record| {
+                    record
+                        .groups
+                        .iter()
+                        .any(|group| group.members.contains(format.extension()))
+                })
+            {
+                self.set_shared_thumbnail(format, true)?;
+            }
+        }
+        for format in Format::ALL {
+            if reviewed.removals.contains(format.extension()) {
                 self.disable_thumbnail(format)?;
             }
         }
-        let path = home()?.join("thumbnail-settings.json");
-        let previous = ThumbnailSettings::load(&path)?;
-        if previous.as_ref() != Some(&target) {
-            target.save(&path, previous.as_ref())?;
+        let target = ThumbnailSettings {
+            selected: reviewed.selected,
+            ..ThumbnailSettings::default()
+        };
+        let previous = ThumbnailSettings::load(&settings_path)?;
+        if previous.as_ref() != Some(&target) && (previous.is_some() || !target.selected.is_empty())
+        {
+            target.save(&settings_path, previous.as_ref())?;
         }
         Ok(())
     }
@@ -904,6 +788,25 @@ impl Manager {
     }
 }
 
+fn apply_reviewed_groups(
+    path: &Path,
+    existing: Option<&file_icons_windows::thumbnails::Recovery>,
+    additional: &file_icons_windows::thumbnails::Recovery,
+    registry: &mut (impl Registry + file_icons_windows::thumbnails::KeyState),
+    inspector: &(
+         impl file_icons_windows::thumbnails::DependencyInspector
+         + file_icons_windows::thumbnails::ProviderState
+     ),
+) -> Result<file_icons_windows::thumbnails::Recovery> {
+    match existing {
+        Some(record) => record.append_groups(path, additional, registry, inspector),
+        None => {
+            additional.apply_new(path, registry, inspector)?;
+            Ok(additional.clone())
+        }
+    }
+}
+
 fn set_shared_thumbnail_record(
     path: &Path,
     mut record: file_icons_windows::thumbnails::Recovery,
@@ -1042,7 +945,8 @@ mod thumbnail_tests {
             );
             let state = self.0.borrow();
             let parent = "software\\classes\\example.vector\\shellex\\{e357fccd-a995-4576-b01f-234630154e96}";
-            if let Some(value) = state.get(&(parent.into(), String::new()))
+            if matches!(extension, ".ai" | ".ait" | ".eps")
+                && let Some(value) = state.get(&(parent.into(), String::new()))
                 && value.bytes != [0, 0]
             {
                 return Ok(Some(decode(value)?));
@@ -1070,6 +974,113 @@ mod thumbnail_tests {
             .collect();
         let text = String::from_utf16(&units[..units.len() - 1])?;
         Ok(GUID::try_from(text.trim_matches(['{', '}']))?)
+    }
+
+    #[test]
+    fn reviewed_shared_group_rejects_a_new_member_before_any_registry_write() {
+        struct AddedMember<'a>(&'a Inspector);
+        impl DependencyInspector for AddedMember<'_> {
+            fn inspect(&self, group: &Group) -> Result<Dependencies> {
+                let mut dependencies = self.0.inspect(group)?;
+                if group.class.as_deref() == Some("Example.Vector") {
+                    dependencies
+                        .associations
+                        .insert(".ait".into(), "Example.Vector".into());
+                }
+                Ok(dependencies)
+            }
+        }
+        impl ProviderState for AddedMember<'_> {
+            fn provider(&self, extension: &str) -> Result<Option<GUID>> {
+                self.0.provider(extension)
+            }
+            fn notify(&self) -> Result<()> {
+                Ok(())
+            }
+        }
+
+        for append in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("thumbnail-recovery.json");
+            let mut registry = Memory::default();
+            let inspector = Inspector(registry.0.clone());
+            let module = Path::new("C:\\FileHue\\file_icons_thumbnail_shell.dll");
+            let existing = if append {
+                let mut group = thumbnails::plan_extension_group(&registry, Format::Svg).unwrap();
+                group.add_provider(&registry, Format::Svg, module).unwrap();
+                group.capture_dependencies(&inspector).unwrap();
+                group.capture_providers(&inspector).unwrap();
+                group.capture_created_keys(&registry).unwrap();
+                let record = Recovery {
+                    format_version: 1,
+                    groups: vec![group],
+                    transition: None,
+                };
+                record.apply_new(&path, &mut registry, &inspector).unwrap();
+                Some(record)
+            } else {
+                None
+            };
+            let parent = "Software\\Classes\\Example.Vector\\shellex\\{e357fccd-a995-4576-b01f-234630154e96}";
+            let old = Value {
+                kind: 1,
+                bytes: "{11111111-2222-4333-8444-555555555555}"
+                    .encode_utf16()
+                    .chain(Some(0))
+                    .flat_map(u16::to_le_bytes)
+                    .collect(),
+            };
+            registry.write(parent, "", Some(&old)).unwrap();
+            let members = [".ai".into()].into_iter().collect();
+            let mut group = thumbnails::plan_shared_group(
+                &registry,
+                "Example.Vector",
+                members,
+                &[".ai".into()].into_iter().collect(),
+            )
+            .unwrap();
+            group.add_provider(&registry, Format::Ai, module).unwrap();
+            group.capture_dependencies(&inspector).unwrap();
+            group.capture_providers(&inspector).unwrap();
+            group.capture_created_keys(&registry).unwrap();
+            let reviewed = Recovery {
+                format_version: 1,
+                groups: vec![group],
+                transition: None,
+            };
+            let before = registry.0.borrow().clone();
+            let saved = fs::read(&path).ok();
+
+            let error = apply_reviewed_groups(
+                &path,
+                existing.as_ref(),
+                &reviewed,
+                &mut registry,
+                &AddedMember(&inspector),
+            )
+            .unwrap_err();
+            assert!(
+                format!("{error:#}").contains("thumbnail associations"),
+                "{error:#}"
+            );
+            assert_eq!(*registry.0.borrow(), before);
+            assert_eq!(fs::read(&path).ok(), saved);
+
+            let applied = apply_reviewed_groups(
+                &path,
+                existing.as_ref(),
+                &reviewed,
+                &mut registry,
+                &inspector,
+            )
+            .unwrap();
+            let mut expected: BTreeSet<String> = [".ai".into()].into_iter().collect();
+            if append {
+                expected.insert(".svg".into());
+            }
+            assert_eq!(applied.selected_extensions().unwrap(), expected);
+            assert_eq!(Recovery::load(&path).unwrap(), Some(applied));
+        }
     }
 
     #[test]
