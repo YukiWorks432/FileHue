@@ -182,6 +182,8 @@ fn real_process_import_resolve_rights_dry_runs_and_removal_preserve_sources() {
     fixture(&extension);
     let theme_path = extension.join("theme.json");
     let mut theme: Value = serde_json::from_slice(&fs::read(&theme_path).unwrap()).unwrap();
+    // 実ユーザーの.toml関連付けに依存せず、専用拡張子で名前の一致を確認する。
+    theme["fileNames"] = serde_json::json!({"fixture.wfi-cli-probe":"x"});
     theme["fileExtensions"]["broken"] = "undefined".into();
     fs::write(&theme_path, serde_json::to_vec(&theme).unwrap()).unwrap();
     let source_before = files(source.path());
@@ -225,7 +227,10 @@ fn real_process_import_resolve_rights_dry_runs_and_removal_preserve_sources() {
     );
     assert_eq!(
         document(
-            &run(profile.path(), &["resolve", id, "CARGO.TOML", "--json"]),
+            &run(
+                profile.path(),
+                &["resolve", id, "FIXTURE.WFI-CLI-PROBE", "--json"]
+            ),
             0
         )["data"]["reason"],
         "file_name"
