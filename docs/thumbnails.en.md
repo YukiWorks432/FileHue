@@ -18,6 +18,8 @@ For shared associations, the app records the observed members and previous thumb
 
 An extension without a default application is recorded in that state before only its thumbnail is registered. If a default application is subsequently set, the change is detected and the old state is not restored automatically.
 
+When restoring an extension-only registration, an added user-level extension value that explicitly names the same previously effective ProgID is preserved while only the thumbnail is restored. This requires the effective association and all other references to remain unchanged, and every thumbnail registration to match either the applied or original value. This exception does not cover a newly assigned default application, a different application or reference, or a group that changes a shared class. New application and applied-state checks still require an exact match with the recorded references.
+
 When the last group is disabled, the original registration is restored, the empty selection is saved, and only then is the recovery record removed. A save or removal failure keeps the record for retry. If a saved selection exists but its recovery record is missing, the previous registration cannot be inferred, so new application and clearing the settings are stopped.
 
 Explorer display, compatibility with existing handlers, cloud file retrieval and speed vary by environment and file. The app does not guarantee that every file contains a preview or that a particular display speed will be achieved.

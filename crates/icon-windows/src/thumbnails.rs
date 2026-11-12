@@ -976,7 +976,7 @@ impl Recovery {
             "finish thumbnail transition before restoring"
         );
         let group = self.groups.get(index).context("thumbnail group missing")?;
-        check_dependencies(group, inspector)?;
+        check_restore_dependencies(group, inspector)?;
         file_icons_core::registry::restore_group(registry, &group.changes)
     }
 
@@ -995,7 +995,7 @@ impl Recovery {
         );
         let group = self.groups.get(index).context("thumbnail group missing")?;
         ensure!(group.keys_captured, "thumbnail keys not recorded");
-        check_dependencies(group, inspector)?;
+        check_restore_dependencies(group, inspector)?;
         for change in &group.changes {
             let current = registry.read(&change.key, &change.name)?;
             ensure!(
@@ -1078,7 +1078,7 @@ impl Recovery {
         stored.validate()?;
         ensure!(&stored == self, "thumbnail recovery changed");
         let group = self.groups.get(index).context("thumbnail group missing")?;
-        check_dependencies(group, inspector)?;
+        check_restore_dependencies(group, inspector)?;
         for change in &group.changes {
             ensure!(
                 registry.read(&change.key, &change.name)? == change.before,
@@ -1433,6 +1433,57 @@ fn check_dependencies(group: &Group, inspector: &impl DependencyInspector) -> Re
     Ok(())
 }
 
+/// 拡張子だけの解除では、同じ実効関連付けを明示する追加値を保持して戻せる。
+/// 適用時と共有クラスの解除では、引き続き参照値の完全一致を要求する。
+fn check_restore_dependencies(group: &Group, inspector: &impl DependencyInspector) -> Result<()> {
+    let expected = group
+        .dependencies
+        .as_ref()
+        .context("thumbnail dependencies missing")?;
+    let current = inspector.inspect(group)?;
+    validate_dependencies(group, &current)?;
+    if &current == expected {
+        return Ok(());
+    }
+    ensure!(
+        group.class.is_none()
+            && current.associations == expected.associations
+            && current.references.len() == expected.references.len(),
+        "thumbnail dependencies changed"
+    );
+    for (before, now) in expected.references.iter().zip(&current.references) {
+        if before == now {
+            continue;
+        }
+        ensure!(
+            before.scope == Scope::User
+                && now.scope == Scope::User
+                && before.name.is_empty()
+                && now.name.is_empty()
+                && same_registration(&before.key, &now.key)
+                && before.value.is_none(),
+            "thumbnail dependencies changed"
+        );
+        let extension = group
+            .members
+            .iter()
+            .find(|extension| {
+                same_registration(&now.key, &format!("Software\\Classes\\{extension}"))
+            })
+            .context("thumbnail dependencies changed")?;
+        let value = now
+            .value
+            .as_ref()
+            .context("thumbnail dependencies changed")?;
+        let class = decode_registry_string(value)?;
+        ensure!(
+            !class.is_empty() && same_registration(&class, &current.associations[extension]),
+            "thumbnail dependencies changed"
+        );
+    }
+    Ok(())
+}
+
 fn validate_dependencies(group: &Group, dependencies: &Dependencies) -> Result<()> {
     let members: BTreeSet<_> = group
         .members
@@ -1651,6 +1702,141 @@ mod transaction_tests {
             registry,
             inspector,
         )
+    }
+
+    #[test]
+    fn direct_restore_preserves_only_a_redundant_new_default_association() {
+        struct Referenced<'a> {
+            inner: &'a InspectorSim,
+            association: RefCell<String>,
+        }
+        impl DependencyInspector for Referenced<'_> {
+            fn inspect(&self, group: &Group) -> Result<Dependencies> {
+                let mut dependencies = self.inner.inspect(group)?;
+                dependencies
+                    .associations
+                    .insert(".svg".into(), self.association.borrow().clone());
+                for key in [
+                    "software\\classes\\.svg",
+                    "software\\classes\\example.vector\\curver",
+                ] {
+                    dependencies.references.push(Reference {
+                        scope: Scope::User,
+                        key: key.into(),
+                        name: String::new(),
+                        value: self
+                            .inner
+                            .state
+                            .borrow()
+                            .values
+                            .get(&(key.into(), String::new()))
+                            .cloned(),
+                    });
+                }
+                Ok(dependencies)
+            }
+        }
+        impl ProviderState for Referenced<'_> {
+            fn provider(&self, extension: &str) -> Result<Option<windows::core::GUID>> {
+                self.inner.provider(extension)
+            }
+            fn notify(&self) -> Result<()> {
+                self.inner.notify()
+            }
+        }
+        for scenario in [
+            "same",
+            "different",
+            "new_default",
+            "other_reference",
+            "malformed",
+        ] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("recovery.json");
+            let (mut record, mut registry, inner) = prepared();
+            let inspector = Referenced {
+                inner: &inner,
+                association: RefCell::new(
+                    if scenario == "new_default" {
+                        ""
+                    } else {
+                        "Example.Vector"
+                    }
+                    .into(),
+                ),
+            };
+            record.groups[0].dependencies = Some(inspector.inspect(&record.groups[0]).unwrap());
+            record.apply_new(&path, &mut registry, &inspector).unwrap();
+            let class = if scenario == "different" {
+                "Another.Application"
+            } else {
+                "Example.Vector"
+            };
+            let added = Value {
+                kind: 1,
+                bytes: class
+                    .encode_utf16()
+                    .chain(Some(0))
+                    .flat_map(u16::to_le_bytes)
+                    .collect(),
+            };
+            registry
+                .write("Software\\Classes\\.svg", "", Some(&added))
+                .unwrap();
+            if scenario == "new_default" {
+                *inspector.association.borrow_mut() = class.into();
+            }
+            if scenario == "other_reference" {
+                registry
+                    .write(
+                        "Software\\Classes\\Example.Vector\\CurVer",
+                        "",
+                        Some(&added),
+                    )
+                    .unwrap();
+            }
+            if scenario == "malformed" {
+                registry
+                    .write(
+                        "Software\\Classes\\.svg",
+                        "",
+                        Some(&Value {
+                            kind: 3,
+                            bytes: vec![1, 2],
+                        }),
+                    )
+                    .unwrap();
+            }
+            let before = registry.0.borrow().values.clone();
+            let writes = registry.0.borrow().writes;
+            let journal = fs::read(&path).unwrap();
+            // 適用状態の確認は引き続き厳密で、変更後の新しい適用を許可しない。
+            assert!(
+                record
+                    .check_applied_group(0, &registry, &inspector)
+                    .is_err()
+            );
+            let result = record.restore_checked_group(0, &mut registry, &inspector);
+            if scenario == "same" {
+                result.unwrap();
+                assert!(
+                    record
+                        .remove_restored_group(&path, 0, &mut registry, &inspector)
+                        .unwrap()
+                        .is_none()
+                );
+                assert_eq!(
+                    registry.read("Software\\Classes\\.svg", "").unwrap(),
+                    Some(added)
+                );
+                assert_eq!(inspector.provider(".svg").unwrap(), None);
+            } else {
+                assert!(result.is_err(), "{scenario}");
+                assert_eq!(registry.0.borrow().writes, writes);
+                assert_eq!(registry.0.borrow().values, before);
+                assert_eq!(fs::read(&path).unwrap(), journal);
+            }
+        }
     }
 
     #[test]
