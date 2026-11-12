@@ -220,15 +220,35 @@ impl Manager {
                         );
                     })),
             );
-        let mut panel = div().flex().flex_col().gap_4().p_4()
-            .child(div().text_sm().text_color(colors.muted_foreground).child(self.text(
-                "エクスプローラーで内容をプレビューするファイル形式を選びます。アイコンと既定のアプリは変更しません。",
-                "Choose file types to preview in Explorer. Icons and default apps are unchanged.",
-            )))
-            .child(div().text_sm().text_color(colors.muted_foreground).child(self.text(
-                "AI・PSD・PSB・EPS は表示に必要なプレビュー情報がある場合に表示します。",
-                "AI, PSD, PSB and EPS are shown when suitable preview data is available.",
-            )));
+        let mut panel = div()
+            .flex()
+            .flex_col()
+            .gap_4()
+            .p_4()
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .text_sm()
+                    .text_color(colors.muted_foreground)
+                    .child(self.text(
+                        "エクスプローラーで内容をプレビューするファイル形式を選びます。",
+                        "Choose file types to preview in Explorer.",
+                    ))
+                    .child(self.text(
+                        "アイコンと既定のアプリは変更しません。",
+                        "Icons and default apps are unchanged.",
+                    )),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(colors.muted_foreground)
+                    .child(self.text(
+                        "AI・PSD・PSB・EPS は表示に必要なプレビュー情報がある場合に表示します。",
+                        "AI, PSD, PSB and EPS are shown when suitable preview data is available.",
+                    )),
+            );
         if let Some(plan) = &self.thumbnails.plan {
             let names = |items: &BTreeSet<String>| {
                 if items.is_empty() {

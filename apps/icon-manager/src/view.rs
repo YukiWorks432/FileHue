@@ -95,14 +95,7 @@ impl Manager {
         theme::button(id, cx)
             .small()
             .icon(IconName::ArrowLeft)
-            .label(
-                if self.screen == Screen::Protection && self.protection.draft.dirty(&self.settings)
-                {
-                    self.text("変更を破棄して戻る", "Discard and return")
-                } else {
-                    self.text("戻る", "Back")
-                },
-            )
+            .label(self.text("戻る", "Back"))
             .disabled_elevated(self.operation.busy())
             .on_click(cx.listener(|this, _, window, cx| this.navigate_back(window, cx)))
     }
@@ -222,6 +215,7 @@ impl Manager {
     fn pack_heading(&self, cx: &mut Context<Self>) -> Div {
         div()
             .flex_shrink_0()
+            .bg(cx.theme().colors.sidebar)
             .flex()
             .flex_wrap()
             .items_center()
@@ -257,6 +251,7 @@ impl Manager {
         if compact && self.screen == Screen::Protection {
             return div()
                 .flex_shrink_0()
+                .bg(cx.theme().colors.sidebar)
                 .px_4()
                 .py_1()
                 .text_sm()
@@ -265,6 +260,7 @@ impl Manager {
         if compact && self.screen == Screen::Recovery {
             return div()
                 .flex_shrink_0()
+                .bg(cx.theme().colors.sidebar)
                 .flex()
                 .flex_wrap()
                 .gap_2()
@@ -290,6 +286,7 @@ impl Manager {
         let packs = self.screen == Screen::Packs;
         div()
             .flex_shrink_0()
+            .bg(cx.theme().colors.sidebar)
             .flex()
             .items_center()
             .flex_wrap()
@@ -412,7 +409,7 @@ impl Manager {
             .px_4()
             .py_3()
             .flex_shrink_0()
-            .bg(colors.group_box)
+            .bg(colors.sidebar)
             .border_b_1()
             .border_color(colors.border)
             .child(

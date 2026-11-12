@@ -198,20 +198,43 @@ impl Manager {
                 .selections
                 .get(&pack.id)
                 .unwrap_or(&default_selection);
-            let samples = [
-                "sample.js",
-                "sample.ts",
-                "sample.py",
-                "sample.rs",
-                "sample.html",
-            ]
-            .into_iter()
-            .filter_map(|name| {
-                selection
-                    .resolve(&pack.theme, name)
-                    .map(|(path, _)| (name, path.to_path_buf()))
-            })
-            .collect::<Vec<_>>();
+            let rules = pack.theme.rules();
+            let preferred = ["js", "ts", "py", "rs", "html"]
+                .into_iter()
+                .map(|ext| (format!("sample.{ext}"), format!(".{ext}")));
+            let filenames = rules
+                .files
+                .keys()
+                .chain(rules.language_files.keys())
+                .map(|name| (name.clone(), name.clone()));
+            let extensions = rules
+                .extensions
+                .keys()
+                .chain(rules.language_extensions.keys())
+                .map(|ext| {
+                    if let Some((parent, ext)) = ext.split_once('/') {
+                        (
+                            format!("{parent}/sample.{ext}"),
+                            format!("{parent}/*.{ext}"),
+                        )
+                    } else {
+                        (format!("sample.{ext}"), format!(".{ext}"))
+                    }
+                });
+            let mut seen = std::collections::BTreeSet::new();
+            let samples = preferred
+                .chain(filenames)
+                .chain(extensions)
+                .filter_map(|(name, label)| {
+                    if !seen.insert(name.clone()) {
+                        return None;
+                    }
+                    selection
+                        .resolve(&pack.theme, &name)
+                        .map(|(path, _)| (name, label, path.to_path_buf()))
+                })
+                .take(5)
+                .collect::<Vec<_>>();
             let has_samples = !samples.is_empty();
             let metadata = format!(
                 "{} · {} {} · {} {}",
@@ -288,11 +311,11 @@ impl Manager {
                 });
             if has_samples {
                 let mut preview = div().flex().flex_wrap().items_center().gap_2();
-                for (name, path) in samples {
+                for (name, label, path) in samples {
                     let sample = div()
                         .id(pack_control(&format!("sample:{name}"), &pack.id))
                         .role(Role::Image)
-                        .aria_label(name)
+                        .aria_label(name.clone())
                         .flex()
                         .flex_col()
                         .items_center()
@@ -301,8 +324,10 @@ impl Manager {
                         .child(
                             div()
                                 .text_xs()
+                                .max_w(rems(6.))
+                                .truncate()
                                 .text_color(colors.muted_foreground)
-                                .child(name.trim_start_matches("sample").to_owned()),
+                                .child(label),
                         );
                     #[cfg(feature = "test-support")]
                     let sample = sample.test_support();
@@ -386,14 +411,6 @@ impl Manager {
                 .flex_shrink_0()
                 .child(identity)
                 .child(actions);
-            if has_samples {
-                row = row.child(div().text_xs().text_color(colors.muted_foreground).child(
-                    self.text(
-                        "見本には保護設定を含みません。",
-                        "Samples do not include icon protection.",
-                    ),
-                ));
-            }
             if has_previous {
                 row = row.child(theme::inset(cx).p_3().flex().flex_col().gap_2()
                     .child(div().text_sm().child(self.text(
