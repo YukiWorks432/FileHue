@@ -321,10 +321,11 @@ fn confirmed_recovery_resumes_after_save_failure() {
     application_icon
         .set_value("", &"illustrator.ico,3")
         .unwrap();
-    assert!(
-        file_icons_windows::association("wfi-recovery").is_err(),
-        "書き込み対象の検査は維持する"
+    assert_eq!(
+        file_icons_windows::association("wfi-recovery").unwrap(),
+        application
     );
+    assert!(file_icons_windows::protected_class(application).unwrap());
     let listed = dispatch(&manager, &["conflicts", "list"]).unwrap();
     assert_eq!(listed["conflicts"], 1);
     fs::remove_file(&asset).unwrap();
