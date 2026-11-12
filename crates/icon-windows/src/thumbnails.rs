@@ -1464,10 +1464,10 @@ fn check_restore_dependencies(group: &Group, inspector: &impl DependencyInspecto
                 && before.value.is_none(),
             "thumbnail dependencies changed"
         );
-        let extension = group
-            .members
+        let (_, effective_class) = current
+            .associations
             .iter()
-            .find(|extension| {
+            .find(|(extension, _)| {
                 same_registration(&now.key, &format!("Software\\Classes\\{extension}"))
             })
             .context("thumbnail dependencies changed")?;
@@ -1477,7 +1477,7 @@ fn check_restore_dependencies(group: &Group, inspector: &impl DependencyInspecto
             .context("thumbnail dependencies changed")?;
         let class = decode_registry_string(value)?;
         ensure!(
-            !class.is_empty() && same_registration(&class, &current.associations[extension]),
+            !class.is_empty() && same_registration(&class, effective_class),
             "thumbnail dependencies changed"
         );
     }
@@ -1653,7 +1653,7 @@ mod transaction_tests {
                 associations: group
                     .members
                     .iter()
-                    .map(|extension| (extension.clone(), "Example.Vector".into()))
+                    .map(|extension| (extension.to_lowercase(), "Example.Vector".into()))
                     .collect(),
                 references: Vec::new(),
             })
@@ -1661,7 +1661,8 @@ mod transaction_tests {
     }
     impl ProviderState for InspectorSim {
         fn provider(&self, extension: &str) -> Result<Option<windows::core::GUID>> {
-            let key = format!("software\\classes\\{extension}\\shellex\\{THUMBNAIL_IID}");
+            let key =
+                format!("software\\classes\\{extension}\\shellex\\{THUMBNAIL_IID}").to_lowercase();
             let state = self.state.borrow();
             let value = state.values.get(&(key, String::new()));
             if value.is_some() && self.reject_applied.get() {
@@ -1746,6 +1747,7 @@ mod transaction_tests {
         }
         for scenario in [
             "same",
+            "same_uppercase_member",
             "different",
             "new_default",
             "other_reference",
@@ -1754,6 +1756,9 @@ mod transaction_tests {
             let directory = tempfile::tempdir().unwrap();
             let path = directory.path().join("recovery.json");
             let (mut record, mut registry, inner) = prepared();
+            if scenario == "same_uppercase_member" {
+                record.groups[0].members = [".SVG".into()].into_iter().collect();
+            }
             let inspector = Referenced {
                 inner: &inner,
                 association: RefCell::new(
@@ -1817,7 +1822,7 @@ mod transaction_tests {
                     .is_err()
             );
             let result = record.restore_checked_group(0, &mut registry, &inspector);
-            if scenario == "same" {
+            if matches!(scenario, "same" | "same_uppercase_member") {
                 result.unwrap();
                 assert!(
                     record
