@@ -1,6 +1,6 @@
 # 補助CLI
 
-Windows 11 x64用の `file-icons.exe` は、GUIと同じパック一覧、設定、登録・復元処理を使うコンソール用の入口です。配布ZIPにはGUI、CLI、Shell DLLを同じフォルダーへ収録します。CLIからも日常の管理操作を実行でき、GUIの操作にCLI入力は必要ありません。
+Windows 11 x64用の `file-icons.exe` は、GUIと同じパック一覧、設定、登録・復元処理を使うコンソール用の入口です。配布ZIPにはGUI、CLI、アイコン用とサムネイル用のShell DLLを同じフォルダーへ収録します。CLIからも日常の管理操作を実行でき、GUIの操作にCLI入力は必要ありません。
 
 ## 基本操作
 

@@ -92,6 +92,8 @@ pub const PAYLOAD: &[&str] = &[
     "docs/releases/0.1.0.en.md",
     "docs/cli.ja.md",
     "docs/cli.en.md",
+    "docs/thumbnails.ja.md",
+    "docs/thumbnails.en.md",
     "docs/target-selection.ja.md",
     "docs/conflict-recovery.ja.md",
     "docs/pack-downloads.ja.md",

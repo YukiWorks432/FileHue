@@ -236,6 +236,18 @@ fn document_links_must_stay_within_the_payload_and_target_files() {
         assert!(documents::verify(&folder).is_err(), "{target}");
     }
 }
+
+#[test]
+fn bundled_guides_link_to_documents_in_the_actual_payload() {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let output = tempfile::tempdir().unwrap();
+    for name in package::PAYLOAD {
+        let destination = output.path().join(name);
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        fs::copy(source.join(name), destination).unwrap();
+    }
+    documents::verify(output.path()).unwrap();
+}
 #[test]
 fn archives_reject_traversal_mixed_roots_duplicates_links_and_resource_overflow() {
     let root = tempfile::tempdir().unwrap();
