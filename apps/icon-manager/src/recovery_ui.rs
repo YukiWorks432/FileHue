@@ -6,7 +6,6 @@ use gpui_kit::prelude::FluentBuilder;
 
 #[derive(Default)]
 pub(super) struct Editor {
-    opened: bool,
     plan: Option<Plan>,
     alternative: Option<Plan>,
     unavailable: Option<String>,
@@ -30,16 +29,12 @@ impl Editor {
         }
         self.completed = true;
     }
-    pub(super) fn is_open(&self) -> bool {
-        self.opened
-    }
 }
 
 #[cfg(test)]
 impl Editor {
     pub(super) fn visual(plan: Plan) -> Self {
         Self {
-            opened: true,
             plan: Some(plan),
             unavailable: Some("Pack unavailable".into()),
             ..Default::default()
@@ -90,12 +85,13 @@ impl Manager {
         let Some(service) = self._guard.clone() else {
             return;
         };
-        if !self.recovery.opened {
+        if self.screen != Screen::Recovery {
             self.recovery.previous_focus = window.focused(cx);
+            self.recovery_return = self.screen;
         }
         let focus = self.recovery.focus.get_or_insert_with(|| cx.focus_handle());
         focus.focus(window, cx);
-        self.recovery.opened = true;
+        self.screen = Screen::Recovery;
         self.recovery.plan = None;
         self.recovery.alternative = None;
         self.recovery.unavailable = None;
@@ -147,7 +143,7 @@ impl Manager {
                 focus.focus(window, cx);
             }
         } else {
-            self.recovery.opened = false;
+            self.screen = self.recovery_return;
             if let Some(focus) = self.recovery.previous_focus.take() {
                 focus.focus(window, cx);
             }
@@ -177,10 +173,7 @@ impl Manager {
         }
     }
 
-    pub(super) fn recovery_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if !self.recovery.opened {
-            return None;
-        }
+    pub(super) fn recovery_panel(&self, cx: &mut Context<Self>) -> AnyElement {
         let colors = cx.theme().colors;
         let completed = self.recovery.completed;
         let title = if completed {
@@ -216,25 +209,23 @@ impl Manager {
             .min_h_0()
             .overflow_y_scroll()
             .child(body);
-        Some(
-            div()
-                .size_full()
-                .min_w_0()
-                .when_some(self.recovery.focus.as_ref(), |view, focus| {
-                    view.track_focus(focus)
-                })
-                .flex()
-                .flex_col()
-                .child(self.header(cx))
-                .child(scroll)
-                .child(self.recovery_footer(cx))
-                .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                    if event.keystroke.key == "escape" && !this.operation.busy() {
-                        this.close_recovery(window, cx);
-                    }
-                }))
-                .into_any_element(),
-        )
+        div()
+            .size_full()
+            .min_w_0()
+            .when_some(self.recovery.focus.as_ref(), |view, focus| {
+                view.track_focus(focus)
+            })
+            .flex()
+            .flex_col()
+            .child(self.header(cx))
+            .child(scroll)
+            .child(self.recovery_footer(cx))
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                if event.keystroke.key == "escape" && !this.operation.busy() {
+                    this.close_recovery(window, cx);
+                }
+            }))
+            .into_any_element()
     }
 
     fn recovery_methods(&self, cx: &mut Context<Self>) -> Div {

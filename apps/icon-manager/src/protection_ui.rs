@@ -89,7 +89,6 @@ pub(super) struct Editor {
     active_extensions: std::collections::BTreeSet<String>,
     active_classes: std::collections::BTreeSet<String>,
     active_excluded_extensions: std::collections::BTreeSet<String>,
-    pub open: bool,
     pub draft: bool,
     pub(super) rules: IconProtectionRules,
     pub(super) sources: Vec<ExistingIcon>,
@@ -225,7 +224,7 @@ impl Manager {
                     .map(|s| s.registration.clone())
                     .collect(),
             );
-            self.protection.open = true;
+            self.screen = Screen::Protection;
             self.protection.list =
                 Some(ListState::new(0, ListAlignment::Top, px(0.)).measure_all());
         }
@@ -251,7 +250,6 @@ impl Manager {
     }
 
     pub(super) fn prepare_target_protection(&mut self, id: &str, cx: &mut Context<Self>) {
-        self.protection.open = false;
         self.protection.retained.clear();
         self.protection.pack = Some(id.into());
         self.refresh_protection_context();
@@ -271,7 +269,8 @@ impl Manager {
         self.protection.collapsed.clear();
         // 未表示行も測定し、ホイールとスクロールバーが全件の高さを参照できるようにする。
         self.protection.list = Some(ListState::new(0, ListAlignment::Top, px(0.)).measure_all());
-        self.protection.open = true;
+        self.protection_return = self.screen;
+        self.screen = Screen::Protection;
         self.protection.changes_recommended = false;
         self.protection.changes_show_same = false;
         self.protection.view_picker = None;
@@ -327,7 +326,7 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
-        self.protection.open = false;
+        self.screen = self.protection_return;
         // 同じ対象画面へ戻る場合は、進行中の調査をその画面で受け取る。
         if self.targets.pack.is_none() || self.targets.pack != self.protection.pack {
             self.protection.inspection += 1;
@@ -388,7 +387,7 @@ impl Manager {
         self.protection.previews = None;
         self.protection.previews_loading = true;
         let executor = cx.background_executor().clone();
-        let include_saved = self.protection.open;
+        let include_saved = self.screen == Screen::Protection;
         let mut retained: Vec<_> = self.protection.retained.iter().cloned().collect();
         if include_saved {
             retained.extend(

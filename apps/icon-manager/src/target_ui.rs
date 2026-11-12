@@ -228,6 +228,7 @@ impl Manager {
                 )
             });
         self.targets.pack = copy.then(|| pack.id.clone());
+        self.screen = if copy { Screen::Targets } else { Screen::Packs };
         self.targets.auxiliary = copy.then_some(Auxiliary::Copy);
         self.selected = (!copy).then(|| pack.id.clone());
     }
@@ -242,6 +243,7 @@ impl Manager {
         }
         if !matches!(page, "samples" | "update" | "planned") {
             self.targets.pack = None;
+            self.screen = Screen::Packs;
             self.selected = None;
         }
     }
@@ -252,6 +254,7 @@ impl Manager {
         }
         if self.targets.auxiliary.take().is_none() {
             self.targets.pack = None;
+            self.screen = Screen::Packs;
             self.targets.all.clear();
             self.targets.preview_class = None;
             self.close_target_protection();
@@ -278,6 +281,7 @@ impl Manager {
         });
         self.targets.auxiliary = None;
         self.targets.pack = Some(id.into());
+        self.screen = Screen::Targets;
         self.targets.reset_page();
         self.targets.selecting = false;
         self.targets.marked.clear();

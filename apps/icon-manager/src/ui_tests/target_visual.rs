@@ -1049,6 +1049,7 @@ fn recovery_visual_probe() {
             };
             // 描画用の値だけを設定する。登録の読み書きや復旧の実行は行わない。
             this.recovery = crate::recovery_ui::Editor::visual(plan);
+            this.screen = crate::Screen::Recovery;
 
 
             cx.notify();

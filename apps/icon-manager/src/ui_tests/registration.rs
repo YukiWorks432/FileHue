@@ -804,6 +804,21 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
         })
         .unwrap();
     }
+    // 復旧から保護画面へ移動しても、戻ると確認中の復旧方法を保持する。
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("protection-open", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("protection-back", cx);
+        w.render_frame(cx);
+        assert!(w.find("recovery-summary").visible());
+        assert_eq!(w.find("recovery-preserve").checked(), Some(true));
+    })
+    .unwrap();
     cx.update_window(window, |_, w, cx| w.click("navigate-back", cx))
         .unwrap();
     assert_eq!(snapshot(&registry._classes), before_review);

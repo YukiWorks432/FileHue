@@ -31,6 +31,7 @@ mod thumbnail_ui;
 use theme::ButtonElevation;
 mod view;
 use status::{Failure, Status};
+use view::Screen;
 
 #[cfg(all(test, feature = "test-support"))]
 mod ui_tests;
@@ -46,6 +47,9 @@ use file_icons_manager_service::{DownloadSource, Manager as ManagerService};
 type InitialSettings = (Option<std::sync::Arc<ManagerService>>, Result<Settings>);
 
 struct Manager {
+    screen: Screen,
+    recovery_return: Screen,
+    protection_return: Screen,
     about: about_ui::About,
     protection: protection_ui::Editor,
     recovery: recovery_ui::Editor,
@@ -115,6 +119,9 @@ impl Manager {
                     settings.language = "ja".into();
                 }
                 Self {
+                    screen: Screen::Packs,
+                    recovery_return: Screen::Packs,
+                    protection_return: Screen::Packs,
                     about: Default::default(),
                     protection: Default::default(),
                     recovery: Default::default(),
@@ -148,6 +155,9 @@ impl Manager {
                     .unwrap_or_default();
                 let recovery_available = guard.is_some() && !settings.journal.is_empty();
                 Self {
+                    screen: Screen::Packs,
+                    recovery_return: Screen::Packs,
+                    protection_return: Screen::Packs,
                     about: Default::default(),
                     protection: Default::default(),
                     recovery: Default::default(),

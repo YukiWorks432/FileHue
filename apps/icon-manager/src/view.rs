@@ -9,6 +9,16 @@ use gpui_kit::{
     },
 };
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Screen {
+    Packs,
+    Targets,
+    Thumbnails,
+    About,
+    Recovery,
+    Protection,
+}
+
 impl Manager {
     fn navigation_root(&self, cx: &mut Context<Self>) -> Stateful<Div> {
         div()
@@ -52,22 +62,22 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
-        if self.thumbnails.open {
-            self.thumbnails.open = false;
+        if self.screen == Screen::Thumbnails {
+            self.screen = Screen::Packs;
             self.focus.focus(window, cx);
             cx.notify();
-        } else if self.about.open {
+        } else if self.screen == Screen::About {
             if self.about.license_text.take().is_none() {
-                self.about.open = false;
+                self.screen = Screen::Packs;
             }
             self.about.scroll.set_offset(point(px(0.), px(0.)));
             self.focus.focus(window, cx);
             cx.notify();
-        } else if self.protection.open {
+        } else if self.screen == Screen::Protection {
             self.close_protection(window, cx);
-        } else if self.recovery.is_open() {
+        } else if self.screen == Screen::Recovery {
             self.close_recovery(window, cx);
-        } else if self.targets.pack.is_some() {
+        } else if self.screen == Screen::Targets {
             self.back_from_targets(window, cx);
         } else if self.browsing {
             self.show_library(false, window, cx);
@@ -86,8 +96,7 @@ impl Manager {
             .small()
             .icon(IconName::ArrowLeft)
             .label(
-                if !self.about.open && self.protection.open && self.protection.dirty(&self.settings)
-                {
+                if self.screen == Screen::Protection && self.protection.dirty(&self.settings) {
                     self.text("変更を破棄して戻る", "Discard and return")
                 } else {
                     self.text("戻る", "Back")
@@ -116,20 +125,13 @@ impl Manager {
                     .items_center()
                     .gap_3()
                     .when(
-                        self.thumbnails.open
-                            || self.about.open
-                            || self.targets.pack.is_some()
-                            || self.protection.open
-                            || self.recovery.is_open()
+                        self.screen != Screen::Packs
                             || self.browsing
                             || self.selected.is_some()
                             || self.pending.is_some(),
                         |row| {
                             row.child(self.back_button(
-                                if self.targets.pack.is_some()
-                                    && !self.recovery.is_open()
-                                    && !self.protection.open
-                                {
+                                if self.screen == Screen::Targets {
                                     "target-back"
                                 } else {
                                     "navigate-back"
@@ -204,14 +206,12 @@ impl Manager {
                             } else {
                                 self.text("競合を確認", "Review conflicts")
                             })
-                            .selected(self.recovery.is_open())
+                            .selected(self.screen == Screen::Recovery)
                             .disabled_elevated(
-                                self.about.open
-                                    || self.thumbnails.open
+                                matches!(self.screen, Screen::About | Screen::Thumbnails)
                                     || self.operation.busy()
                                     || self._guard.is_none()
-                                    || self.recovery.is_open()
-                                    || self.protection.open,
+                                    || matches!(self.screen, Screen::Recovery | Screen::Protection),
                             )
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.open_conflicts(
@@ -227,11 +227,10 @@ impl Manager {
                             .small()
                             .label(self.text("アイコンの保護", "Icon protection"))
                             .disabled_elevated(
-                                self.about.open
-                                    || self.thumbnails.open
+                                matches!(self.screen, Screen::About | Screen::Thumbnails)
                                     || self.operation.busy()
                                     || !self.valid
-                                    || self.protection.open,
+                                    || self.screen == Screen::Protection,
                             )
                             .on_click(
                                 cx.listener(|this, _, window, cx| this.open_protection(window, cx)),
@@ -311,7 +310,7 @@ impl Manager {
                     .label(self.text("アプリ情報", "About"))
                     .disabled_elevated(self.operation.busy())
                     .on_click(cx.listener(|this, _, window, cx| {
-                        this.about.open = true;
+                        this.screen = Screen::About;
                         this.about.scroll.set_offset(point(px(0.), px(0.)));
                         this.focus.focus(window, cx);
                         cx.notify();
@@ -494,20 +493,20 @@ impl Manager {
 
 impl Render for Manager {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.thumbnails.open {
+        if self.screen == Screen::Thumbnails {
             return self
                 .standard_root(cx)
                 .child(self.header(cx))
                 .child(self.thumbnail_panel(cx))
                 .child(self.footer(cx));
         }
-        if self.about.open {
+        if self.screen == Screen::About {
             return self
                 .standard_root(cx)
                 .child(self.header(cx))
                 .child(self.about_panel(cx));
         }
-        if self.protection.open {
+        if self.screen == Screen::Protection {
             return self
                 .screen_root(cx)
                 .flex()
@@ -517,10 +516,12 @@ impl Render for Manager {
                     root.child(self.footer(cx))
                 });
         }
-        if let Some(panel) = self.recovery_panel(cx) {
-            return self.screen_root(cx).child(panel);
+        if self.screen == Screen::Recovery {
+            return self.screen_root(cx).child(self.recovery_panel(cx));
         }
-        if let Some(panel) = self.target_panel(window, cx) {
+        if self.screen == Screen::Targets
+            && let Some(panel) = self.target_panel(window, cx)
+        {
             return self.screen_root(cx).child(panel);
         }
         let body = div().p_4().child(if self.browsing {
