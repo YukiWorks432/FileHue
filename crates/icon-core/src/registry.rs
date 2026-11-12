@@ -71,3 +71,19 @@ pub fn restore(registry: &mut impl Registry, changes: &[Change]) -> Result<()> {
     );
     Ok(())
 }
+
+/// 関連する登録をすべて照合し、競合がなければ逆順で復元する。
+/// 復元中の書き込み失敗に備え、呼び出し元は記録を完了まで保持する。
+pub fn restore_group(registry: &mut impl Registry, changes: &[Change]) -> Result<()> {
+    for change in changes {
+        let current = registry.read(&change.key, &change.name)?;
+        ensure!(
+            current == change.before || current.as_ref() == Some(&change.after),
+            Conflict(format!(
+                "registry group changed before restore: {}",
+                change.key
+            ))
+        );
+    }
+    restore(registry, changes)
+}

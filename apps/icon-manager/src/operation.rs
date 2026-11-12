@@ -18,6 +18,7 @@ pub enum Kind {
     Details,
     InspectConflicts,
     ResolveConflicts,
+    Thumbnails,
 }
 
 pub struct Operation {

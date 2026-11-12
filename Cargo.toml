@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/icon-core", "crates/icon-catalog", "crates/icon-windows", "crates/icon-shell", "apps/icon-manager", "crates/icon-manager-service", "apps/icon-cli", "xtask"]
+members = ["crates/icon-core", "crates/icon-catalog", "crates/icon-windows", "crates/icon-shell", "crates/thumbnail-core", "crates/thumbnail-shell", "apps/icon-manager", "crates/icon-manager-service", "apps/icon-cli", "xtask"]
 resolver = "3"
 
 [workspace.package]

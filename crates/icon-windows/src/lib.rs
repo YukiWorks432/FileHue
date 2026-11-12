@@ -34,7 +34,7 @@ mod shell_cleanup;
 pub use shell_cleanup::{ShellCleanupPending, cleanup_staged_shell};
 
 mod deployment;
-pub use deployment::stage_shell;
+pub use deployment::{planned_thumbnail_shell, stage_shell, stage_thumbnail_shell};
 
 pub mod conflict;
 mod icon_policy;
@@ -46,6 +46,7 @@ pub use protection::{inspect_existing_icons, inspect_pack_icons, inspect_retaine
 mod recovery;
 mod registration_scope;
 mod settings_file;
+pub mod thumbnails;
 pub use protection::{IconExclusion, ProtectionReason, protection_report};
 use recovery::Recovery;
 pub use settings_file::UnsupportedSettingsFormat;
@@ -315,11 +316,15 @@ impl Registry for UserRegistry {
                 11 => REG_QWORD,
                 _ => anyhow::bail!("unsupported registry value type"),
             };
+            // RegSetValueExWが終端のない既存文字列を補完しないよう、
+            // 指定長の直後に非ゼロの余白を確保して元のバイト数だけ渡す。
+            let mut guarded = value.bytes.clone();
+            guarded.extend_from_slice(&[1, 1]);
             root.create_subkey(key)?.0.set_raw_value(
                 name,
                 &RegValue {
                     vtype: kind,
-                    bytes: (&value.bytes[..]).into(),
+                    bytes: (&guarded[..value.bytes.len()]).into(),
                 },
             )?;
         } else {

@@ -38,7 +38,11 @@ impl std::error::Error for ShellCleanupPending {
 }
 
 fn registered() -> Result<bool> {
-    let path = format!("CLSID\\{CLSID_TEXT}\\InprocServer32");
+    registered_guid(CLSID_TEXT)
+}
+
+fn registered_guid(guid: &str) -> Result<bool> {
+    let path = format!("CLSID\\{guid}\\InprocServer32");
     for (root, path) in [
         (
             RegKey::predef(HKEY_CURRENT_USER),
@@ -59,7 +63,24 @@ fn registered() -> Result<bool> {
 pub fn cleanup_staged_shell() -> Result<()> {
     (|| {
         let settings = load()?;
-        cleanup_at(&settings, &home()?, registered()?)
+        let root = home()?;
+        ensure!(
+            crate::thumbnails::Recovery::load(&root.join("thumbnail-recovery.json"))?.is_none()
+                && crate::thumbnails::Settings::load(&root.join("thumbnail-settings.json"))?
+                    .unwrap_or_default()
+                    .selected
+                    .is_empty(),
+            "restore thumbnail registration before deleting staged Shell DLLs"
+        );
+        for format in crate::thumbnails::Format::ALL {
+            let guid = windows::core::GUID::from_u128(format.clsid());
+            ensure!(
+                !registered_guid(&format!("{{{guid:?}}}"))?,
+                "thumbnail provider remains registered"
+            );
+        }
+        cleanup_at(&settings, &root, registered()?)?;
+        cleanup_store(&root, "thumbnail-shell", "file_icons_thumbnail_shell.dll")
     })()
     .map_err(|cause| ShellCleanupPending { cause }.into())
 }
@@ -172,12 +193,16 @@ fn cleanup_at(settings: &Settings, base: &Path, is_registered: bool) -> Result<(
             && settings.created_keys.is_empty(),
         "restore registration before deleting staged Shell DLLs"
     );
-    let store = base.join("shell");
+    cleanup_store(base, "shell", "file_icons_shell.dll")
+}
+
+fn cleanup_store(base: &Path, store_name: &str, filename: &str) -> Result<()> {
+    let store = base.join(store_name);
     if !store.try_exists()? {
         return Ok(());
     }
     let base = base.canonicalize()?;
-    let expected = base.join("shell");
+    let expected = base.join(store_name);
     ensure!(
         ordinary(&fs::symlink_metadata(&store)?) && store.canonicalize()? == expected,
         "Shell storage was redirected"
@@ -224,10 +249,10 @@ fn cleanup_at(settings: &Settings, base: &Path, is_registered: bool) -> Result<(
                 return Ok(());
             }
             ensure!(
-                files.len() == 1 && files[0].file_name() == "file_icons_shell.dll",
+                files.len() == 1 && files[0].file_name() == filename,
                 "unexpected files in Shell bucket"
             );
-            let dll = directory.join("file_icons_shell.dll");
+            let dll = directory.join(filename);
             delete_verified(&dll, &name, &mut budget, began)?;
             // 空の所有フォルダーだけを削除し、再帰削除を使わない。
             remove_empty_directory(&directory)?;

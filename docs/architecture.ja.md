@@ -11,6 +11,8 @@ Rust製のテーマ処理、取得、Windows統合と、GPUI / GPUI Kit製GUI、
 | `crates/icon-windows` | ユーザー単位の保存、関連付け照会、登録と復元 |
 | `crates/icon-manager-service` | 管理ロック、取得・取り込み・選択保存・適用・復元の共通処理 |
 | `crates/icon-shell` | `IPersistFile` / `IExtractIconW` によるCOM DLL |
+| `crates/thumbnail-core` | 埋め込みプレビューの抽出とSVG描画 |
+| `crates/thumbnail-shell` | `IInitializeWithStream` / `IThumbnailProvider` によるサムネイルDLL |
 | `apps/icon-manager` | GPUI製GUI。主要操作、日英表示、進捗と復旧画面 |
 | `apps/icon-cli` | GUIと共通管理処理を使う `file-icons.exe` |
 
@@ -19,6 +21,8 @@ Rust製のテーマ処理、取得、Windows統合と、GPUI / GPUI Kit製GUI、
 取り込みの`import_observed`は中断確認に加え、使用する画像定義の総数と変換・検証を完了した件数を通知する。従来の`import_controlled`も同じ処理を使う。取得・取り込み側の`Progress`がテーマ番号と件数を一貫した組として保持し、GUIは既存の更新タイマーで読む。進捗通知は書き込み・出典の公開や設定保存の契約を変えず、既存ICOの再検証も省略しない。
 
 GUIはExplorer内で動くShell拡張から分離する。UIの原則と検証は[GUIとデザインの参照方針](design.ja.md)に従う。
+
+サムネイルはアイコン処理と別のDLL・設定・復元記録を使う。形式ごとのCLSIDと拡張子単位の登録だけを扱い、共有ProgIDの登録を分配する場合は共有先と外部参照を照合する。変更前の値を先に記録し、復元時は共有する組全体を照合する。ユーザー側の未選択種類は元の提供元へ戻し、マシン側の共有登録は未検証として拒否する。失敗した記録は保持する。表示条件は[内容のサムネイル](thumbnails.ja.md)を参照する。
 
 GUIの通常起動では、管理ロックの取得と設定読み込みを描画基盤の初期化と並行して進める。画面を構築する前に結果を受け取り、ロックと検証済み設定を画面へ引き渡す。操作可能な仮の設定や、後から設定を差し替える段階は設けない。読み込み失敗時の復旧案内と、ロックを取得できない場合の操作制限は同期起動と同じである。
 

@@ -60,6 +60,25 @@ fn cleanup_preserves_registration_unknown_changed_and_locked_files() {
 }
 
 #[test]
+fn thumbnail_cleanup_verifies_owned_content_and_preserves_icon_storage() {
+    let root = tempfile::tempdir().unwrap();
+    let base = root.path().join("home");
+    let icon = fixture(&base);
+    let thumbnail = base
+        .join("thumbnail-shell")
+        .join(ABC)
+        .join("file_icons_thumbnail_shell.dll");
+    fs::create_dir_all(thumbnail.parent().unwrap()).unwrap();
+    fs::write(&thumbnail, b"changed").unwrap();
+    assert!(cleanup_store(&base, "thumbnail-shell", "file_icons_thumbnail_shell.dll").is_err());
+    assert_eq!(fs::read(&thumbnail).unwrap(), b"changed");
+    fs::write(&thumbnail, b"abc").unwrap();
+    cleanup_store(&base, "thumbnail-shell", "file_icons_thumbnail_shell.dll").unwrap();
+    assert!(!thumbnail.exists());
+    assert_eq!(fs::read(icon).unwrap(), b"abc");
+}
+
+#[test]
 fn cleanup_never_follows_redirected_storage_and_limits_work() {
     let root = tempfile::tempdir().unwrap();
     let base = root.path().join("home");

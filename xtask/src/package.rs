@@ -100,6 +100,7 @@ pub const BINARIES: &[&str] = &[
     "file-icons-manager.exe",
     "file-icons.exe",
     "file_icons_shell.dll",
+    "file_icons_thumbnail_shell.dll",
 ];
 
 pub fn digest(path: &Path) -> Result<String> {
@@ -266,8 +267,13 @@ pub fn dependencies(metadata: &Value) -> Result<Vec<&Value>> {
     let mut todo: Vec<_> = packages
         .iter()
         .filter(|(_, p)| {
-            ["file-icons-manager", "file-icons-shell", "file-icons-cli"]
-                .contains(&p["name"].as_str().unwrap_or(""))
+            [
+                "file-icons-manager",
+                "file-icons-shell",
+                "file-icons-thumbnail-shell",
+                "file-icons-cli",
+            ]
+            .contains(&p["name"].as_str().unwrap_or(""))
         })
         .map(|(id, _)| *id)
         .collect();

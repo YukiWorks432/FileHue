@@ -3,6 +3,7 @@ use file_icons_catalog::CATALOG;
 use file_icons_core::ImportedPack;
 use file_icons_windows::Settings;
 use std::{
+    collections::BTreeSet,
     fs,
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
@@ -37,11 +38,28 @@ fn warning_count(manager: &Manager, ids: &[String]) -> Result<usize> {
         .sum())
 }
 
+fn thumbnail_selection(value: &str) -> Result<BTreeSet<String>> {
+    let mut selected = BTreeSet::new();
+    for part in value.split(',') {
+        let part = part.trim();
+        let part = part.strip_prefix('.').unwrap_or(part).to_ascii_lowercase();
+        let extension = format!(".{part}");
+        anyhow::ensure!(
+            file_icons_windows::thumbnails::Format::ALL
+                .iter()
+                .any(|format| format.extension() == extension),
+            "unsupported thumbnail extension"
+        );
+        anyhow::ensure!(selected.insert(extension), "duplicate thumbnail extension");
+    }
+    Ok(selected)
+}
+
 pub fn independent(args: &Args, en: bool) -> Result<Value> {
     match args.command.as_str() {
         "version" => Ok(json!({"version":env!("CARGO_PKG_VERSION")})),
         "help" => Ok(
-            json!({"help":format!("{}\nfile-icons [--json] [--lang ja|en] <command>\n\nstatus\ncatalog list\ncatalog show <id>\npack list\npack show <id>\npack download <catalog-id>\npack inspect <folder>\npack import <folder> --theme <theme-id>\npack remove <id> [--dry-run]\nresolve <pack-id> <filename>\napply <pack-id> [--dry-run]\nrestore [--dry-run]\nrecover [--dry-run]\nconflicts list\nrecover --strategy preserve-external|reapply-theme --dry-run\nrecover --strategy preserve-external|reapply-theme --confirm <id>\ncleanup [--dry-run]\ntargets list <pack-id>\ntargets set <pack-id> <changes.json> [--dry-run]\ntargets edit <pack-id> <all|category:id|query:text|target-id> <on|off|inherit> [--dry-run]\ntargets copy <source-id> <destination-id> [--dry-run]\nprotection show\nprotection set <on|off> [--dry-run]\nprotection exclusions <pack-id>\n\n{}",
+            json!({"help":format!("{}\nfile-icons [--json] [--lang ja|en] <command>\n\nstatus\ncatalog list\ncatalog show <id>\npack list\npack show <id>\npack download <catalog-id>\npack inspect <folder>\npack import <folder> --theme <theme-id>\npack remove <id> [--dry-run]\nresolve <pack-id> <filename>\napply <pack-id> [--dry-run]\nrestore [--dry-run]\nrecover [--dry-run]\nconflicts list\nrecover --strategy preserve-external|reapply-theme --dry-run\nrecover --strategy preserve-external|reapply-theme --confirm <id>\ncleanup [--dry-run]\ntargets list <pack-id>\ntargets set <pack-id> <changes.json> [--dry-run]\ntargets edit <pack-id> <all|category:id|query:text|target-id> <on|off|inherit> [--dry-run]\ntargets copy <source-id> <destination-id> [--dry-run]\nprotection show\nprotection set <on|off> [--dry-run]\nprotection exclusions <pack-id>\nthumbnails show\nthumbnails set <ai,psd,...> [--dry-run]\nthumbnails restore [--dry-run]\n\n{}",
             text(en,"Windowsのファイルアイコンを管理します。","Manage Windows file icons."),
             text(en,"取得だけでは適用しません。変更操作の前にGUIを閉じてください。--は以後の引数を値として扱います。","Downloading does not apply icons. Close the GUI before managing state. Use -- before literal arguments."))}),
         ),
@@ -123,6 +141,41 @@ pub fn run(manager: &Manager, args: &Args, progress: Arc<Progress>, en: bool) ->
     let dry = args.dry_run;
     let id = args.values.first().map(String::as_str).unwrap_or_default();
     match args.command.as_str() {
+        "thumbnails show" => {
+            let status = manager.thumbnail_status()?;
+            let planned = status
+                .recovery
+                .as_ref()
+                .and_then(|record| record.selected_extensions().ok());
+            let recovery_pending = status.missing_recovery
+                || status.group_errors.iter().any(Option::is_some)
+                || status
+                    .recovery
+                    .as_ref()
+                    .is_some_and(|record| record.transition.is_some());
+            Ok(
+                json!({"saved_selection":status.settings.selected,"planned_selection":planned,"group_errors":status.group_errors,"recovery_pending":recovery_pending}),
+            )
+        }
+        "thumbnails set" => {
+            let selected = thumbnail_selection(id)?;
+            if dry {
+                return Ok(
+                    json!({"dry_run":true,"plan":manager.preview_thumbnail_selection(selected)?}),
+                );
+            }
+            manager.set_thumbnail_selection(selected.clone())?;
+            Ok(json!({"dry_run":false,"selected":selected}))
+        }
+        "thumbnails restore" => {
+            if dry {
+                return Ok(
+                    json!({"dry_run":true,"recovery":manager.thumbnail_recovery()?,"recheck_on_execution":true}),
+                );
+            }
+            manager.restore_thumbnails()?;
+            Ok(json!({"dry_run":false,"restored":true}))
+        }
         "protection show" => {
             Ok(json!({"preserve_existing_icons":manager.settings()?.preserve_existing_icons}))
         }
@@ -358,6 +411,11 @@ pub fn run(manager: &Manager, args: &Args, progress: Arc<Progress>, en: bool) ->
                 Failure::Precondition
             );
             if dry {
+                let thumbnail = manager.thumbnail_status()?;
+                anyhow::ensure!(
+                    thumbnail.recovery.is_none() && thumbnail.settings.selected.is_empty(),
+                    Failure::Precondition
+                );
                 let path = file_icons_windows::home()?.join("shell");
                 let candidates = if path.try_exists()? {
                     fs::read_dir(path)?
@@ -368,8 +426,18 @@ pub fn run(manager: &Manager, args: &Args, progress: Arc<Progress>, en: bool) ->
                     vec![]
                 };
                 anyhow::ensure!(candidates.len() <= 1024, Failure::Precondition);
+                let path = file_icons_windows::home()?.join("thumbnail-shell");
+                let thumbnail_candidates = if path.try_exists()? {
+                    fs::read_dir(path)?
+                        .take(1025)
+                        .map(|entry| Ok(entry?.path()))
+                        .collect::<Result<Vec<_>>>()?
+                } else {
+                    vec![]
+                };
+                anyhow::ensure!(thumbnail_candidates.len() <= 1024, Failure::Precondition);
                 return Ok(
-                    json!({"dry_run":true,"pending_pack_removals":settings.pending_pack_removals,"shell_candidates":candidates,"verify_ownership_on_execution":true}),
+                    json!({"dry_run":true,"pending_pack_removals":settings.pending_pack_removals,"shell_candidates":candidates,"thumbnail_shell_candidates":thumbnail_candidates,"verify_ownership_on_execution":true}),
                 );
             }
             progress.check()?;

@@ -1,0 +1,15 @@
+[package]
+name = "file-icons-thumbnail-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = ["preview"]
+preview = ["dep:base64", "dep:image", "dep:resvg"]
+
+[dependencies]
+base64 = { version = "0.22", optional = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"], optional = true }
+resvg = { version = "=0.48.1", default-features = false, features = ["raster-images", "system-fonts", "text"], optional = true }

@@ -195,6 +195,13 @@ fn render(out: &mut impl Write, value: &Value, en: bool, depth: usize) -> io::Re
                         "Protected file type managed by Windows",
                     ),
                     "dry_run" => text(en, "変更予定のみ", "Dry run"),
+                    "saved_selection" => text(en, "保存された選択", "Saved selection"),
+                    "planned_selection" => text(en, "記録された選択", "Recorded selection"),
+                    "selected" => text(en, "選択", "Selected"),
+                    "additions" => text(en, "追加", "Additions"),
+                    "removals" => text(en, "解除", "Removals"),
+                    "group_errors" => text(en, "登録の確認結果", "Registration errors"),
+                    "recovery_pending" => text(en, "復旧が必要", "Recovery pending"),
                     "help" => text(en, "使い方", "Usage"),
                     "catalog" => text(en, "公式パック", "Catalog"),
                     "id" => text(en, "識別子", "ID"),
@@ -312,8 +319,10 @@ fn main() -> std::process::ExitCode {
         Err(error) => Err(("invalid_arguments", 2, error)),
         Ok(args) => {
             json_output = args.json;
-            registration_notice =
-                matches!(args.command.as_str(), "apply" | "restore" | "recover") && !args.dry_run;
+            registration_notice = matches!(
+                args.command.as_str(),
+                "apply" | "restore" | "recover" | "thumbnails set" | "thumbnails restore"
+            ) && !args.dry_run;
             let progress = Arc::new(Progress::default());
             (|| -> Result<Value> {
                 let _console = initialize(progress.clone())?;
@@ -340,7 +349,7 @@ fn main() -> std::process::ExitCode {
                 vec![text(
                     en,
                     "表示が更新されない場合は、ファイル操作を終えてからExplorerを再起動してください。",
-                    "If icons do not update, finish file operations and restart Explorer.",
+                    "If the display does not update, finish file operations and restart Explorer.",
                 ).into()]
             } else {
                 vec![]

@@ -85,19 +85,26 @@ pub fn extract(archive: &Path, destination: &Path) -> Result<PathBuf> {
 }
 
 pub fn probe(messages: &str) -> Result<PathBuf> {
+    probe_for(messages, "isolated_shell")
+}
+
+pub fn probe_for(messages: &str, target: &str) -> Result<PathBuf> {
     let mut paths = Vec::new();
     for line in messages.lines() {
         let Ok(value) = serde_json::from_str::<Value>(line) else {
             continue;
         };
         if value["reason"] == "compiler-artifact"
-            && value["target"]["name"] == "isolated_shell"
+            && value["target"]["name"] == target
             && let Some(path) = value["executable"].as_str()
         {
             paths.push(PathBuf::from(path));
         }
     }
-    ensure!(paths.len() == 1, "cannot identify isolated Shell probe");
+    ensure!(
+        paths.len() == 1,
+        "cannot identify isolated Shell probe: {target}"
+    );
     Ok(paths.remove(0))
 }
 
@@ -168,7 +175,7 @@ pub fn verify(
     }
     let sysroot = package::run(root, "rustc", &["--print", "sysroot"], 30)?;
     crate::privacy::verify(&folder, root, Path::new(&sysroot))?;
-    let probe_sha256 = if verify_shell {
+    let (probe_sha256, thumbnail_probe_sha256) = if verify_shell {
         let messages = process::checked(
             Command::new("cargo")
                 .args([
@@ -208,9 +215,47 @@ pub fn verify(
             "配布DLLのSTA/MTA",
             &logs.join("shell"),
         )?;
-        Some(package::digest(&probe)?)
+        let thumbnail_messages = process::checked(
+            Command::new("cargo")
+                .args([
+                    "test",
+                    "-p",
+                    "file-icons-thumbnail-shell",
+                    "--test",
+                    "pdf",
+                    "--no-run",
+                    "--locked",
+                    "--message-format=json",
+                ])
+                .current_dir(root),
+            Duration::from_secs(1800),
+            "配布検証のサムネイル試験ビルド",
+            &logs.join("thumbnail-build"),
+        )?;
+        let thumbnail_probe = probe_for(std::str::from_utf8(&thumbnail_messages)?, "pdf")?;
+        fs::copy(&thumbnail_probe, copied.join("thumbnail_pdf.exe"))?;
+        fs::copy(
+            folder.join("file_icons_thumbnail_shell.dll"),
+            copied.join("file_icons_thumbnail_shell.dll"),
+        )?;
+        process::checked(
+            Command::new(copied.join("thumbnail_pdf.exe"))
+                .args([
+                    "--exact",
+                    "first_page_is_rendered_in_sta_and_mta",
+                    "--nocapture",
+                ])
+                .current_dir(root),
+            Duration::from_secs(180),
+            "配布サムネイルDLLのSTA/MTA",
+            &logs.join("thumbnail-shell"),
+        )?;
+        (
+            Some(package::digest(&probe)?),
+            Some(package::digest(&thumbnail_probe)?),
+        )
     } else {
-        None
+        (None, None)
     };
     smoke(
         &folder.join("file-icons-manager.exe"),
@@ -258,8 +303,8 @@ pub fn verify(
     );
     let mut result = json!({"product":package::PRODUCT,"purpose":purpose,"source_commit":source.head,"version":manifest.version,"target":manifest.target,
         "source_repository":manifest.source_repository,"signature":"unsigned","archive":archive_name,"archive_sha256":archive_hash,"files":manifest.files.len(),
-        "dll_sha256":package::digest(&folder.join("file_icons_shell.dll"))?,"gui_sha256":package::digest(&folder.join("file-icons-manager.exe"))?,"probe_sha256":probe_sha256,
-        "manifest":"passed","document_links":"passed","document_links_checked":links,"shell_sta_mta":if verify_shell { "passed" } else { "not-run" },"gui_startup":"passed","cli_smoke":"passed","cli_sha256":package::digest(&folder.join("file-icons.exe"))?,"actual_user_registration_modified":false,
+        "dll_sha256":package::digest(&folder.join("file_icons_shell.dll"))?,"thumbnail_dll_sha256":package::digest(&folder.join("file_icons_thumbnail_shell.dll"))?,"gui_sha256":package::digest(&folder.join("file-icons-manager.exe"))?,"probe_sha256":probe_sha256,"thumbnail_probe_sha256":thumbnail_probe_sha256,
+        "manifest":"passed","document_links":"passed","document_links_checked":links,"shell_sta_mta":if verify_shell { "passed" } else { "not-run" },"thumbnail_sta_mta":if verify_shell { "passed" } else { "not-run" },"gui_startup":"passed","cli_smoke":"passed","cli_sha256":package::digest(&folder.join("file-icons.exe"))?,"actual_user_registration_modified":false,
         "license_review_required":manifest.license_review_required,"publication_approved":false});
     // 生ログ・ローカルパスは検証者だけが保持し、公開候補の報告には含めない。
     if purpose == package::Purpose::Validation {

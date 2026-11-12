@@ -26,9 +26,9 @@ Windows検証は、通常検証と最適化ZIPの生成・検証を別のWindows
 
 初回のEXEとDLLは未署名である。SHA-256は内容の一致を、[ビルド来歴証明](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)は作成元を確認するもので、Windowsのコード署名ではない。ZIP、`SHA256SUMS.txt`、外部マニフェスト、提供ソース、検証報告が同じ版・コミットを示すことを確認し、必要な原本を継続して提供できるよう保持する。
 
-通常CIはメモリ上のレジストリ実装やCOMの試験用実装と、実際の本体ロジックを組み合わせて検証する。実Shell試験をGitHub管理ランナーで実行せず、一時ユーザーの作成や権限変更を行わない。CI報告書の`shell_sta_mta=not-run`は未実施を表し、公開の受け入れ結果には使わない。
+通常CIはメモリ上のレジストリ実装やCOMの試験用実装と、実際の本体ロジックを組み合わせて検証する。配布検証でDLLを呼び出す試験をGitHub管理ランナーでは実行せず、一時ユーザーの作成や権限変更を行わない。CI報告書の`shell_sta_mta=not-run`と`thumbnail_sta_mta=not-run`は未実施を表し、公開の受け入れ結果には使わない。
 
-対応対象のWindows 11 x64の通常権限の環境で、対象コミットのソースとドラフトから取得した同じZIPを用意し、`just verify-release --public-candidate --archive <候補ZIP> --report <新しい報告書>`を実行する。ZIPのハッシュがCI報告と一致し、`shell_sta_mta=passed`であることを確認する。Shellの登録・保護・委譲・復元を変更した場合も、[実Shell検証](../development.ja.md#windows-11での実shell検証)を実行する。
+対応対象のWindows 11 x64の通常権限の環境で、対象コミットのソースとドラフトから取得した同じZIPを用意し、`just verify-release --public-candidate --archive <候補ZIP> --report <新しい報告書>`を実行する。ZIPのハッシュがCI報告と一致し、`shell_sta_mta=passed`と`thumbnail_sta_mta=passed`であることを確認する。Shellの登録・保護・委譲・復元を変更した場合も、[実Shell検証](../development.ja.md#windows-11での実shell検証)を実行する。
 
 同じWindows 11環境で、ハッシュと`gh attestation verify <ZIP> --repo YukiWorks432/FileHue`を確認する。[実Explorerの受け入れ](../explorer-acceptance.ja.md)と、起動、権利表示、更新・復元・削除を確認し、結果をGUI起動試験や隔離DLL試験と区別して残す。
 

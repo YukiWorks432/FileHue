@@ -2,6 +2,7 @@ use super::{Manager, theme};
 mod about;
 mod imports;
 mod pack_guidance;
+mod thumbnails;
 use crate::test_process::CommandOutput;
 
 fn pack_button(

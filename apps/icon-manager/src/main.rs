@@ -27,6 +27,7 @@ use operation::{Kind, Operation};
 mod recovery_ui;
 mod status;
 mod theme;
+mod thumbnail_ui;
 use theme::ButtonElevation;
 mod view;
 use status::{Failure, Status};
@@ -49,6 +50,7 @@ struct Manager {
     protection: protection_ui::Editor,
     recovery: recovery_ui::Editor,
     targets: target_ui::Editor,
+    thumbnails: thumbnail_ui::Editor,
     browsing: bool,
     conflict_attention: bool,
     selected: Option<String>,
@@ -118,6 +120,7 @@ impl Manager {
                     recovery: Default::default(),
                     focus: cx.focus_handle(),
                     targets: target_ui::Editor::new(window, cx),
+                    thumbnails: Default::default(),
                     browsing: false,
                     conflict_attention: file_icons_windows::conflict::pending().unwrap_or(true),
                     selected: None,
@@ -150,6 +153,7 @@ impl Manager {
                     recovery: Default::default(),
                     focus: cx.focus_handle(),
                     targets: target_ui::Editor::new(window, cx),
+                    thumbnails: Default::default(),
                     browsing: false,
                     conflict_attention: file_icons_windows::conflict::pending().unwrap_or(true),
                     selected: None,

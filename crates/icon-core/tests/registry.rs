@@ -107,3 +107,70 @@ fn refuses_stale_install_plan_and_preserves_external_edit_during_restore() {
     );
     assert!(registry::apply(&mut registry, &changes(), |_| Ok(())).is_err());
 }
+
+#[test]
+fn shared_group_conflict_does_not_restore_parent_or_hide_external_handler() {
+    let group = vec![
+        Change {
+            key: "Classes/.ait/shellex/thumbnail".into(),
+            name: "".into(),
+            before: Some(value("hidden-original")),
+            after: value("shared-original"),
+        },
+        Change {
+            key: "Classes/Shared/shellex/thumbnail".into(),
+            name: "".into(),
+            before: Some(value("shared-original")),
+            after: value(""),
+        },
+    ];
+    let mut registry = Store::default();
+    for change in &group {
+        registry
+            .write(&change.key, "", change.before.as_ref())
+            .unwrap();
+    }
+    registry::apply(&mut registry, &group, |_| Ok(())).unwrap();
+    registry
+        .write(&group[0].key, "", Some(&value("other-app")))
+        .unwrap();
+    let before = registry.values.clone();
+    let writes = registry.writes;
+    assert!(registry::restore_group(&mut registry, &group).is_err());
+    assert_eq!(registry.values, before);
+    assert_eq!(registry.writes, writes);
+    assert_eq!(registry.read(&group[1].key, "").unwrap(), Some(value("")));
+}
+
+#[test]
+fn interrupted_shared_group_restore_can_resume_without_losing_original_values() {
+    let group = vec![
+        Change {
+            key: "Classes/.ai/shellex/thumbnail".into(),
+            name: "".into(),
+            before: None,
+            after: value("filehue"),
+        },
+        Change {
+            key: "Classes/Shared/shellex/thumbnail".into(),
+            name: "".into(),
+            before: Some(value("original")),
+            after: value(""),
+        },
+    ];
+    let mut registry = Store::default();
+    registry
+        .write(&group[1].key, "", group[1].before.as_ref())
+        .unwrap();
+    let original = registry.values.clone();
+    registry::apply(&mut registry, &group, |_| Ok(())).unwrap();
+    registry.fail_at = Some(registry.writes + 2);
+    assert!(registry::restore_group(&mut registry, &group).is_err());
+    assert_eq!(
+        registry.read(&group[1].key, "").unwrap(),
+        Some(value("original"))
+    );
+    registry.fail_at = None;
+    registry::restore_group(&mut registry, &group).unwrap();
+    assert_eq!(registry.values, original);
+}

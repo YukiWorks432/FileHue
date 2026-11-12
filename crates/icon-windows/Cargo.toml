@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dependencies]
 file-icons-core = { path = "../icon-core" }
+file-icons-thumbnail-core = { path = "../thumbnail-core", default-features = false }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
