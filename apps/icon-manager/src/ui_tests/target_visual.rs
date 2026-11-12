@@ -1277,6 +1277,7 @@ fn protection_visual_probe() {
                 provider_location: Some(file_icons_windows::IconLocation { path: "shell32.dll".into(), index: 0 }),
                 protect: true, needs_review: false, always_protected: false,
             }).collect());
+            this.refresh_protection_policy(cx);
             cx.notify();
           });
         }).unwrap();
