@@ -7,7 +7,6 @@ use gpui_kit::prelude::FluentBuilder;
 const DISTRIBUTION_URL: &str = "https://github.com/YukiWorks432/FileHue/releases";
 
 pub(super) struct About {
-    pub(super) open: bool,
     pub(super) executable_dir: Option<PathBuf>,
     pub(super) license_text: Option<String>,
     license_error: bool,
@@ -17,7 +16,6 @@ pub(super) struct About {
 impl Default for About {
     fn default() -> Self {
         Self {
-            open: false,
             executable_dir: std::env::current_exe()
                 .ok()
                 .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf)),

@@ -106,7 +106,7 @@ impl Manager {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        if self.protection.view_picker.is_none() {
+        if self.protection.presentation.view_picker.is_none() {
             let items = Filter::ALL
                 .into_iter()
                 .map(|filter| ProtectionOption {
@@ -117,7 +117,7 @@ impl Manager {
                 .collect::<Vec<_>>();
             let ix = Filter::ALL
                 .iter()
-                .position(|filter| *filter == self.protection.filter)
+                .position(|filter| *filter == self.protection.presentation.filter)
                 .unwrap();
             let picker = cx.new(|cx| {
                 SelectState::new(
@@ -127,20 +127,20 @@ impl Manager {
                     cx,
                 )
             });
-            self.protection.view_subscription =
+            self.protection.presentation.view_subscription =
                 Some(cx.subscribe(&picker, |this, _, event, cx| {
                     if let SelectEvent::Confirm(Some(id)) = event {
                         let Some(filter) = Filter::ALL.into_iter().find(|filter| filter.id() == id)
                         else {
                             return;
                         };
-                        this.protection.filter = filter;
-                        this.protection.pinned.clear();
+                        this.protection.presentation.filter = filter;
+                        this.protection.presentation.pinned.clear();
                         this.reset_protection_list();
                         cx.notify();
                     }
                 }));
-            self.protection.view_picker = Some(picker);
+            self.protection.presentation.view_picker = Some(picker);
         }
         div()
             .flex()
@@ -148,7 +148,7 @@ impl Manager {
             .gap_2()
             .child(div().text_sm().child(self.text("表示", "View")))
             .child(
-                Select::new(self.protection.view_picker.as_ref().unwrap())
+                Select::new(self.protection.presentation.view_picker.as_ref().unwrap())
                     .id("protection-view-select")
                     .small()
                     .w_48()
@@ -166,37 +166,47 @@ impl Manager {
     ) -> AnyElement {
         let colors = cx.theme().colors;
         // 操作記録は下書きと独立した値。以降の手動編集では書き換えない。
-        if !self.protection.changes_recommended && self.protection.changes_pending.is_none() {
-            self.protection.changes_pending = Some(compare(
-                &self.protection.sources,
+        if !self.protection.presentation.changes_recommended
+            && self.protection.presentation.changes_pending.is_none()
+        {
+            self.protection.presentation.changes_pending = Some(compare(
+                &self.protection.inspection.sources,
                 self.settings.preserve_existing_icons,
                 &self.settings.icon_protection_rules,
-                self.protection.draft,
-                &self.protection.rules,
+                self.protection.draft.enabled,
+                &self.protection.draft.rules,
             ));
         }
-        let data = if self.protection.changes_recommended {
-            self.protection.recommendation_changes.as_ref().unwrap()
+        let data = if self.protection.presentation.changes_recommended {
+            self.protection
+                .presentation
+                .recommendation_changes
+                .as_ref()
+                .unwrap()
         } else {
-            self.protection.changes_pending.as_ref().unwrap()
+            self.protection
+                .presentation
+                .changes_pending
+                .as_ref()
+                .unwrap()
         };
-        let data_changed = self.protection.changes_data.as_ref() != Some(data);
+        let data_changed = self.protection.presentation.changes_data.as_ref() != Some(data);
         if data_changed {
             let count = data.rows.len();
-            self.protection.changes_data = Some(data.clone());
-            if let Some(list) = &self.protection.changes_list {
+            self.protection.presentation.changes_data = Some(data.clone());
+            if let Some(list) = &self.protection.presentation.changes_list {
                 list.reset(count);
             } else {
-                self.protection.changes_list =
+                self.protection.presentation.changes_list =
                     Some(ListState::new(count, ListAlignment::Top, px(0.)));
             }
         }
-        let data = self.protection.changes_data.as_ref().unwrap();
+        let data = self.protection.presentation.changes_data.as_ref().unwrap();
         let (released, protected, choices) = data.counts();
         let default = data.default;
         let count = data.rows.len();
         let review = data.review;
-        let same = if self.protection.changes_recommended {
+        let same = if self.protection.presentation.changes_recommended {
             std::collections::BTreeSet::new()
         } else {
             data.rows
@@ -209,20 +219,23 @@ impl Manager {
                 .collect::<std::collections::BTreeSet<_>>()
         };
         let visible = (0..count)
-            .filter(|ix| self.protection.changes_show_same || !same.contains(ix))
+            .filter(|ix| self.protection.presentation.changes_show_same || !same.contains(ix))
             .collect::<Vec<_>>();
         let visible_count = visible.len();
-        if data_changed || self.protection.changes_visible != visible {
+        if data_changed || self.protection.presentation.changes_visible != visible {
             self.protection
+                .presentation
                 .changes_list
                 .as_ref()
                 .unwrap()
                 .reset(visible_count);
-            self.protection.changes_visible = visible;
+            self.protection.presentation.changes_visible = visible;
         }
-        let unavailable = !self.protection.changes_recommended
-            && (self.protection.loading || self.protection.error.is_some() || !self.valid);
-        if self.protection.basis_picker.is_none() {
+        let unavailable = !self.protection.presentation.changes_recommended
+            && (self.protection.inspection.loading
+                || self.protection.inspection.error.is_some()
+                || !self.valid);
+        if self.protection.presentation.basis_picker.is_none() {
             let items = vec![
                 ProtectionOption {
                     id: "pending".into(),
@@ -234,10 +247,14 @@ impl Manager {
                     label: self
                         .text("直前のおすすめ操作", "Last recommended action")
                         .into(),
-                    disabled: self.protection.recommendation_changes.is_none(),
+                    disabled: self
+                        .protection
+                        .presentation
+                        .recommendation_changes
+                        .is_none(),
                 },
             ];
-            let selected = usize::from(self.protection.changes_recommended);
+            let selected = usize::from(self.protection.presentation.changes_recommended);
             let picker = cx.new(|cx| {
                 SelectState::new(
                     items,
@@ -246,19 +263,19 @@ impl Manager {
                     cx,
                 )
             });
-            self.protection.basis_subscription =
+            self.protection.presentation.basis_subscription =
                 Some(cx.subscribe(&picker, |this, _, event, cx| {
                     if let SelectEvent::Confirm(Some(id)) = event {
-                        this.protection.changes_recommended = id == "recommended";
-                        this.protection.changes_show_same = false;
-                        this.protection.changes_expanded.clear();
-                        this.protection.changes_data = None;
+                        this.protection.presentation.changes_recommended = id == "recommended";
+                        this.protection.presentation.changes_show_same = false;
+                        this.protection.presentation.changes_expanded.clear();
+                        this.protection.presentation.changes_data = None;
                         cx.notify();
                     }
                 }));
-            self.protection.basis_picker = Some(picker);
+            self.protection.presentation.basis_picker = Some(picker);
         }
-        let save_scope = if self.protection.changes_recommended {
+        let save_scope = if self.protection.presentation.changes_recommended {
             self.text(
                 "操作直後の記録です。保存対象は現在の下書きです。",
                 "Action snapshot. Saving commits the current draft.",
@@ -308,7 +325,7 @@ impl Manager {
                             .justify_between()
                             .gap_3()
                             .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(
-                                if self.protection.changes_recommended {
+                                if self.protection.presentation.changes_recommended {
                                     self.text(
                                         "おすすめ操作の変更記録",
                                         "Recommendation change record",
@@ -319,11 +336,13 @@ impl Manager {
                             ))
                             .child(
                                 div().w_64().min_w_0().child(
-                                    Select::new(self.protection.basis_picker.as_ref().unwrap())
-                                        .id("protection-changes-basis")
-                                        .small()
-                                        .w_full()
-                                        .accessibility_label(self.text("比較する内容", "Compare")),
+                                    Select::new(
+                                        self.protection.presentation.basis_picker.as_ref().unwrap(),
+                                    )
+                                    .id("protection-changes-basis")
+                                    .small()
+                                    .w_full()
+                                    .accessibility_label(self.text("比較する内容", "Compare")),
                                 ),
                             ),
                     )
@@ -331,7 +350,7 @@ impl Manager {
                         div()
                             .text_xs()
                             .text_color(colors.muted_foreground)
-                            .when(self.protection.changes_recommended, |notice| {
+                            .when(self.protection.presentation.changes_recommended, |notice| {
                                 notice
                                     .text_sm()
                                     .text_color(colors.foreground)
@@ -339,17 +358,23 @@ impl Manager {
                             })
                             .child(save_scope),
                     )
-                    .when(self.protection.recommendation_changes.is_none(), |p| {
-                        p.child(div().text_xs().text_color(colors.muted_foreground).child(
-                            self.text(
-                                "おすすめ操作の記録はまだありません。",
-                                "No recommended action has been recorded.",
-                            ),
-                        ))
-                    }),
+                    .when(
+                        self.protection
+                            .presentation
+                            .recommendation_changes
+                            .is_none(),
+                        |p| {
+                            p.child(div().text_xs().text_color(colors.muted_foreground).child(
+                                self.text(
+                                    "おすすめ操作の記録はまだありません。",
+                                    "No recommended action has been recorded.",
+                                ),
+                            ))
+                        },
+                    ),
             );
         if unavailable {
-            let message = if self.protection.loading {
+            let message = if self.protection.inspection.loading {
                 self.text("保存予定を確認中…", "Checking pending changes…")
             } else if !self.valid {
                 self.text(
@@ -417,7 +442,7 @@ impl Manager {
             }
             if count == 0 && default.is_none() {
                 panel = panel.child(div().p_4().text_color(colors.muted_foreground).child(
-                    if self.protection.changes_recommended {
+                    if self.protection.presentation.changes_recommended {
                         self.text(
                             "この操作による変更はありません",
                             "This action made no changes",
@@ -427,7 +452,7 @@ impl Manager {
                     },
                 ));
             }
-            if !self.protection.changes_recommended {
+            if !self.protection.presentation.changes_recommended {
                 let changed = data
                     .rows
                     .iter()
@@ -442,7 +467,7 @@ impl Manager {
                     )));
                 }
             }
-            if !self.protection.changes_recommended
+            if !self.protection.presentation.changes_recommended
                 && count == same.len()
                 && (count > 0 || default.is_some())
             {
@@ -453,7 +478,7 @@ impl Manager {
                 );
             }
             if !same.is_empty() {
-                let open = self.protection.changes_show_same;
+                let open = self.protection.presentation.changes_show_same;
                 panel = panel.child(
                     div().px_3().pb_3().child(
                         theme::button("protection-changes-show-same", cx)
@@ -469,8 +494,8 @@ impl Manager {
                             ))
                             .selected(open)
                             .on_click(cx.listener(|this, _, _, cx| {
-                                this.protection.changes_show_same =
-                                    !this.protection.changes_show_same;
+                                this.protection.presentation.changes_show_same =
+                                    !this.protection.presentation.changes_show_same;
                                 cx.notify();
                             })),
                     ),
@@ -481,7 +506,7 @@ impl Manager {
                     .id("protection-change-before-heading")
                     .flex_1()
                     .min_w_0()
-                    .child(if self.protection.changes_recommended {
+                    .child(if self.protection.presentation.changes_recommended {
                         self.text("操作前", "Before action")
                     } else {
                         self.text("現在の表示", "Current appearance")
@@ -490,7 +515,7 @@ impl Manager {
                     .id("protection-change-after-heading")
                     .flex_1()
                     .min_w_0()
-                    .child(if self.protection.changes_recommended {
+                    .child(if self.protection.presentation.changes_recommended {
                         self.text("操作後", "After action")
                     } else {
                         self.text("保存後の見込み", "After saving")
@@ -523,18 +548,24 @@ impl Manager {
                         .child(div().w_32()),
                 );
             }
-            let state = self.protection.changes_list.as_ref().unwrap().clone();
+            let state = self
+                .protection
+                .presentation
+                .changes_list
+                .as_ref()
+                .unwrap()
+                .clone();
             let metrics = (
                 window.viewport_size().width,
                 window.rem_size(),
                 self.settings.language.clone(),
             );
-            if self.protection.changes_metrics.as_ref() != Some(&metrics) {
+            if self.protection.presentation.changes_metrics.as_ref() != Some(&metrics) {
                 state.remeasure();
-                self.protection.changes_metrics = Some(metrics);
+                self.protection.presentation.changes_metrics = Some(metrics);
             }
             let view = cx.entity().downgrade();
-            let indices = self.protection.changes_visible.clone();
+            let indices = self.protection.presentation.changes_visible.clone();
             let list_area = div()
                 .id("protection-changes-rows")
                 .relative()
@@ -568,7 +599,7 @@ impl Manager {
     // 解決できない表示は、同じ代替画像でも「変化なし」にしない。
     fn protection_appearance_changed(&self, extension: &str) -> Option<bool> {
         use super::sources::SampleDisplay;
-        let source = self.protection.source(extension)?;
+        let source = self.protection.inspection.source(extension)?;
         let before = self.protection_sample(source, false);
         let after = self.protection_sample(source, true);
         match (&before, &after) {
@@ -637,7 +668,14 @@ impl Manager {
         compact: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let row = self.protection.changes_data.as_ref().unwrap().rows[ix].clone();
+        let row = self
+            .protection
+            .presentation
+            .changes_data
+            .as_ref()
+            .unwrap()
+            .rows[ix]
+            .clone();
         let colors = cx.theme().colors;
         let extension = if row.extension.is_empty() {
             self.text(
@@ -677,9 +715,9 @@ impl Manager {
                 self.text("は継続", " unchanged")
             )
         };
-        let appearance = if self.protection.changes_recommended {
+        let appearance = if self.protection.presentation.changes_recommended {
             self.text("設定の変更記録", "Settings change record")
-        } else if let Some(source) = self.protection.source(&row.extension) {
+        } else if let Some(source) = self.protection.inspection.source(&row.extension) {
             use super::sources::SampleDisplay;
             let old = self.protection_sample(source, false);
             let new = self.protection_sample(source, true);
@@ -698,7 +736,11 @@ impl Manager {
             self.text("表示を確認できません", "Appearance unavailable")
         };
         let target = row.extension.clone();
-        let expanded = self.protection.changes_expanded.contains(&target);
+        let expanded = self
+            .protection
+            .presentation
+            .changes_expanded
+            .contains(&target);
         let actions = div()
             .w_32()
             .flex_shrink_0()
@@ -716,10 +758,18 @@ impl Manager {
                 .selected(expanded)
                 .toggled(expanded)
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    if !this.protection.changes_expanded.remove(&target) {
-                        this.protection.changes_expanded.insert(target.clone());
+                    if !this
+                        .protection
+                        .presentation
+                        .changes_expanded
+                        .remove(&target)
+                    {
+                        this.protection
+                            .presentation
+                            .changes_expanded
+                            .insert(target.clone());
                     }
-                    if let Some(list) = &this.protection.changes_list {
+                    if let Some(list) = &this.protection.presentation.changes_list {
                         list.remeasure();
                     }
                     cx.notify();
@@ -751,14 +801,14 @@ impl Manager {
             .min_w_0()
             .when(compact, |p| {
                 p.child(div().text_xs().text_color(colors.muted_foreground).child(
-                    if self.protection.changes_recommended {
+                    if self.protection.presentation.changes_recommended {
                         self.text("操作前", "Before action")
                     } else {
                         self.text("現在の表示", "Current appearance")
                     },
                 ))
             })
-            .child(if self.protection.changes_recommended {
+            .child(if self.protection.presentation.changes_recommended {
                 div()
                     .child(self.text("画像の記録なし", "No image recorded"))
                     .into_any_element()
@@ -767,7 +817,7 @@ impl Manager {
                     .child(self.text("変更前の設定", "Previous settings"))
                     .child(before.clone())
                     .into_any_element()
-            } else if let Some(source) = self.protection.source(&row.extension) {
+            } else if let Some(source) = self.protection.inspection.source(&row.extension) {
                 self.protection_result(source, false, true, cx)
             } else {
                 div()
@@ -783,14 +833,14 @@ impl Manager {
             .min_w_0()
             .when(compact, |p| {
                 p.child(div().text_xs().text_color(colors.muted_foreground).child(
-                    if self.protection.changes_recommended {
+                    if self.protection.presentation.changes_recommended {
                         self.text("操作後", "After action")
                     } else {
                         self.text("保存後の見込み", "After saving")
                     },
                 ))
             })
-            .child(if self.protection.changes_recommended {
+            .child(if self.protection.presentation.changes_recommended {
                 div()
                     .child(self.text("画像の記録なし", "No image recorded"))
                     .into_any_element()
@@ -799,7 +849,7 @@ impl Manager {
                     .child(self.text("変更後の設定", "New settings"))
                     .child(after.clone())
                     .into_any_element()
-            } else if let Some(source) = self.protection.source(&row.extension) {
+            } else if let Some(source) = self.protection.inspection.source(&row.extension) {
                 self.protection_result(source, true, true, cx)
             } else {
                 div()
@@ -877,23 +927,24 @@ impl Manager {
                 .small()
                 .label(self.text("設定を開く", "Open settings"))
                 .disabled_elevated(
-                    self.protection.source(&target).is_none() || self.operation.busy(),
+                    self.protection.inspection.source(&target).is_none() || self.operation.busy(),
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    this.protection.filter = Filter::All;
-                    this.protection.view_picker = None;
-                    this.protection.pinned.clear();
-                    if let Some(source) = this.protection.source(&target) {
+                    this.protection.presentation.filter = Filter::All;
+                    this.protection.presentation.view_picker = None;
+                    this.protection.presentation.pinned.clear();
+                    if let Some(source) = this.protection.inspection.source(&target) {
                         let group = display_group(source);
-                        this.protection.collapsed.remove(&group);
+                        this.protection.presentation.collapsed.remove(&group);
                     }
                     this.reset_protection_list();
                     if let Some(index) = this
                         .protection
+                        .presentation
                         .visible_rows
                         .iter()
-                        .position(|ix| this.protection.rows[*ix].extension == target)
-                        && let Some(list) = &this.protection.list
+                        .position(|ix| this.protection.presentation.rows[*ix].extension == target)
+                        && let Some(list) = &this.protection.presentation.list
                     {
                         list.scroll_to(ListOffset {
                             item_ix: index,

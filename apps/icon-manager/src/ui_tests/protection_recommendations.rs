@@ -38,7 +38,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     })
     .unwrap();
     cx.run_until_parked();
-    let inspection = cx.read(|cx| manager.read(cx).protection.inspection);
+    let inspection = cx.read(|cx| manager.read(cx).protection.inspection.revision);
     // 狭幅でも六つの表示を一つの選択欄から選べ、保存帯を見失わない。
     cx.simulate_window_resize(window, size(px(640.), px(640.)));
     cx.update_window(window, |_, w, cx| {
@@ -103,19 +103,35 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     .unwrap();
     cx.run_until_parked();
     assert_eq!(
-        cx.read(|cx| manager.read(cx).protection.inspection),
+        cx.read(|cx| manager.read(cx).protection.inspection.revision),
         inspection
     );
-    assert!(!cx.read(|cx| manager.read(cx).protection.source("mts").unwrap().protect));
-    assert!(cx.read(|cx| manager.read(cx).protection.source("m2ts").unwrap().protect));
+    assert!(!cx.read(|cx| {
+        manager
+            .read(cx)
+            .protection
+            .inspection
+            .source("mts")
+            .unwrap()
+            .protect
+    }));
+    assert!(cx.read(|cx| {
+        manager
+            .read(cx)
+            .protection
+            .inspection
+            .source("m2ts")
+            .unwrap()
+            .protect
+    }));
     assert_eq!(serde_json::to_value(load().unwrap()).unwrap(), before);
-    let rules = cx.read(|cx| manager.read(cx).protection.rules.clone());
+    let rules = cx.read(|cx| manager.read(cx).protection.draft.rules.clone());
     cx.update_window(window, |_, w, cx| {
         w.click("protection-recommended", cx);
     })
     .unwrap();
     assert_eq!(
-        cx.read(|cx| manager.read(cx).protection.rules.clone()),
+        cx.read(|cx| manager.read(cx).protection.draft.rules.clone()),
         rules
     );
     cx.update_window(window, |_, w, cx| {
@@ -123,14 +139,30 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         w.click("original-icon-mts", cx);
     })
     .unwrap();
-    assert!(cx.read(|cx| manager.read(cx).protection.source("mts").unwrap().protect));
+    assert!(cx.read(|cx| {
+        manager
+            .read(cx)
+            .protection
+            .inspection
+            .source("mts")
+            .unwrap()
+            .protect
+    }));
     cx.update_window(window, |_, w, cx| {
         w.click("protection-back", cx);
         w.click("protection-open", cx);
     })
     .unwrap();
     cx.run_until_parked();
-    assert!(cx.read(|cx| manager.read(cx).protection.source("mts").unwrap().protect));
+    assert!(cx.read(|cx| {
+        manager
+            .read(cx)
+            .protection
+            .inspection
+            .source("mts")
+            .unwrap()
+            .protect
+    }));
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("protection-recommended", cx);
@@ -219,7 +251,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         manager.update(cx, |this, cx| {
-            this.protection.error = Some("inspection failed".into());
+            this.protection.inspection.error = Some("inspection failed".into());
             cx.notify();
         });
         w.render_frame(cx);
@@ -240,7 +272,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 .contains("確認できません")
         );
         manager.update(cx, |this, cx| {
-            this.protection.error = None;
+            this.protection.inspection.error = None;
             cx.notify();
         });
         w.render_frame(cx);
@@ -283,7 +315,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     assert!(cx.read(|cx| manager.read(cx).operation.failed()));
     assert_eq!(serde_json::to_value(load().unwrap()).unwrap(), before);
     assert_eq!(
-        cx.read(|cx| manager.read(cx).protection.rules.clone()),
+        cx.read(|cx| manager.read(cx).protection.draft.rules.clone()),
         rules
     );
     drop(locked);
@@ -365,7 +397,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     let saved = serde_json::to_value(load().unwrap()).unwrap();
     cx.update_window(window, |_, w, cx| {
         manager.update(cx, |this, cx| {
-            let template = this.protection.source("mts").unwrap().clone();
+            let template = this.protection.inspection.source("mts").unwrap().clone();
             let sources = (0..192)
                 .map(|index| {
                     let mut source = template.clone();
@@ -376,8 +408,8 @@ fn recommended_in_child(cx: &mut TestAppContext) {
                 })
                 .collect();
             this.settings.icon_protection_rules = Default::default();
-            this.protection.rules = Default::default();
-            this.protection.draft = true;
+            this.protection.draft.rules = Default::default();
+            this.protection.draft.enabled = true;
             this.protection.visual_sources(sources);
             cx.notify();
         });
@@ -457,7 +489,8 @@ fn recommended_visual_probe() {
                 for scenario in ["mixed", "choices"] {
                     if scenario == "choices" {
                         manager.update(cx, |this, cx| {
-                            let template = this.protection.source("mts").unwrap().clone();
+                            let template =
+                                this.protection.inspection.source("mts").unwrap().clone();
                             let sources = [
                                 "c", "cc", "cpp", "go", "h", "java", "js", "jsx", "py", "rb", "tsx",
                             ]
@@ -484,8 +517,8 @@ fn recommended_visual_probe() {
                             }
                             this.settings.icon_protection_rules = rules.clone();
                             this.settings.preserve_existing_icons = true;
-                            this.protection.rules = rules;
-                            this.protection.draft = true;
+                            this.protection.draft.rules = rules;
+                            this.protection.draft.enabled = true;
                             this.protection.visual_sources(sources);
                             cx.notify();
                         });

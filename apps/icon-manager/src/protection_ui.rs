@@ -80,22 +80,39 @@ impl Filter {
 
 #[derive(Default)]
 pub(super) struct Editor {
+    pub(super) draft: Draft,
+    pub(super) inspection: Inspection,
+    presentation: Presentation,
+}
+
+#[derive(Default)]
+pub(super) struct Draft {
+    pub(super) enabled: bool,
+    pub(super) rules: IconProtectionRules,
+}
+
+#[derive(Default)]
+pub(super) struct Inspection {
     source_by_extension: std::collections::BTreeMap<String, usize>,
     classes: std::collections::BTreeMap<String, Vec<usize>>,
     groups: std::collections::BTreeMap<String, Vec<usize>>,
-    group_counts: std::collections::BTreeMap<String, usize>,
     pack_extensions: std::collections::BTreeSet<String>,
     pack_unknown: bool,
     active_extensions: std::collections::BTreeSet<String>,
     active_classes: std::collections::BTreeSet<String>,
     active_excluded_extensions: std::collections::BTreeSet<String>,
-    pub open: bool,
-    pub draft: bool,
-    pub(super) rules: IconProtectionRules,
     pub(super) sources: Vec<ExistingIcon>,
     pub(super) previews: Option<super::original_icons::Previews>,
     pub(super) previews_loading: bool,
     pub(super) pack: Option<String>,
+    pub(super) loading: bool,
+    pub(super) error: Option<String>,
+    pub(super) revision: u64,
+}
+
+#[derive(Default)]
+struct Presentation {
+    group_counts: std::collections::BTreeMap<String, usize>,
     rows: Vec<IconExclusion>,
     current_rows: Vec<IconExclusion>,
     visible_rows: Vec<usize>,
@@ -105,13 +122,10 @@ pub(super) struct Editor {
     collapsed: std::collections::BTreeSet<String>,
     planned_count: usize,
     candidate_count: usize,
-    pub(super) loading: bool,
-    pub(super) error: Option<String>,
     list: Option<ListState>,
     text_metrics: Option<(Pixels, String)>,
     details: bool,
     previous_focus: Option<FocusHandle>,
-    pub(super) inspection: u64,
     recommendation_notice: Option<String>,
     changes_recommended: bool,
     recommendation_changes: Option<changes::Changes>,
@@ -133,7 +147,13 @@ pub(super) struct Editor {
 impl Editor {
     fn rebuild_index(&mut self) {
         // 調査結果と方針の更新はここを通り、保存予定の比較も更新する。
-        self.changes_pending = None;
+        self.presentation.changes_pending = None;
+        self.inspection.rebuild_index();
+    }
+}
+
+impl Inspection {
+    fn rebuild_index(&mut self) {
         self.source_by_extension.clear();
         self.classes.clear();
         self.groups.clear();
@@ -179,15 +199,15 @@ fn display_group(source: &ExistingIcon) -> String {
 impl Editor {
     #[cfg(test)]
     pub(super) fn visual_applied(&mut self, rows: &[ExistingIcon]) {
-        self.active_extensions = rows
+        self.inspection.active_extensions = rows
             .iter()
             .map(|r| r.registration.extension.clone())
             .collect();
-        self.active_classes = rows
+        self.inspection.active_classes = rows
             .iter()
             .map(|r| r.registration.class.to_lowercase())
             .collect();
-        self.active_excluded_extensions = rows
+        self.inspection.active_excluded_extensions = rows
             .iter()
             .filter(|r| r.protect)
             .map(|r| r.registration.extension.clone())
@@ -195,21 +215,21 @@ impl Editor {
     }
     #[cfg(test)]
     pub(super) fn visual_sources(&mut self, rows: Vec<ExistingIcon>) {
-        self.previews = super::original_icons::generate(&rows).ok();
+        self.inspection.previews = super::original_icons::generate(&rows).ok();
         self.visual_rows(rows.iter().map(|r| r.registration.clone()).collect());
-        self.planned_count = rows.len();
-        self.candidate_count = rows.len();
-        self.sources = rows;
+        self.presentation.planned_count = rows.len();
+        self.presentation.candidate_count = rows.len();
+        self.inspection.sources = rows;
         self.rebuild_index();
     }
     pub(super) fn visual_rows(&mut self, rows: Vec<IconExclusion>) {
-        self.rows = rows;
-        self.visible_rows = (0..self.rows.len()).collect();
-        self.loading = false;
-        self.previews_loading = false;
-        self.inspection += 1;
-        if let Some(list) = &self.list {
-            list.reset(self.rows.len());
+        self.presentation.rows = rows;
+        self.presentation.visible_rows = (0..self.presentation.rows.len()).collect();
+        self.inspection.loading = false;
+        self.inspection.previews_loading = false;
+        self.inspection.revision += 1;
+        if let Some(list) = &self.presentation.list {
+            list.reset(self.presentation.rows.len());
         }
     }
 }
@@ -217,72 +237,75 @@ impl Editor {
 impl Manager {
     #[cfg(test)]
     pub(super) fn performance_protection(&mut self, collapse: bool, cx: &mut Context<Self>) {
-        if self.protection.list.is_none() {
+        if self.protection.presentation.list.is_none() {
             self.protection.visual_rows(
                 self.protection
+                    .inspection
                     .sources
                     .iter()
                     .map(|s| s.registration.clone())
                     .collect(),
             );
-            self.protection.open = true;
-            self.protection.list =
+            self.screen = Screen::Protection;
+            self.protection.presentation.list =
                 Some(ListState::new(0, ListAlignment::Top, px(0.)).measure_all());
         }
         if collapse {
             self.protection
+                .presentation
                 .collapsed
-                .extend(self.protection.sources.iter().map(display_group));
+                .extend(self.protection.inspection.sources.iter().map(display_group));
             self.reset_protection_list();
-            self.protection.collapsed.clear();
+            self.protection.presentation.collapsed.clear();
         }
         self.refresh_protection_policy(cx);
     }
     pub(super) fn close_target_protection(&mut self) {
         self.targets.invalidate();
-        self.protection.inspection += 1;
-        self.protection.loading = false;
-        self.protection.previews_loading = false;
-        self.protection.previews = None;
-        self.protection.sources.clear();
+        self.protection.inspection.revision += 1;
+        self.protection.inspection.loading = false;
+        self.protection.inspection.previews_loading = false;
+        self.protection.inspection.previews = None;
+        self.protection.inspection.sources.clear();
         self.protection.rebuild_index();
-        self.protection.draft = self.settings.preserve_existing_icons;
-        self.protection.rules = self.settings.icon_protection_rules.clone();
+        self.protection.draft.enabled = self.settings.preserve_existing_icons;
+        self.protection.draft.rules = self.settings.icon_protection_rules.clone();
     }
 
     pub(super) fn prepare_target_protection(&mut self, id: &str, cx: &mut Context<Self>) {
-        self.protection.open = false;
-        self.protection.retained.clear();
-        self.protection.pack = Some(id.into());
+        self.protection.presentation.retained.clear();
+        self.protection.inspection.pack = Some(id.into());
         self.refresh_protection_context();
-        self.protection.draft = self.settings.preserve_existing_icons;
-        self.protection.rules = self.settings.icon_protection_rules.clone();
-        self.protection.sources.clear();
+        self.protection.draft.enabled = self.settings.preserve_existing_icons;
+        self.protection.draft.rules = self.settings.icon_protection_rules.clone();
+        self.protection.inspection.sources.clear();
         self.protection.rebuild_index();
-        self.protection.previews = None;
+        self.protection.inspection.previews = None;
         self.inspect_protection(cx);
     }
 
     pub(super) fn open_protection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let from_targets = self.targets.pack.is_some();
-        self.protection.previous_focus = window.focused(cx);
+        self.protection.presentation.previous_focus = window.focused(cx);
         self.focus.focus(window, cx);
-        self.protection.details = false;
-        self.protection.collapsed.clear();
+        self.protection.presentation.details = false;
+        self.protection.presentation.collapsed.clear();
         // 未表示行も測定し、ホイールとスクロールバーが全件の高さを参照できるようにする。
-        self.protection.list = Some(ListState::new(0, ListAlignment::Top, px(0.)).measure_all());
-        self.protection.open = true;
-        self.protection.changes_recommended = false;
-        self.protection.changes_show_same = false;
-        self.protection.view_picker = None;
-        self.protection.basis_picker = None;
-        self.protection.changes_expanded.clear();
-        self.protection.recommendation_changes = None;
+        self.protection.presentation.list =
+            Some(ListState::new(0, ListAlignment::Top, px(0.)).measure_all());
+        self.protection_return = self.screen;
+        self.screen = Screen::Protection;
+        self.protection.presentation.changes_recommended = false;
+        self.protection.presentation.changes_show_same = false;
+        self.protection.presentation.view_picker = None;
+        self.protection.presentation.basis_picker = None;
+        self.protection.presentation.changes_expanded.clear();
+        self.protection.presentation.recommendation_changes = None;
         if !from_targets {
-            self.protection.draft = self.settings.preserve_existing_icons;
-            self.protection.rules = self.settings.icon_protection_rules.clone();
+            self.protection.draft.enabled = self.settings.preserve_existing_icons;
+            self.protection.draft.rules = self.settings.icon_protection_rules.clone();
         }
-        self.protection.pack = self
+        self.protection.inspection.pack = self
             .targets
             .pack
             .clone()
@@ -290,9 +313,9 @@ impl Manager {
             .or_else(|| self.selected.clone())
             .or_else(|| self.settings.packs.first().map(|p| p.id.clone()));
         self.refresh_protection_context();
-        self.protection.filter = Filter::All;
-        self.protection.pinned.clear();
-        self.protection.retained.clear();
+        self.protection.presentation.filter = Filter::All;
+        self.protection.presentation.pinned.clear();
+        self.protection.presentation.retained.clear();
         let items = self
             .settings
             .packs
@@ -305,20 +328,21 @@ impl Manager {
             .collect::<Vec<_>>();
         let selected = items
             .iter()
-            .position(|item| Some(&item.id) == self.protection.pack.as_ref())
+            .position(|item| Some(&item.id) == self.protection.inspection.pack.as_ref())
             .map(|row| gpui_kit::component::IndexPath::default().row(row));
         let picker = cx.new(|cx| SelectState::new(items, selected, window, cx));
-        self.protection.picker_subscription = Some(cx.subscribe(&picker, |this, _, event, cx| {
-            let SelectEvent::Confirm(Some(id)) = event else {
-                return;
-            };
-            this.protection.pack = Some(id.clone());
-            this.protection.pinned.clear();
-            this.protection.retained.clear();
-            this.refresh_protection_context();
-            this.inspect_protection(cx);
-        }));
-        self.protection.picker = Some(picker);
+        self.protection.presentation.picker_subscription =
+            Some(cx.subscribe(&picker, |this, _, event, cx| {
+                let SelectEvent::Confirm(Some(id)) = event else {
+                    return;
+                };
+                this.protection.inspection.pack = Some(id.clone());
+                this.protection.presentation.pinned.clear();
+                this.protection.presentation.retained.clear();
+                this.refresh_protection_context();
+                this.inspect_protection(cx);
+            }));
+        self.protection.presentation.picker = Some(picker);
 
         self.inspect_protection(cx);
     }
@@ -327,17 +351,17 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
-        self.protection.open = false;
+        self.screen = self.protection_return;
         // 同じ対象画面へ戻る場合は、進行中の調査をその画面で受け取る。
-        if self.targets.pack.is_none() || self.targets.pack != self.protection.pack {
-            self.protection.inspection += 1;
+        if self.targets.pack.is_none() || self.targets.pack != self.protection.inspection.pack {
+            self.protection.inspection.revision += 1;
         }
         if let Some(id) = self.targets.pack.clone() {
             self.prepare_target_protection(&id, cx);
         } else {
-            self.protection.previews = None;
+            self.protection.inspection.previews = None;
         }
-        if let Some(focus) = self.protection.previous_focus.take() {
+        if let Some(focus) = self.protection.presentation.previous_focus.take() {
             focus.focus(window, cx);
         }
         cx.notify();
@@ -345,18 +369,18 @@ impl Manager {
 
     pub(super) fn save_protection(&mut self, cx: &mut Context<Self>) {
         if self.operation.busy()
-            || self.protection.loading
+            || self.protection.inspection.loading
             || !self.valid
-            || self.protection.error.is_some()
-            || !self.protection.dirty(&self.settings)
+            || self.protection.inspection.error.is_some()
+            || !self.protection.draft.dirty(&self.settings)
         {
             return;
         }
         let Some(service) = self._guard.clone() else {
             return;
         };
-        let enabled = self.protection.draft;
-        let rules = self.protection.rules.clone();
+        let enabled = self.protection.draft.enabled;
+        let rules = self.protection.draft.rules.clone();
         self.run(
             Kind::SaveProtection,
             move || service.set_icon_protection_rules(enabled, rules, false),
@@ -365,31 +389,37 @@ impl Manager {
     }
 
     pub(super) fn inspect_protection(&mut self, cx: &mut Context<Self>) {
-        self.protection.recommendation_notice = None;
+        self.protection.presentation.recommendation_notice = None;
         self.targets.invalidate();
-        self.protection.inspection += 1;
-        let inspection = self.protection.inspection;
-        self.protection.loading = false;
-        self.protection.rows.clear();
-        self.protection.sources.clear();
+        self.protection.inspection.revision += 1;
+        let inspection = self.protection.inspection.revision;
+        self.protection.inspection.loading = false;
+        self.protection.presentation.rows.clear();
+        self.protection.inspection.sources.clear();
         self.protection.rebuild_index();
-        self.protection.visible_rows.clear();
-        if let Some(list) = &self.protection.list {
+        self.protection.presentation.visible_rows.clear();
+        if let Some(list) = &self.protection.presentation.list {
             list.reset(0);
         }
-        self.protection.error = None;
-        let id = self.protection.pack.clone();
+        self.protection.inspection.error = None;
+        let id = self.protection.inspection.pack.clone();
         let Some(service) = self._guard.clone() else {
             return;
         };
-        let enabled = self.protection.draft;
-        let rules = self.protection.rules.clone();
-        self.protection.loading = true;
-        self.protection.previews = None;
-        self.protection.previews_loading = true;
+        let enabled = self.protection.draft.enabled;
+        let rules = self.protection.draft.rules.clone();
+        self.protection.inspection.loading = true;
+        self.protection.inspection.previews = None;
+        self.protection.inspection.previews_loading = true;
         let executor = cx.background_executor().clone();
-        let include_saved = self.protection.open;
-        let mut retained: Vec<_> = self.protection.retained.iter().cloned().collect();
+        let include_saved = self.screen == Screen::Protection;
+        let mut retained: Vec<_> = self
+            .protection
+            .presentation
+            .retained
+            .iter()
+            .cloned()
+            .collect();
         if include_saved {
             retained.extend(
                 self.settings
@@ -415,19 +445,19 @@ impl Manager {
             let result = task.await;
             let sources = this
                 .update(cx, |this, cx| {
-                    if this.protection.inspection != inspection {
+                    if this.protection.inspection.revision != inspection {
                         return None;
                     }
-                    this.protection.loading = false;
+                    this.protection.inspection.loading = false;
                     this.targets.invalidate();
                     let sources = match result {
                         Ok(sources) => {
                             this.accept_protection_sources(sources);
-                            Some(this.protection.sources.clone())
+                            Some(this.protection.inspection.sources.clone())
                         }
                         Err(error) => {
-                            this.protection.previews_loading = false;
-                            this.protection.error = Some(format!("{error:#}"));
+                            this.protection.inspection.previews_loading = false;
+                            this.protection.inspection.error = Some(format!("{error:#}"));
                             None
                         }
                     };
@@ -456,13 +486,13 @@ impl Manager {
         previews: Option<super::original_icons::Previews>,
         cx: &mut Context<Self>,
     ) {
-        if self.protection.inspection != inspection {
+        if self.protection.inspection.revision != inspection {
             return;
         }
-        self.protection.previews_loading = false;
-        self.protection.previews = previews;
+        self.protection.inspection.previews_loading = false;
+        self.protection.inspection.previews = previews;
         self.targets.invalidate();
-        if let Some(list) = &self.protection.list {
+        if let Some(list) = &self.protection.presentation.list {
             list.remeasure();
         }
         cx.notify();
@@ -470,7 +500,7 @@ impl Manager {
     pub(super) fn accept_protection_sources(&mut self, mut sources: Vec<ExistingIcon>) {
         self.targets.invalidate();
         for source in &mut sources {
-            source.update_protection(&self.protection.rules, self.protection.draft);
+            source.update_protection(&self.protection.draft.rules, self.protection.draft.enabled);
         }
         sources.sort_by_cached_key(|source| {
             (
@@ -479,27 +509,31 @@ impl Manager {
                 source.registration.extension.clone(),
             )
         });
-        self.protection.rows = sources.iter().map(|r| r.registration.clone()).collect();
-        self.protection.sources = sources;
+        self.protection.presentation.rows =
+            sources.iter().map(|r| r.registration.clone()).collect();
+        self.protection.inspection.sources = sources;
         self.protection.rebuild_index();
         self.refresh_protection_context();
-        self.protection.current_rows = self.settings.icon_exclusions.clone();
-        let sources = &self.protection.sources;
-        let by_extension = &self.protection.source_by_extension;
-        self.protection.current_rows.sort_by_cached_key(|r| {
-            (
-                !r.extension.is_empty(),
-                by_extension
-                    .get(&r.extension)
-                    .map(|i| display_group(&sources[*i])),
-                r.extension.clone(),
-            )
-        });
+        self.protection.presentation.current_rows = self.settings.icon_exclusions.clone();
+        let sources = &self.protection.inspection.sources;
+        let by_extension = &self.protection.inspection.source_by_extension;
+        self.protection
+            .presentation
+            .current_rows
+            .sort_by_cached_key(|r| {
+                (
+                    !r.extension.is_empty(),
+                    by_extension
+                        .get(&r.extension)
+                        .map(|i| display_group(&sources[*i])),
+                    r.extension.clone(),
+                )
+            });
         let targets = self
             .settings
             .packs
             .iter()
-            .find(|p| Some(&p.id) == self.protection.pack.as_ref())
+            .find(|p| Some(&p.id) == self.protection.inspection.pack.as_ref())
             .map(|p| {
                 (
                     p.theme
@@ -509,20 +543,20 @@ impl Manager {
                     p.theme.needs_unknown_class(),
                 )
             });
-        self.protection.current_rows.retain(|row| {
+        self.protection.presentation.current_rows.retain(|row| {
             targets.as_ref().is_some_and(|(extensions, unknown)| {
                 extensions.contains(&row.extension) || (row.extension.is_empty() && *unknown)
             })
         });
-        self.protection.candidate_count = 0;
-        self.protection.planned_count = 0;
-        for source in &self.protection.sources {
+        self.protection.presentation.candidate_count = 0;
+        self.protection.presentation.planned_count = 0;
+        for source in &self.protection.inspection.sources {
             if targets.as_ref().is_some_and(|(extensions, unknown)| {
                 extensions.contains(&source.registration.extension)
                     || (source.registration.extension.is_empty() && *unknown)
             }) {
-                self.protection.candidate_count += 1;
-                self.protection.planned_count += usize::from(source.protect);
+                self.protection.presentation.candidate_count += 1;
+                self.protection.presentation.planned_count += usize::from(source.protect);
             }
         }
     }
@@ -532,20 +566,20 @@ impl Manager {
             .settings
             .packs
             .iter()
-            .find(|pack| Some(&pack.id) == self.protection.pack.as_ref());
-        self.protection.pack_extensions = inspected
+            .find(|pack| Some(&pack.id) == self.protection.inspection.pack.as_ref());
+        self.protection.inspection.pack_extensions = inspected
             .map(|pack| pack.theme.registration_extensions().into_iter().collect())
             .unwrap_or_default();
-        self.protection.pack_unknown =
+        self.protection.inspection.pack_unknown =
             inspected.is_some_and(|pack| pack.theme.needs_unknown_class());
-        self.protection.active_extensions = self
+        self.protection.inspection.active_extensions = self
             .settings
             .active
             .as_ref()
             .and_then(|id| self.settings.packs.iter().find(|pack| &pack.id == id))
             .map(|pack| pack.theme.registration_extensions().into_iter().collect())
             .unwrap_or_default();
-        self.protection.active_classes = self
+        self.protection.inspection.active_classes = self
             .settings
             .journal
             .iter()
@@ -556,7 +590,7 @@ impl Manager {
                     .map(str::to_owned)
             })
             .collect();
-        self.protection.active_excluded_extensions = self
+        self.protection.inspection.active_excluded_extensions = self
             .settings
             .icon_exclusions
             .iter()
@@ -564,22 +598,23 @@ impl Manager {
             .collect();
     }
     pub(super) fn refresh_protection_policy(&mut self, cx: &mut Context<Self>) {
-        self.protection.recommendation_notice = None;
+        self.protection.presentation.recommendation_notice = None;
         self.targets.invalidate();
-        for source in &mut self.protection.sources {
-            source.update_protection(&self.protection.rules, self.protection.draft);
+        for source in &mut self.protection.inspection.sources {
+            source.update_protection(&self.protection.draft.rules, self.protection.draft.enabled);
         }
         self.protection.rebuild_index();
         if let Some(pack) = self
             .settings
             .packs
             .iter()
-            .find(|p| Some(&p.id) == self.protection.pack.as_ref())
+            .find(|p| Some(&p.id) == self.protection.inspection.pack.as_ref())
         {
             let extensions: std::collections::BTreeSet<_> =
                 pack.theme.registration_extensions().into_iter().collect();
-            self.protection.planned_count = self
+            self.protection.presentation.planned_count = self
                 .protection
+                .inspection
                 .sources
                 .iter()
                 .filter(|r| {
@@ -592,58 +627,72 @@ impl Manager {
         }
         let scroll = self
             .protection
+            .presentation
             .list
             .as_ref()
             .map(|list| list.logical_scroll_top());
         self.reset_protection_list();
         if let Some(mut scroll) = scroll
-            && !self.protection.visible_rows.is_empty()
-            && let Some(list) = &self.protection.list
+            && !self.protection.presentation.visible_rows.is_empty()
+            && let Some(list) = &self.protection.presentation.list
         {
-            scroll.item_ix = scroll.item_ix.min(self.protection.visible_rows.len() - 1);
+            scroll.item_ix = scroll
+                .item_ix
+                .min(self.protection.presentation.visible_rows.len() - 1);
             list.scroll_to(scroll);
         }
         cx.notify();
     }
 
     fn protection_rows(&self) -> &[IconExclusion] {
-        &self.protection.rows
+        &self.protection.presentation.rows
     }
 
     fn pin_visible_protection_rows(&mut self) {
-        self.protection
-            .retained
-            .extend(self.protection.rows.iter().filter_map(|row| {
+        self.protection.presentation.retained.extend(
+            self.protection.presentation.rows.iter().filter_map(|row| {
                 let extension = &row.extension;
-                (!self.protection.pack_extensions.contains(extension)
-                    && !(extension.is_empty() && self.protection.pack_unknown))
+                (!self
+                    .protection
+                    .inspection
+                    .pack_extensions
+                    .contains(extension)
+                    && !(extension.is_empty() && self.protection.inspection.pack_unknown))
                     .then(|| extension.clone())
-            }));
-        if self.protection.filter != Filter::All {
-            self.protection
-                .pinned
-                .extend(self.protection.rows.iter().map(|row| row.extension.clone()));
+            }),
+        );
+        if self.protection.presentation.filter != Filter::All {
+            self.protection.presentation.pinned.extend(
+                self.protection
+                    .presentation
+                    .rows
+                    .iter()
+                    .map(|row| row.extension.clone()),
+            );
         }
     }
 
     fn reset_protection_list(&mut self) {
-        let current = self.protection.pack.as_ref() == self.settings.active.as_ref()
+        let current = self.protection.inspection.pack.as_ref() == self.settings.active.as_ref()
             && self.settings.active.is_some();
         let excluded: std::collections::BTreeSet<_> = self
             .protection
+            .presentation
             .current_rows
             .iter()
             .map(|row| row.extension.clone())
             .collect();
-        self.protection.rows = self
+        self.protection.presentation.rows = self
             .protection
+            .inspection
             .sources
             .iter()
             .filter(|source| {
                 self.protection
+                    .presentation
                     .pinned
                     .contains(&source.registration.extension)
-                    || match self.protection.filter {
+                    || match self.protection.presentation.filter {
                         Filter::All | Filter::Changes => true,
                         Filter::Protected => source.protect,
                         Filter::Allowed => !source.protect,
@@ -656,30 +705,30 @@ impl Manager {
             .map(|source| source.registration.clone())
             .collect();
         let mut seen = std::collections::BTreeSet::new();
-        self.protection.group_counts = self
+        self.protection.presentation.group_counts = self
             .protection_rows()
             .iter()
-            .filter_map(|row| self.protection.source(&row.extension))
+            .filter_map(|row| self.protection.inspection.source(&row.extension))
             .fold(std::collections::BTreeMap::new(), |mut counts, source| {
                 *counts.entry(display_group(source)).or_default() += 1;
                 counts
             });
-        self.protection.visible_rows = self
+        self.protection.presentation.visible_rows = self
             .protection_rows()
             .iter()
             .enumerate()
             .filter_map(|(ix, row)| {
-                let source = self.protection.source(&row.extension);
+                let source = self.protection.inspection.source(&row.extension);
                 let visible = source.is_none_or(|source| {
                     let group = display_group(source);
                     let first = seen.insert(group.clone());
-                    first || !self.protection.collapsed.contains(&group)
+                    first || !self.protection.presentation.collapsed.contains(&group)
                 });
                 visible.then_some(ix)
             })
             .collect();
-        if let Some(list) = &self.protection.list {
-            list.reset(self.protection.visible_rows.len());
+        if let Some(list) = &self.protection.presentation.list {
+            list.reset(self.protection.presentation.visible_rows.len());
         }
     }
 
@@ -689,26 +738,26 @@ impl Manager {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let compact = window.viewport_size().width < window.rem_size() * 62.;
-        if !compact && let Some(picker) = self.protection.view_picker.take() {
+        if !compact && let Some(picker) = self.protection.presentation.view_picker.take() {
             if picker.read(cx).focus_handle(cx).is_focused(window) {
                 self.focus.focus(window, cx);
             }
-            self.protection.view_subscription = None;
+            self.protection.presentation.view_subscription = None;
         }
-        let is_changes = self.protection.filter == Filter::Changes;
+        let is_changes = self.protection.presentation.filter == Filter::Changes;
         let metrics = (window.rem_size(), self.settings.language.clone());
-        if self.protection.text_metrics.as_ref() != Some(&metrics) {
-            if let Some(list) = &self.protection.list {
+        if self.protection.presentation.text_metrics.as_ref() != Some(&metrics) {
+            if let Some(list) = &self.protection.presentation.list {
                 list.remeasure();
             }
-            self.protection.view_picker = None;
-            self.protection.basis_picker = None;
-            self.protection.text_metrics = Some(metrics);
+            self.protection.presentation.view_picker = None;
+            self.protection.presentation.basis_picker = None;
+            self.protection.presentation.text_metrics = Some(metrics);
         }
         use gpui_kit::{assets::IconName, component::button::ButtonGroup};
         let colors = cx.theme().colors;
-        let blocked = self.operation.busy() || self.protection.loading || !self.valid;
-        let dirty = self.protection.dirty(&self.settings);
+        let blocked = self.operation.busy() || self.protection.inspection.loading || !self.valid;
+        let dirty = self.protection.draft.dirty(&self.settings);
         let mut panel = div()
             .id("protection-panel")
             .flex_1()
@@ -720,10 +769,11 @@ impl Manager {
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                 if event.keystroke.key == "escape" {
                     this.close_protection(window, cx);
-                } else if let Some(list) = if this.protection.filter == Filter::Changes {
-                    &this.protection.changes_list
+                } else if let Some(list) = if this.protection.presentation.filter == Filter::Changes
+                {
+                    &this.protection.presentation.changes_list
                 } else {
-                    &this.protection.list
+                    &this.protection.presentation.list
                 } {
                     match event.keystroke.key.as_str() {
                         "home" => list.scroll_to(ListOffset::default()),
@@ -759,11 +809,11 @@ impl Manager {
             .flex_shrink_0().flex().flex_col().gap_2()
             .child(div().flex().items_center().gap_2()
                 .child(Checkbox::new("protection-toggle")
-                    .checked(self.protection.draft).disabled(blocked)
+                    .checked(self.protection.draft.enabled).disabled(blocked)
                     .label(self.text("既定では既存アイコンを保護する", "Protect existing icons by default"))
                     .on_click(cx.listener(|this, checked, _, cx| {
                         this.pin_visible_protection_rows();
-                        this.protection.draft = *checked;
+                        this.protection.draft.enabled = *checked;
                         this.refresh_protection_policy(cx);
                     })))
                 .child(theme::button("protection-help", cx).small().icon(IconName::Info)
@@ -779,7 +829,7 @@ impl Manager {
                 .text_color(colors.muted_foreground)
                 .child(self.text("確認するパック", "Inspect pack")),
         );
-        if let Some(picker) = &self.protection.picker {
+        if let Some(picker) = &self.protection.presentation.picker {
             packs = packs.child(
                 Select::new(picker)
                     .id("protection-pack")
@@ -797,24 +847,28 @@ impl Manager {
                 .flex_shrink_0()
                 .ml_2()
                 .label(self.text("おすすめ設定", "Recommended settings"))
-                .disabled_elevated(blocked || self.protection.error.is_some())
+                .disabled_elevated(blocked || self.protection.inspection.error.is_some())
                 .on_click(cx.listener(|this, _, _, cx| this.apply_recommended_protection(cx))),
         );
         settings = settings.child(packs);
-        let current = if self.protection.pack.as_ref() == self.settings.active.as_ref() {
-            self.protection.current_rows.len()
+        let current = if self.protection.inspection.pack.as_ref() == self.settings.active.as_ref() {
+            self.protection.presentation.current_rows.len()
         } else {
             0
         };
-        let summary = if let Some(notice) = &self.protection.recommendation_notice {
+        let summary = if let Some(notice) = &self.protection.presentation.recommendation_notice {
             notice.clone()
-        } else if self.protection.loading {
+        } else if self.protection.inspection.loading {
             self.text("調査中…", "Checking…").into()
-        } else if self.protection.pack.is_none() {
+        } else if self.protection.inspection.pack.is_none() {
             self.text("パックなし", "No pack").into()
         } else {
-            let kept = self.protection.planned_count;
-            let replaced = self.protection.candidate_count.saturating_sub(kept);
+            let kept = self.protection.presentation.planned_count;
+            let replaced = self
+                .protection
+                .presentation
+                .candidate_count
+                .saturating_sub(kept);
             if self.settings.language == "en" {
                 format!(
                     "This pack: protect {kept} · allow pack {replaced} / Currently excluded: {current}"
@@ -827,7 +881,7 @@ impl Manager {
             "おすすめ設定は全体保護をオンにし、VS Code・開発用の個別指定をパック優先にします。",
             "Recommended settings enable default protection and prefer pack icons for VS Code and development types, replacing their overrides.",
         ));
-        if self.protection.previews_loading {
+        if self.protection.inspection.previews_loading {
             settings = settings.child(
                 div()
                     .flex()
@@ -842,7 +896,7 @@ impl Manager {
             .small()
             .disabled(self.operation.busy());
         for filter in Filter::ALL {
-            let selected = self.protection.filter == filter;
+            let selected = self.protection.presentation.filter == filter;
             filters = filters.child(
                 theme::button(filter.id(), cx)
                     .label(filter.label(self))
@@ -866,14 +920,16 @@ impl Manager {
         panel = panel.child(settings);
         let has_expanded_group = self
             .protection
+            .presentation
             .group_counts
             .keys()
-            .any(|group| !self.protection.collapsed.contains(group));
+            .any(|group| !self.protection.presentation.collapsed.contains(group));
         let has_collapsed_group = self
             .protection
+            .presentation
             .group_counts
             .keys()
-            .any(|group| self.protection.collapsed.contains(group));
+            .any(|group| self.protection.presentation.collapsed.contains(group));
         panel = panel.child(
             div()
                 .flex()
@@ -894,9 +950,9 @@ impl Manager {
                             else {
                                 return;
                             };
-                            this.protection.filter = filter;
-                            this.protection.view_picker = None;
-                            this.protection.pinned.clear();
+                            this.protection.presentation.filter = filter;
+                            this.protection.presentation.view_picker = None;
+                            this.protection.presentation.pinned.clear();
                             this.reset_protection_list();
                             cx.notify();
                         }))
@@ -907,16 +963,19 @@ impl Manager {
                         theme::button("protection-details", cx)
                             .small()
                             .label(self.text("登録の詳細", "Registration details"))
-                            .selected(self.protection.details)
-                            .toggled(self.protection.details)
-                            .when(self.protection.details, |b| b.icon(IconName::Check))
+                            .selected(self.protection.presentation.details)
+                            .toggled(self.protection.presentation.details)
+                            .when(self.protection.presentation.details, |b| {
+                                b.icon(IconName::Check)
+                            })
                             .tooltip(self.text(
                                 "登録情報の詳細を表示・非表示",
                                 "Show or hide registration details",
                             ))
                             .on_click(cx.listener(|this, _, _, cx| {
-                                this.protection.details = !this.protection.details;
-                                if let Some(list) = &this.protection.list {
+                                this.protection.presentation.details =
+                                    !this.protection.presentation.details;
+                                if let Some(list) = &this.protection.presentation.list {
                                     list.remeasure();
                                 }
                                 cx.notify();
@@ -930,7 +989,7 @@ impl Manager {
                         .label(self.text("再調査", "Refresh"))
                         .disabled_elevated(blocked)
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.protection.retained.clear();
+                            this.protection.presentation.retained.clear();
                             this.inspect_protection(cx);
                         })),
                 )
@@ -948,7 +1007,7 @@ impl Manager {
                                     .label(self.text("すべて開く", "Expand all"))
                                     .disabled_elevated(blocked || !has_collapsed_group)
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        this.protection.collapsed.clear();
+                                        this.protection.presentation.collapsed.clear();
                                         this.reset_protection_list();
                                         cx.notify();
                                     })),
@@ -959,8 +1018,12 @@ impl Manager {
                                     .label(self.text("すべて閉じる", "Collapse all"))
                                     .disabled_elevated(blocked || !has_expanded_group)
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        this.protection.collapsed.extend(
-                                            this.protection.sources.iter().map(display_group),
+                                        this.protection.presentation.collapsed.extend(
+                                            this.protection
+                                                .inspection
+                                                .sources
+                                                .iter()
+                                                .map(display_group),
                                         );
                                         this.reset_protection_list();
                                         cx.notify();
@@ -972,7 +1035,7 @@ impl Manager {
         if is_changes {
             panel = panel.child(self.protection_changes_panel(compact, window, cx));
         } else {
-            if !self.protection.pinned.is_empty() {
+            if !self.protection.presentation.pinned.is_empty() {
                 panel = panel.child(
                 div()
                     .px_4()
@@ -986,7 +1049,7 @@ impl Manager {
             );
             }
             let shown = self.protection_rows();
-            if let Some(error) = &self.protection.error {
+            if let Some(error) = &self.protection.inspection.error {
                 panel = panel.child(
                     div()
                         .id("protection-error")
@@ -1009,21 +1072,25 @@ impl Manager {
                 .min_h_0()
                 .flex()
                 .flex_col();
-            if shown.is_empty() && !self.protection.loading && self.protection.error.is_none() {
-                let message = if self.protection.pack.is_none() {
+            if shown.is_empty()
+                && !self.protection.inspection.loading
+                && self.protection.inspection.error.is_none()
+            {
+                let message = if self.protection.inspection.pack.is_none() {
                     self.text(
                         "パックを追加すると、保護する種類を確認できます。",
                         "Add an icon pack to inspect protected file types.",
                     )
-                } else if self.protection.filter == Filter::Current
+                } else if self.protection.presentation.filter == Filter::Current
                     && (self.settings.active.is_none()
-                        || self.protection.pack.as_ref() != self.settings.active.as_ref())
+                        || self.protection.inspection.pack.as_ref()
+                            != self.settings.active.as_ref())
                 {
                     self.text(
                         "このパックは適用されていません。",
                         "This pack is not active.",
                     )
-                } else if self.protection.filter != Filter::All {
+                } else if self.protection.presentation.filter != Filter::All {
                     self.text(
                         "絞り込みに一致する種類はありません。",
                         "No file types match this filter.",
@@ -1040,16 +1107,16 @@ impl Manager {
                     .text_sm()
                     .text_color(colors.muted_foreground)
                     .child(message);
-                if self.protection.filter != Filter::All {
+                if self.protection.presentation.filter != Filter::All {
                     empty = empty.child(
                         theme::button("protection-show-all", cx)
                             .small()
                             .label(self.text("すべて表示", "Show all"))
                             .on_click(cx.listener(|this, _, window, cx| {
-                                this.protection.filter = Filter::All;
-                                this.protection.view_picker = None;
+                                this.protection.presentation.filter = Filter::All;
+                                this.protection.presentation.view_picker = None;
                                 this.focus.focus(window, cx);
-                                this.protection.pinned.clear();
+                                this.protection.presentation.pinned.clear();
                                 this.reset_protection_list();
                                 cx.notify();
                             })),
@@ -1057,7 +1124,7 @@ impl Manager {
                 }
                 rows = rows.child(empty);
             }
-            if self.protection.loading {
+            if self.protection.inspection.loading {
                 rows = rows.child(
                     div()
                         .px_4()
@@ -1070,7 +1137,7 @@ impl Manager {
                 );
             }
             if !shown.is_empty()
-                && let Some(state) = &self.protection.list
+                && let Some(state) = &self.protection.presentation.list
             {
                 let view = cx.entity().downgrade();
                 rows = rows.child(
@@ -1086,7 +1153,7 @@ impl Manager {
             }
             #[cfg(feature = "test-support")]
             let rows = rows.test_support();
-            panel = panel.child(if let Some(state) = &self.protection.list {
+            panel = panel.child(if let Some(state) = &self.protection.presentation.list {
                 rows.relative().vertical_scrollbar(state)
             } else {
                 rows
@@ -1137,7 +1204,9 @@ impl Manager {
                         } else {
                             self.text("保存", "Save")
                         })
-                        .disabled_elevated(blocked || self.protection.error.is_some() || !dirty)
+                        .disabled_elevated(
+                            blocked || self.protection.inspection.error.is_some() || !dirty,
+                        )
                         .on_click(cx.listener(|this, _, _, cx| this.save_protection(cx))),
                 ),
         );
@@ -1147,7 +1216,7 @@ impl Manager {
     }
     fn protection_row(&self, ix: usize, cx: &mut Context<Self>) -> AnyElement {
         let colors = cx.theme().colors;
-        let ix = self.protection.visible_rows[ix];
+        let ix = self.protection.presentation.visible_rows[ix];
         let row = &self.protection_rows()[ix];
         let reason = match row.reason {
             ProtectionReason::ChangedRegistration => self.text(
@@ -1189,14 +1258,24 @@ impl Manager {
             .role(Role::Group)
             .aria_label(label)
             .text_sm();
-        let group = |row: &IconExclusion| self.protection.source(&row.extension).map(display_group);
+        let group = |row: &IconExclusion| {
+            self.protection
+                .inspection
+                .source(&row.extension)
+                .map(display_group)
+        };
         let first = ix == 0 || group(&self.protection_rows()[ix - 1]) != group(row);
         if first && ix != 0 {
             row_element = row_element.border_t_1();
         }
-        if let Some(source) = self.protection.source(&row.extension) {
+        if let Some(source) = self.protection.inspection.source(&row.extension) {
             row_element = row_element.child(self.protection_source_header(source, ix, cx));
-            if self.protection.collapsed.contains(&display_group(source)) {
+            if self
+                .protection
+                .presentation
+                .collapsed
+                .contains(&display_group(source))
+            {
                 #[cfg(feature = "test-support")]
                 let row_element = row_element.test_support();
                 return row_element.into_any_element();
@@ -1239,10 +1318,10 @@ impl Manager {
                     .child(div().flex_1().min_w_0()),
             );
         }
-        if let Some(source) = self.protection.source(&row.extension) {
+        if let Some(source) = self.protection.inspection.source(&row.extension) {
             content = content.child(self.protection_source_controls(source, cx));
         }
-        if self.protection.details {
+        if self.protection.presentation.details {
             let mut detail = format!(
                 "{}: {}\n{}: {}",
                 self.text("クラス", "Class"),
@@ -1250,7 +1329,7 @@ impl Manager {
                 self.text("登録位置", "Registration"),
                 row.source
             );
-            if let Some(source) = self.protection.source(&row.extension) {
+            if let Some(source) = self.protection.inspection.source(&row.extension) {
                 if row.extension.is_empty() {
                     let provider = format!(
                         "{}: {}",

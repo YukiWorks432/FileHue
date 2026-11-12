@@ -138,14 +138,14 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     manager.update(cx, |this, _| {
         assert!(
-            this.protection.error.is_none(),
+            this.protection.inspection.error.is_none(),
             "{:?}",
-            this.protection.error
+            this.protection.inspection.error
         );
         assert!(
-            !this.protection.sources.is_empty(),
+            !this.protection.inspection.sources.is_empty(),
             "loading={}",
-            this.protection.loading
+            this.protection.inspection.loading
         );
     });
     cx.update_window(window, |_, w, cx| {
@@ -194,9 +194,17 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("パック")
         );
-        assert!(manager.read(cx).protection.source("m2ts").unwrap().protect);
+        assert!(
+            manager
+                .read(cx)
+                .protection
+                .inspection
+                .source("m2ts")
+                .unwrap()
+                .protect
+        );
         assert!(load().unwrap().icon_protection_rules.extensions.is_empty());
-        let inspection = manager.read(cx).protection.inspection;
+        let inspection = manager.read(cx).protection.inspection.revision;
         w.resize(size(px(640.), px(780.)));
         gpui_kit::component::theme::Theme::update(cx, |theme| theme.font_size = px(18.));
         w.render_frame(cx);
@@ -218,7 +226,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("パック")
         );
-        assert_eq!(manager.read(cx).protection.inspection, inspection);
+        assert_eq!(manager.read(cx).protection.inspection.revision, inspection);
         w.resize(size(px(1120.), px(780.)));
         gpui_kit::component::theme::Theme::update(cx, |theme| theme.font_size = px(16.));
         w.render_frame(cx);
@@ -518,11 +526,11 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
     }
     // 見本の到着を待たずに方針を編集でき、前の調査の見本は新しい調査へ混入しない。
     let (inspection, previous_previews) = manager.update(cx, |this, cx| {
-        this.protection.previews_loading = true;
-        let previews = this.protection.previews.take();
-        let inspection = this.protection.inspection;
+        this.protection.inspection.previews_loading = true;
+        let previews = this.protection.inspection.previews.take();
+        let inspection = this.protection.inspection.revision;
         this.accept_protection_previews(inspection.wrapping_sub(1), None, cx);
-        assert!(this.protection.previews_loading);
+        assert!(this.protection.inspection.previews_loading);
         (inspection, previews)
     });
     cx.update_window(window, |_, w, cx| {
@@ -538,12 +546,12 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
     })
     .unwrap();
     manager.update(cx, |this, cx| {
-        this.protection.inspection += 1;
+        this.protection.inspection.revision += 1;
         this.accept_protection_previews(inspection, previous_previews, cx);
-        assert!(this.protection.previews.is_none());
-        assert!(this.protection.previews_loading);
-        this.accept_protection_previews(this.protection.inspection, None, cx);
-        assert!(!this.protection.previews_loading);
-        assert!(this.protection.error.is_none());
+        assert!(this.protection.inspection.previews.is_none());
+        assert!(this.protection.inspection.previews_loading);
+        this.accept_protection_previews(this.protection.inspection.revision, None, cx);
+        assert!(!this.protection.inspection.previews_loading);
+        assert!(this.protection.inspection.error.is_none());
     });
 }

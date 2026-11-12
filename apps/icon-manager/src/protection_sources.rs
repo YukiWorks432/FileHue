@@ -16,21 +16,25 @@ pub(super) enum SampleDisplay {
     Unknown,
 }
 
-impl Editor {
+impl Draft {
     pub(crate) fn dirty(&self, settings: &Settings) -> bool {
-        self.draft != settings.preserve_existing_icons
+        self.enabled != settings.preserve_existing_icons
             || self.rules != settings.icon_protection_rules
     }
+}
 
+impl Editor {
     fn provider_override_count(&self, provider: &str) -> usize {
-        self.groups
+        self.inspection
+            .groups
             .get(provider)
             .into_iter()
             .flatten()
-            .map(|index| &self.sources[*index])
+            .map(|index| &self.inspection.sources[*index])
             .filter(|row| {
                 row.provider_id.as_deref() == Some(provider)
                     && self
+                        .draft
                         .rules
                         .extensions
                         .contains_key(&row.registration.extension)
@@ -41,20 +45,23 @@ impl Editor {
     fn set_provider(&mut self, provider: &str, protect: Option<bool>) {
         // 独立表示前に保存された拡張子なしの提供元指定も、別グループの操作では保持する。
         let extensionless = self
+            .draft
             .rules
             .providers
             .get(provider)
             .and_then(|rules| rules.get(""))
             .cloned();
         let sources = self
+            .inspection
             .sources
             .iter()
             .filter(|row| !row.registration.extension.is_empty())
             .cloned()
             .collect::<Vec<_>>();
-        self.rules.set_provider(&sources, provider, protect);
+        self.draft.rules.set_provider(&sources, provider, protect);
         if let Some(rule) = extensionless {
-            self.rules
+            self.draft
+                .rules
                 .providers
                 .entry(provider.into())
                 .or_default()
@@ -100,7 +107,13 @@ impl Manager {
         }
         if after_save {
             let unknown = extension.is_empty() && pack.theme.needs_unknown_class();
-            if !self.protection.active_extensions.contains(extension) && !unknown {
+            if !self
+                .protection
+                .inspection
+                .active_extensions
+                .contains(extension)
+                && !unknown
+            {
                 // パック外の種類が共有クラス経由の名前パターンに一致するかは、
                 // この一覧の調査だけでは保存後の登録計画を確定できない。
                 return SampleDisplay::Unknown;
@@ -111,9 +124,14 @@ impl Manager {
         } else {
             let protected = sample.match_indices('.').any(|(offset, _)| {
                 self.protection
+                    .inspection
                     .active_excluded_extensions
                     .contains(&sample[offset + 1..])
-            }) || (self.protection.active_excluded_extensions.contains("")
+            }) || (self
+                .protection
+                .inspection
+                .active_excluded_extensions
+                .contains("")
                 && (extension.is_empty()
                     || source.registration.class.eq_ignore_ascii_case("unknown")
                     || (source.registration.class.starts_with('.')
@@ -122,8 +140,13 @@ impl Manager {
                 return SampleDisplay::Original;
             }
             let class = source.registration.class.to_lowercase();
-            if !self.protection.active_classes.contains(&class)
-                && !(class.starts_with('.') && self.protection.active_classes.contains("unknown"))
+            if !self.protection.inspection.active_classes.contains(&class)
+                && !(class.starts_with('.')
+                    && self
+                        .protection
+                        .inspection
+                        .active_classes
+                        .contains("unknown"))
             {
                 return SampleDisplay::Original;
             }
@@ -148,7 +171,7 @@ impl Manager {
             SampleDisplay::Original => (
                 self.text("元の表示", "Original appearance"),
                 self.protection
-                    .previews
+                    .inspection.previews
                     .as_ref()
                     .and_then(|p| p.paths.get(extension))
                     .cloned(),
@@ -177,7 +200,9 @@ impl Manager {
         };
         let prefix = if after_save && self.settings.active.is_none() {
             self.text("保存後（パック未適用）", "After saving (no active pack)")
-        } else if after_save && self.protection.pack.as_ref() != self.settings.active.as_ref() {
+        } else if after_save
+            && self.protection.inspection.pack.as_ref() != self.settings.active.as_ref()
+        {
             self.text("保存後（適用中パック）", "After saving (active pack)")
         } else if after_save {
             self.text("保存後の見込み", "After saving")
@@ -255,32 +280,35 @@ impl Manager {
         cx: &mut Context<Self>,
     ) -> Div {
         let colors = cx.theme().colors;
-        let blocked =
-            self.operation.busy() || self.protection.loading || self.protection.error.is_some();
+        let blocked = self.operation.busy()
+            || self.protection.inspection.loading
+            || self.protection.inspection.error.is_some();
         let mut area = div().flex().flex_col().gap_2().min_w_0();
         let previous = ix
             .checked_sub(1)
             .and_then(|i| self.protection_rows().get(i))
-            .and_then(|r| self.protection.source(&r.extension));
+            .and_then(|r| self.protection.inspection.source(&r.extension));
         if previous.is_none_or(|p| display_group(p) != display_group(source)) {
             let group_id = display_group(source);
-            let expanded = !self.protection.collapsed.contains(&group_id);
+            let expanded = !self.protection.presentation.collapsed.contains(&group_id);
             let count = self
                 .protection
+                .presentation
                 .group_counts
                 .get(&group_id)
                 .copied()
                 .unwrap_or(0);
-            let group = self.protection.groups.get(&group_id);
+            let group = self.protection.inspection.groups.get(&group_id);
             let total = group.map_or(0, Vec::len);
             let protected = group
                 .into_iter()
                 .flatten()
-                .filter(|index| self.protection.sources[**index].protect)
+                .filter(|index| self.protection.inspection.sources[**index].protect)
                 .count();
             let mut heading = div().flex().flex_wrap().items_center().gap_2().min_w_0();
             if let Some(path) = self
                 .protection
+                .inspection
                 .previews
                 .as_ref()
                 .and_then(|p| p.provider_paths.get(&group_id))
@@ -366,19 +394,24 @@ impl Manager {
                 .disabled(blocked)
                 .child(heading.w_full())
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    if this.operation.busy() || this.protection.loading {
+                    if this.operation.busy() || this.protection.inspection.loading {
                         return;
                     }
-                    if !this.protection.collapsed.remove(&group_id) {
-                        this.protection.collapsed.insert(group_id.clone());
+                    if !this.protection.presentation.collapsed.remove(&group_id) {
+                        this.protection
+                            .presentation
+                            .collapsed
+                            .insert(group_id.clone());
                     }
                     let scroll = this
                         .protection
+                        .presentation
                         .list
                         .as_ref()
                         .map(|list| list.logical_scroll_top());
                     let anchor = scroll.and_then(|offset| {
                         this.protection
+                            .presentation
                             .visible_rows
                             .get(offset.item_ix)
                             .copied()
@@ -388,10 +421,11 @@ impl Manager {
                     if let Some((anchor, offset)) = anchor
                         && let Some(ix) = this
                             .protection
+                            .presentation
                             .visible_rows
                             .iter()
                             .position(|ix| *ix == anchor)
-                        && let Some(list) = &this.protection.list
+                        && let Some(list) = &this.protection.presentation.list
                     {
                         list.scroll_to(ListOffset {
                             item_ix: ix,
@@ -407,6 +441,7 @@ impl Manager {
             {
                 let original = self
                     .protection
+                    .inspection
                     .previews
                     .as_ref()
                     .and_then(|p| p.provider_paths.get(&source.group_id()))
@@ -415,12 +450,12 @@ impl Manager {
                     .settings
                     .packs
                     .iter()
-                    .find(|p| Some(&p.id) == self.protection.pack.as_ref())
+                    .find(|p| Some(&p.id) == self.protection.inspection.pack.as_ref())
                     .and_then(|p| {
                         let sample = sample_name(p, &source.registration.extension)?;
                         p.theme.resolve(&sample).map(|p| p.to_path_buf())
                     });
-                let inherited = if self.protection.draft {
+                let inherited = if self.protection.draft.enabled {
                     original.clone()
                 } else {
                     pack.clone().or_else(|| original.clone())
@@ -467,9 +502,15 @@ impl Manager {
                         .disabled_elevated(
                             blocked
                                 || (overrides == 0
-                                    && !self.protection.rules.providers.get(provider).is_some_and(
-                                        |rules| rules.keys().any(|extension| !extension.is_empty()),
-                                    )),
+                                    && !self
+                                        .protection
+                                        .draft
+                                        .rules
+                                        .providers
+                                        .get(provider)
+                                        .is_some_and(|rules| {
+                                            rules.keys().any(|extension| !extension.is_empty())
+                                        })),
                         )
                         .on_click(cx.listener(move |this, event, window, cx| {
                             this.confirm_reset_provider(&reset_source, event, window, cx);
@@ -491,6 +532,7 @@ impl Manager {
         let extension = source.registration.extension.clone();
         let original = self
             .protection
+            .inspection
             .previews
             .as_ref()
             .and_then(|p| p.paths.get(&extension))
@@ -499,17 +541,18 @@ impl Manager {
             .settings
             .packs
             .iter()
-            .find(|p| Some(&p.id) == self.protection.pack.as_ref())
+            .find(|p| Some(&p.id) == self.protection.inspection.pack.as_ref())
             .and_then(|p| {
                 let sample = sample_name(p, &extension)?;
                 p.theme.resolve(&sample).map(|p| p.to_path_buf())
             });
         let inherited = if extension.is_empty() {
-            source.always_protected || self.protection.draft
+            source.always_protected || self.protection.draft.enabled
         } else {
             self.protection
+                .draft
                 .rules
-                .inherited_protection(source, self.protection.draft)
+                .inherited_protection(source, self.protection.draft.enabled)
         };
         let inherited_path = if inherited {
             original.clone()
@@ -601,10 +644,14 @@ impl Manager {
             .gap_3()
             .min_w_0()
             .child(results);
-        if !self.protection.pack_extensions.contains(&extension)
-            && !(extension.is_empty() && self.protection.pack_unknown)
+        if !self
+            .protection
+            .inspection
+            .pack_extensions
+            .contains(&extension)
+            && !(extension.is_empty() && self.protection.inspection.pack_unknown)
         {
-            let text = if self.protection.pack.is_none() {
+            let text = if self.protection.inspection.pack.is_none() {
                 self.text(
                     "パックがありません。設定は全パック共通です。",
                     "No pack is available. This setting applies to all packs.",
@@ -676,17 +723,18 @@ impl Manager {
             let assigned = source
                 .provider_id
                 .as_ref()
-                .and_then(|id| self.protection.rules.providers.get(id))
+                .and_then(|id| self.protection.draft.rules.providers.get(id))
                 .filter(|rules| rules.keys().any(|extension| !extension.is_empty()));
             match choice {
                 None => assigned.is_none(),
                 Some(protect) => self
                     .protection
+                    .inspection
                     .groups
                     .get(&display_group(source))
                     .into_iter()
                     .flatten()
-                    .map(|index| &self.protection.sources[*index])
+                    .map(|index| &self.protection.inspection.sources[*index])
                     .all(|r| {
                         assigned
                             .and_then(|rules| rules.get(&r.registration.extension))
@@ -697,6 +745,7 @@ impl Manager {
             }
         } else {
             self.protection
+                .draft
                 .rules
                 .extensions
                 .get(extension)
@@ -707,7 +756,9 @@ impl Manager {
                             source
                                 .provider_id
                                 .as_ref()
-                                .and_then(|provider| self.protection.rules.providers.get(provider))
+                                .and_then(|provider| {
+                                    self.protection.draft.rules.providers.get(provider)
+                                })
                                 .and_then(|rules| rules.get(extension))
                         })
                         .flatten()
@@ -717,11 +768,11 @@ impl Manager {
                 == choice
         };
         let blocked = self.operation.busy()
-            || self.protection.loading
-            || self.protection.error.is_some()
+            || self.protection.inspection.loading
+            || self.protection.inspection.error.is_some()
             || (!provider_scope && source.always_protected);
         let description = outcome;
-        let tip = if path.is_none() && self.protection.previews_loading {
+        let tip = if path.is_none() && self.protection.inspection.previews_loading {
             format!(
                 "{description}\n{}",
                 self.text("アイコンの見本を読み込み中…", "Loading icon previews…")
@@ -734,7 +785,7 @@ impl Manager {
         let mut image = div().size_8().opacity(if selected { 1. } else { 0.35 });
         if let Some(path) = path {
             image = image.child(img(path).size_8());
-        } else if self.protection.previews_loading {
+        } else if self.protection.inspection.previews_loading {
             image = image.child(super::Spinner::new().small());
         } else {
             image = image.child(
@@ -804,7 +855,7 @@ impl Manager {
             .tooltip(tip)
             .on_click(cx.listener(move |this, _, _, cx| {
                 if this.operation.busy()
-                    || this.protection.loading
+                    || this.protection.inspection.loading
                     || (!provider_scope && row.always_protected)
                 {
                     return;
@@ -815,12 +866,13 @@ impl Manager {
                         this.protection.set_provider(provider, choice);
                     }
                 } else {
-                    this.protection.rules.set_extension(&row, choice);
+                    this.protection.draft.rules.set_extension(&row, choice);
                     if row.registration.extension.is_empty() && choice.is_none() {
-                        for rules in this.protection.rules.providers.values_mut() {
+                        for rules in this.protection.draft.rules.providers.values_mut() {
                             rules.remove("");
                         }
                         this.protection
+                            .draft
                             .rules
                             .providers
                             .retain(|_, rules| !rules.is_empty());
@@ -834,11 +886,11 @@ impl Manager {
     fn reset_provider_protection(&mut self, provider: &str, cx: &mut Context<Self>) {
         self.pin_visible_protection_rows();
         self.protection.set_provider(provider, None);
-        for row in &self.protection.sources {
+        for row in &self.protection.inspection.sources {
             if row.provider_id.as_deref() == Some(provider)
                 && !row.registration.extension.is_empty()
             {
-                self.protection.rules.set_extension(row, None);
+                self.protection.draft.rules.set_extension(row, None);
             }
         }
         self.refresh_protection_policy(cx);
@@ -897,8 +949,8 @@ impl Manager {
                 .on_ok(move |_, _, cx| {
                     let _ = owner.update(cx, |this, cx| {
                         if !this.operation.busy()
-                            && !this.protection.loading
-                            && this.protection.error.is_none()
+                            && !this.protection.inspection.loading
+                            && this.protection.inspection.error.is_none()
                         {
                             this.reset_provider_protection(&provider, cx);
                         }

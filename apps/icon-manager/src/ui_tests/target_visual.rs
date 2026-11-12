@@ -311,7 +311,8 @@ fn target_protection_visual_probe() {
                             });
                             manager.update(cx, |this, cx| {
                                 assert!(
-                                    !this.protection.loading && this.protection.error.is_none()
+                                    !this.protection.inspection.loading
+                                        && this.protection.inspection.error.is_none()
                                 );
                                 this.settings.language = language.into();
                                 this.prepare_target_protection_visual(state, w, cx);
@@ -459,23 +460,24 @@ fn provider_reset_visual_probe() {
                             manager.update(cx, |this, cx| {
                                 this.settings.language = lang.into();
                                 this.protection
-                                    .visual_sources(this.protection.sources.clone());
-                                this.protection.rules = Default::default();
-                                this.protection.draft = true;
-                                this.protection.rules.set_provider(
-                                    &this.protection.sources,
+                                    .visual_sources(this.protection.inspection.sources.clone());
+                                this.protection.draft.rules = Default::default();
+                                this.protection.draft.enabled = true;
+                                this.protection.draft.rules.set_provider(
+                                    &this.protection.inspection.sources,
                                     "visual:media",
                                     Some(false),
                                 );
-                                for row in &this.protection.sources {
+                                for row in &this.protection.inspection.sources {
                                     if matches!(row.registration.extension.as_str(), "ts" | "m2ts")
                                     {
-                                        this.protection.rules.set_extension(row, Some(true));
+                                        this.protection.draft.rules.set_extension(row, Some(true));
                                     }
                                 }
                                 // 保存済みの個別指定を解除する場面として、下書きとの差を実描画する。
                                 this.settings.preserve_existing_icons = true;
-                                this.settings.icon_protection_rules = this.protection.rules.clone();
+                                this.settings.icon_protection_rules =
+                                    this.protection.draft.rules.clone();
                                 this.refresh_protection_policy(cx);
                             });
                             w.resize(size(px(width), px(height)));
@@ -620,7 +622,8 @@ fn provider_reset_visual_probe() {
                                         Some(true)
                                     );
                                     assert!(
-                                        manager.read(cx).protection.rules.extensions["ts"].protect
+                                        manager.read(cx).protection.draft.rules.extensions["ts"]
+                                            .protect
                                     );
                                 } else if state == "warning" {
                                     let dialog = w.find("dialog");
@@ -1049,6 +1052,7 @@ fn recovery_visual_probe() {
             };
             // 描画用の値だけを設定する。登録の読み書きや復旧の実行は行わない。
             this.recovery = crate::recovery_ui::Editor::visual(plan);
+            this.screen = crate::Screen::Recovery;
 
 
             cx.notify();
@@ -1162,14 +1166,14 @@ fn extensionless_protection_visual_probe() {
                             });
                             manager.update(cx, |this, cx| {
                                 this.settings.language = language.into();
-                                let sources = this.protection.sources.clone();
+                                let sources = this.protection.inspection.sources.clone();
                                 let guard = this._guard.take();
                                 this.open_protection(w, cx);
                                 this._guard = guard;
                                 this.accept_protection_sources(sources);
                                 this.protection
-                                    .visual_sources(this.protection.sources.clone());
-                                this.protection.rules = Default::default();
+                                    .visual_sources(this.protection.inspection.sources.clone());
+                                this.protection.draft.rules = Default::default();
                                 this.refresh_protection_policy(cx);
                             });
                             w.resize(size(px(width), px(height)));
@@ -1273,6 +1277,7 @@ fn protection_visual_probe() {
                 provider_location: Some(file_icons_windows::IconLocation { path: "shell32.dll".into(), index: 0 }),
                 protect: true, needs_review: false, always_protected: false,
             }).collect());
+            this.refresh_protection_policy(cx);
             cx.notify();
           });
         }).unwrap();

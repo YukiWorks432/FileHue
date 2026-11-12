@@ -11,7 +11,6 @@ use std::collections::BTreeSet;
 
 #[derive(Default)]
 pub(super) struct Editor {
-    pub open: bool,
     pub(super) draft: BTreeSet<String>,
     initialized: bool,
     pub(super) status: Option<ThumbnailStatus>,
@@ -25,7 +24,7 @@ impl Manager {
         if self.operation.busy() || self._guard.is_none() {
             return;
         }
-        self.thumbnails.open = true;
+        self.screen = Screen::Thumbnails;
         self.thumbnails.plan = None;
         self.thumbnail_operation(|_| Ok(()), !self.thumbnails.initialized, false, cx);
     }

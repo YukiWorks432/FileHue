@@ -31,6 +31,7 @@ mod thumbnail_ui;
 use theme::ButtonElevation;
 mod view;
 use status::{Failure, Status};
+use view::Screen;
 
 #[cfg(all(test, feature = "test-support"))]
 mod ui_tests;
@@ -46,6 +47,9 @@ use file_icons_manager_service::{DownloadSource, Manager as ManagerService};
 type InitialSettings = (Option<std::sync::Arc<ManagerService>>, Result<Settings>);
 
 struct Manager {
+    screen: Screen,
+    recovery_return: Screen,
+    protection_return: Screen,
     about: about_ui::About,
     protection: protection_ui::Editor,
     recovery: recovery_ui::Editor,
@@ -115,6 +119,9 @@ impl Manager {
                     settings.language = "ja".into();
                 }
                 Self {
+                    screen: Screen::Packs,
+                    recovery_return: Screen::Packs,
+                    protection_return: Screen::Packs,
                     about: Default::default(),
                     protection: Default::default(),
                     recovery: Default::default(),
@@ -148,6 +155,9 @@ impl Manager {
                     .unwrap_or_default();
                 let recovery_available = guard.is_some() && !settings.journal.is_empty();
                 Self {
+                    screen: Screen::Packs,
+                    recovery_return: Screen::Packs,
+                    protection_return: Screen::Packs,
                     about: Default::default(),
                     protection: Default::default(),
                     recovery: Default::default(),
@@ -212,143 +222,6 @@ impl Manager {
         let language = language.to_owned();
         let manager = self._guard.clone().expect("valid manager");
         self.run(Kind::Language, move || manager.language(language), cx);
-    }
-
-    fn run(
-        &mut self,
-        kind: Kind,
-        operation: impl FnOnce() -> Result<()> + Send + 'static,
-        cx: &mut Context<Self>,
-    ) {
-        self.start(kind, operation, false, None, cx);
-    }
-
-    fn start(
-        &mut self,
-        kind: Kind,
-        operation: impl FnOnce() -> Result<()> + Send + 'static,
-        recovery: bool,
-        progress: Option<std::sync::Arc<file_icons_catalog::Progress>>,
-        cx: &mut Context<Self>,
-    ) {
-        let can_recover = recovery && self._guard.is_some() && !self.settings.journal.is_empty();
-        if self.operation.busy() || (!self.valid && !can_recover) {
-            return;
-        }
-        self.operation.begin(kind, progress);
-        self.progress_refresh = self.operation.progress().map(|_| {
-            // 画面更新だけを共有する。完了・画面破棄でTaskを落としてタイマーも止める。
-            cx.spawn(async move |this, cx| {
-                loop {
-                    cx.background_executor()
-                        .timer(std::time::Duration::from_millis(100))
-                        .await;
-                    if this.update(cx, |_, cx| cx.notify()).is_err() {
-                        break;
-                    }
-                }
-            })
-        });
-        let backup_hint = if kind == Kind::ResolveConflicts {
-            self.recovery.backup_hint()
-        } else {
-            None
-        };
-        let guard = self._guard.clone();
-        let task = cx.background_executor().spawn(async move {
-            let _guard = guard;
-            let result = operation();
-            let loaded = load();
-            let actual_backup = if result.is_ok() {
-                backup_hint.and_then(|path| path.canonicalize().ok())
-            } else {
-                None
-            };
-            (result, loaded, actual_backup)
-        });
-        cx.spawn(async move |this, cx| {
-            let (result, loaded, actual_backup) = task.await;
-            let operation_error = result.as_ref().err().map(|error| format!("{error:#}"));
-            let _ = this.update(cx, |this, cx| {
-                let status = match result {
-                    Ok(()) => {
-                        if kind == Kind::ResolveConflicts {
-                            this.recovery.complete(actual_backup);
-                        }
-                        if kind == Kind::Import {
-                            this.pending = None;
-                        }
-                        Status::Complete
-                    }
-                    Err(error) if error.is::<file_icons_catalog::Cancelled>() => Status::Cancelled,
-                    Err(error) => Status::Error(
-                        if error.is::<file_icons_windows::conflict::ConfirmationChanged>()
-                            || error.is::<file_icons_core::registry::Conflict>()
-                            || matches!(
-                                error.downcast_ref::<file_icons_manager_service::Failure>(),
-                                Some(file_icons_manager_service::Failure::Conflict)
-                            )
-                        {
-                            Failure::RegistrationConflict
-                        } else if error.is::<file_icons_windows::PreviousPackRestored>() {
-                            Failure::PreviousPackRestored
-                        } else if error.is::<file_icons_windows::ShellCleanupPending>() {
-                            Failure::ShellCleanupPending
-                        } else if error.is::<file_icons_windows::PackCleanupPending>() {
-                            Failure::PackCleanupPending
-                        } else if matches!(kind, Kind::Download(_)) {
-                            Failure::Download
-                        } else if kind == Kind::Language {
-                            Failure::SaveLanguage
-                        } else if kind == Kind::Import {
-                            Failure::Import
-                        } else {
-                            Failure::Operation
-                        },
-                        format!("{error:#}"),
-                    ),
-                };
-                if matches!(
-                    status,
-                    Status::Error(
-                        Failure::RegistrationConflict | Failure::IncompleteRecovery,
-                        _
-                    )
-                ) {
-                    this.conflict_attention = true;
-                } else if matches!(status, Status::Complete)
-                    && matches!(kind, Kind::Apply | Kind::Restore | Kind::ResolveConflicts)
-                {
-                    this.conflict_attention = false;
-                }
-                this.operation.finish(status);
-                this.progress_refresh = None;
-                match loaded {
-                    Ok(settings) => {
-                        this.targets.reconcile(&settings);
-                        this.settings = settings;
-                        this.valid = this._guard.is_some();
-                    }
-                    Err(error) => {
-                        this.valid = false;
-                        let detail = match operation_error {
-                            Some(operation) => format!("{operation}\n\n{error:#}"),
-                            None => format!("{error:#}"),
-                        };
-                        this.operation
-                            .finish(Status::Error(Failure::ReloadSettings, detail));
-                    }
-                }
-                if kind == Kind::SaveProtection && !this.operation.failed() {
-                    this.protection.draft = this.settings.preserve_existing_icons;
-                    this.protection.rules = this.settings.icon_protection_rules.clone();
-                    this.inspect_protection(cx);
-                }
-                cx.notify();
-            });
-        })
-        .detach();
-        cx.notify();
     }
 
     fn choose(&mut self, cx: &mut Context<Self>) {

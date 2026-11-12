@@ -49,7 +49,7 @@ fn about_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.click("about-open", cx);
         w.render_frame(cx);
-        assert!(manager.read(cx).about.open);
+        assert!(w.find("about-license").visible());
         w.click("about-distribution", cx);
         assert!(w.try_find("about-license-missing").is_none());
         w.click("about-license", cx);
@@ -59,7 +59,7 @@ fn about_in_child(cx: &mut TestAppContext) {
         );
         w.press("escape", cx);
         w.render_frame(cx);
-        assert!(manager.read(cx).about.open);
+        assert!(w.find("about-license").visible());
         assert!(manager.read(cx).about.license_text.is_none());
     })
     .unwrap();
@@ -113,11 +113,12 @@ fn about_in_child(cx: &mut TestAppContext) {
     cx.update_window(window, |_, w, cx| {
         w.press("escape", cx);
         w.render_frame(cx);
-        assert!(!manager.read(cx).about.open);
+        assert!(w.find("about-open").visible());
         w.click("about-open", cx);
         w.render_frame(cx);
         w.click("navigate-back", cx);
-        assert!(!manager.read(cx).about.open);
+        w.render_frame(cx);
+        assert!(w.find("about-open").visible());
     })
     .unwrap();
 }
@@ -171,7 +172,7 @@ fn about_visual_probe() {
                                 theme.font_size = px(font)
                             });
                             manager.update(cx, |m, cx| {
-                                m.about.open = true;
+                                m.screen = crate::Screen::About;
                                 m.about.executable_dir = Some(if present {
                                     files.clone()
                                 } else {
