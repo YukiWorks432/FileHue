@@ -180,6 +180,7 @@ fn gui_performance_in_child(cx: &mut TestAppContext) {
         this.selected = None;
         let pack = &this.settings.packs[0];
         this.targets.performance_seed(pack.id.clone(), &pack.theme);
+        this.screen = crate::Screen::Targets;
         cx.notify();
     });
     cx.update_window(window, |_, w, cx| {
@@ -227,6 +228,7 @@ fn gui_performance_in_child(cx: &mut TestAppContext) {
         let id = this.settings.packs[0].id.clone();
         this.targets
             .performance_seed(id, &this.settings.packs[0].theme);
+        this.screen = crate::Screen::Targets;
         this.protection.inspection.sources = sources.clone();
         this.protection.inspection.loading = false;
         this.refresh_protection_policy(cx);
