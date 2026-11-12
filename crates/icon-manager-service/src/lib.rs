@@ -29,7 +29,13 @@ fn restore_thumbnail_records(
     if record.transition.is_some() {
         match record.finish_transition(path, registry, inspector) {
             Ok(finished) => record = finished,
-            Err(error) => failures.push(format!("transition: {error:#}")),
+            Err(error) => {
+                ensure!(
+                    file_icons_windows::thumbnails::Recovery::load(path)?.as_ref() == Some(&record),
+                    "thumbnail recovery changed"
+                );
+                failures.push(format!("transition: {error:#}"));
+            }
         }
     }
     let mut index = 0;
@@ -1230,6 +1236,34 @@ mod thumbnail_tests {
                 )
             })
             .collect();
+        // 記録全体が失われた場合は、独立した組も古い記録で戻さない。
+        let saved = fs::read(&path).unwrap();
+        let mut replaced = record.clone();
+        replaced.transition = None;
+        for content in [
+            None,
+            Some(b"damaged recovery".to_vec()),
+            Some(serde_json::to_vec(&replaced).unwrap()),
+        ] {
+            match &content {
+                Some(bytes) => fs::write(&path, bytes).unwrap(),
+                None => fs::remove_file(&path).unwrap(),
+            }
+            let before = registry.0.borrow().clone();
+            assert!(
+                restore_thumbnail_records(
+                    &path,
+                    record.clone(),
+                    &mut registry,
+                    &inspector,
+                    &mut || panic!("記録の異常時に最終削除へ進んではならない")
+                )
+                .is_err()
+            );
+            assert_eq!(*registry.0.borrow(), before);
+            assert_eq!(fs::read(&path).ok(), content);
+            fs::write(&path, &saved).unwrap();
+        }
         let mut final_removals = 0;
         assert!(
             restore_thumbnail_records(&path, record, &mut registry, &inspector, &mut || {
