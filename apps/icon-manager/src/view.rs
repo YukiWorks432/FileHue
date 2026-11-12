@@ -29,6 +29,25 @@ impl Manager {
                 }
             }))
     }
+    fn screen_root(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+        let colors = cx.theme().colors;
+        self.navigation_root(cx)
+            .size_full()
+            .bg(colors.background)
+            .text_color(colors.foreground)
+    }
+    fn standard_root(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+        self.screen_root(cx)
+            .track_focus(&self.focus)
+            .tab_stop(false)
+            .flex()
+            .flex_col()
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                if event.keystroke.key == "escape" {
+                    this.navigate_back(window, cx);
+                }
+            }))
+    }
     fn navigate_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.operation.busy() {
             return;
@@ -475,50 +494,22 @@ impl Manager {
 
 impl Render for Manager {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = cx.theme().colors;
         if self.thumbnails.open {
             return self
-                .navigation_root(cx)
-                .track_focus(&self.focus)
-                .tab_stop(false)
-                .size_full()
-                .bg(colors.background)
-                .text_color(colors.foreground)
-                .flex()
-                .flex_col()
-                .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                    if event.keystroke.key == "escape" {
-                        this.navigate_back(window, cx);
-                    }
-                }))
+                .standard_root(cx)
                 .child(self.header(cx))
                 .child(self.thumbnail_panel(cx))
                 .child(self.footer(cx));
         }
         if self.about.open {
             return self
-                .navigation_root(cx)
-                .track_focus(&self.focus)
-                .tab_stop(false)
-                .size_full()
-                .bg(colors.background)
-                .text_color(colors.foreground)
-                .flex()
-                .flex_col()
-                .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                    if event.keystroke.key == "escape" {
-                        this.navigate_back(window, cx);
-                    }
-                }))
+                .standard_root(cx)
                 .child(self.header(cx))
                 .child(self.about_panel(cx));
         }
         if self.protection.open {
             return self
-                .navigation_root(cx)
-                .size_full()
-                .bg(colors.background)
-                .text_color(colors.foreground)
+                .screen_root(cx)
                 .flex()
                 .flex_col()
                 .child(self.protection_panel(window, cx))
@@ -527,20 +518,10 @@ impl Render for Manager {
                 });
         }
         if let Some(panel) = self.recovery_panel(cx) {
-            return self
-                .navigation_root(cx)
-                .size_full()
-                .bg(colors.background)
-                .text_color(colors.foreground)
-                .child(panel);
+            return self.screen_root(cx).child(panel);
         }
         if let Some(panel) = self.target_panel(window, cx) {
-            return self
-                .navigation_root(cx)
-                .size_full()
-                .bg(colors.background)
-                .text_color(colors.foreground)
-                .child(panel);
+            return self.screen_root(cx).child(panel);
         }
         let body = div().p_4().child(if self.browsing {
             self.catalog(cx)
@@ -559,19 +540,7 @@ impl Render for Manager {
             .child(body);
         #[cfg(feature = "test-support")]
         let scroll = scroll.test_support();
-        self.navigation_root(cx)
-            .track_focus(&self.focus)
-            .tab_stop(false)
-            .size_full()
-            .bg(colors.background)
-            .text_color(colors.foreground)
-            .flex()
-            .flex_col()
-            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                if event.keystroke.key == "escape" {
-                    this.navigate_back(window, cx);
-                }
-            }))
+        self.standard_root(cx)
             .child(self.header(cx))
             .child(self.registration(cx))
             .child(self.toolbar(cx))
