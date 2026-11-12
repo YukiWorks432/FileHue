@@ -30,6 +30,22 @@ use windows::{
 static OBJECTS: AtomicUsize = AtomicUsize::new(0);
 static LOCKS: AtomicUsize = AtomicUsize::new(0);
 
+// WinRTが完了通知を保持している間は、通知用のCOM実装もDLL内に残す。
+pub(crate) struct PendingCallback;
+
+impl PendingCallback {
+    pub(crate) fn new() -> Self {
+        OBJECTS.fetch_add(1, Ordering::Relaxed);
+        Self
+    }
+}
+
+impl Drop for PendingCallback {
+    fn drop(&mut self) {
+        OBJECTS.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
 #[implement(IInitializeWithStream, IThumbnailProvider)]
 struct Provider {
     format: Format,
@@ -105,6 +121,7 @@ impl IThumbnailProvider_Impl for Provider_Impl {
 }
 
 fn render(format: Format, input: IStream, size: u32) -> Result<raster::Pixels> {
+    unsafe { input.Seek(0, STREAM_SEEK_SET, None)? };
     match format {
         Format::Psd | Format::Psb => {
             let mut stream = StreamReader::new(input);

@@ -1,5 +1,6 @@
 //! Shellの入力ストリームからPDF先頭ページを描画する。
 
+use crate::provider::PendingCallback;
 use std::sync::{Arc, mpsc};
 use windows::{
     Data::Pdf::{PdfDocument, PdfPageRenderOptions},
@@ -14,6 +15,7 @@ use windows::{
     },
     core::{Error, Result},
 };
+use windows_future::{AsyncActionCompletedHandler, AsyncOperationCompletedHandler};
 
 /// 呼び出し元はWindows Runtimeを初期化し、完了までストリームを保持する。
 /// 描画サイズはDIPで指定され、出力ピクセル数は表示倍率によって変わる。
@@ -25,7 +27,9 @@ pub fn render_first_page(input: &IStream, max_side: u32) -> Result<InMemoryRando
     let stream: IRandomAccessStream =
         unsafe { CreateRandomAccessStreamOverStream(input, BSOS_DEFAULT)? };
     let load = PdfDocument::LoadFromStreamAsync(&stream)?;
-    let document = match wait(|callback| load.when(callback)) {
+    let document = match wait(10_000, |callback, lease| {
+        load.SetCompleted(&document_handler(callback, lease))
+    }) {
         Ok(document) => document,
         Err(error) => {
             let _ = load.Cancel();
@@ -50,13 +54,37 @@ pub fn render_first_page(input: &IStream, max_side: u32) -> Result<InMemoryRando
     options.SetDestinationHeight(((size.Height * scale).round() as u32).max(1))?;
     let output = InMemoryRandomAccessStream::new()?;
     let rendering = page.RenderWithOptionsToStreamAsync(&output, &options)?;
-    if let Err(error) = wait(|callback| rendering.when(callback)) {
+    if let Err(error) = wait(10_000, |callback, lease| {
+        rendering.SetCompleted(&action_handler(callback, lease))
+    }) {
         let _ = rendering.Cancel();
         return Err(error);
     }
     page.Close()?;
     output.Seek(0)?;
     Ok(output)
+}
+
+fn document_handler(
+    callback: Box<dyn Fn(Result<PdfDocument>) + Send>,
+    lease: PendingCallback,
+) -> AsyncOperationCompletedHandler<PdfDocument> {
+    AsyncOperationCompletedHandler::new(move |operation, _| {
+        let _lease = &lease;
+        callback(operation.ok().and_then(|operation| operation.GetResults()));
+        Ok(())
+    })
+}
+
+fn action_handler(
+    callback: Box<dyn Fn(Result<()>) + Send>,
+    lease: PendingCallback,
+) -> AsyncActionCompletedHandler {
+    AsyncActionCompletedHandler::new(move |operation, _| {
+        let _lease = &lease;
+        callback(operation.ok().and_then(|operation| operation.GetResults()));
+        Ok(())
+    })
 }
 
 struct CompletionEvent(HANDLE);
@@ -72,20 +100,76 @@ impl Drop for CompletionEvent {
 }
 
 fn wait<T: Send + 'static>(
-    register: impl FnOnce(Box<dyn FnOnce(Result<T>) + Send>) -> Result<()>,
+    timeout_ms: u32,
+    register: impl FnOnce(Box<dyn Fn(Result<T>) + Send>, PendingCallback) -> Result<()>,
 ) -> Result<T> {
     let event = Arc::new(CompletionEvent(unsafe {
         CreateEventW(None, false, false, None)?
     }));
     let signal = event.clone();
     let (sender, receiver) = mpsc::sync_channel(1);
-    register(Box::new(move |result| {
-        let _ = sender.send(result);
-        let _ = unsafe { SetEvent(signal.0) };
-    }))?;
+    register(
+        Box::new(move |result| {
+            let _ = sender.try_send(result);
+            let _ = unsafe { SetEvent(signal.0) };
+        }),
+        PendingCallback::new(),
+    )?;
     // STAではCOM呼び出しを処理しながら待ち、非同期処理の完了を妨げない。
-    unsafe { CoWaitForMultipleHandles(0, 10_000, &[event.0])? };
+    unsafe { CoWaitForMultipleHandles(0, timeout_ms, &[event.0])? };
     receiver
         .try_recv()
         .map_err(|_| Error::from_hresult(E_FAIL))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::provider::DllCanUnloadNow;
+    use std::cell::RefCell;
+    use windows::Win32::{
+        Foundation::{S_FALSE, S_OK},
+        System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize},
+    };
+    use windows_future::AsyncStatus;
+
+    #[test]
+    fn timed_out_completion_keeps_dll_loaded_until_handler_is_released() {
+        unsafe { CoInitializeEx(None, COINIT_MULTITHREADED).ok().unwrap() };
+        let retained = RefCell::new(None);
+        let result: Result<()> = wait(1, |callback, lease| {
+            let handler = action_handler(callback, lease);
+            *retained.borrow_mut() = Some(handler);
+            Ok(())
+        });
+        assert!(result.is_err());
+        assert_eq!(DllCanUnloadNow(), S_FALSE);
+        retained
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .Invoke(None, AsyncStatus::Canceled)
+            .unwrap();
+        assert_eq!(DllCanUnloadNow(), S_FALSE);
+        drop(retained.into_inner());
+        assert_eq!(DllCanUnloadNow(), S_OK);
+
+        let retained = RefCell::new(None);
+        let result: Result<PdfDocument> = wait(1, |callback, lease| {
+            *retained.borrow_mut() = Some(document_handler(callback, lease));
+            Ok(())
+        });
+        assert!(result.is_err());
+        assert_eq!(DllCanUnloadNow(), S_FALSE);
+        retained
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .Invoke(None, AsyncStatus::Canceled)
+            .unwrap();
+        assert_eq!(DllCanUnloadNow(), S_FALSE);
+        drop(retained.into_inner());
+        assert_eq!(DllCanUnloadNow(), S_OK);
+        unsafe { CoUninitialize() };
+    }
 }

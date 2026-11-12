@@ -63,6 +63,12 @@ fn provider_com_child() -> Result<()> {
         let svg = br##"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1" fill="#ff0000" fill-opacity="0.5"/></svg>"##;
         let bitmap = provider_bitmap(file_icons_thumbnail_core::format::Format::Svg, svg)?;
         verify_bitmap(bitmap, 1, 1, &[0, 0, 128, 128])?;
+        let svg = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><rect width="16" height="8" fill="#ff0000" fill-opacity="0.5"/></svg>"##;
+        let handles =
+            provider_bitmaps(file_icons_thumbnail_core::format::Format::Svg, svg, &[8, 4])?;
+        for (handle, width, height) in [(handles[0], 8, 4), (handles[1], 4, 2)] {
+            verify_bitmap(handle, width, height, &[0, 0, 128, 128])?;
+        }
         for (format, version) in [
             (file_icons_thumbnail_core::format::Format::Psd, 1u16),
             (file_icons_thumbnail_core::format::Format::Psb, 2u16),
@@ -209,6 +215,14 @@ fn provider_bitmap(
     format: file_icons_thumbnail_core::format::Format,
     data: &[u8],
 ) -> Result<HBITMAP> {
+    Ok(provider_bitmaps(format, data, &[256])?.remove(0))
+}
+
+fn provider_bitmaps(
+    format: file_icons_thumbnail_core::format::Format,
+    data: &[u8],
+    sizes: &[u32],
+) -> Result<Vec<HBITMAP>> {
     struct Library(HMODULE);
     impl Drop for Library {
         fn drop(&mut self) {
@@ -240,15 +254,19 @@ fn provider_bitmap(
     assert!(unsafe { provider.Initialize(&input, 0) }.is_err());
     drop(input);
     let thumbnail: IThumbnailProvider = provider.cast()?;
-    let mut handle = HBITMAP::default();
-    let mut alpha = WTS_ALPHATYPE::default();
-    unsafe { thumbnail.GetThumbnail(256, &mut handle, &mut alpha)? };
-    assert_eq!(alpha, WTSAT_ARGB);
+    let mut handles = Vec::new();
+    for size in sizes {
+        let mut handle = HBITMAP::default();
+        let mut alpha = WTS_ALPHATYPE::default();
+        unsafe { thumbnail.GetThumbnail(*size, &mut handle, &mut alpha)? };
+        assert_eq!(alpha, WTSAT_ARGB);
+        handles.push(handle);
+    }
     drop(thumbnail);
     drop(provider);
     drop(factory);
     assert_eq!(unsafe { unload() }, S_OK);
-    Ok(handle)
+    Ok(handles)
 }
 
 fn verify_bitmap(handle: HBITMAP, width: i32, height: i32, first_pixel: &[u8]) -> Result<()> {

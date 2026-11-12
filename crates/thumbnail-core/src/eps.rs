@@ -44,7 +44,7 @@ pub fn extract_epsi<R: Read + Seek>(
     reader.seek(SeekFrom::Start(start))?;
     let mut input = BufReader::new(reader.take(section_length.min(MAX_TEXT_BYTES + 1)));
     let mut line = Vec::new();
-    if input.read_until(b'\n', &mut line)? == 0
+    if read_dsc_line(&mut input, &mut line)? == 0
         || !line.starts_with(b"%!PS-Adobe-")
         || !line.windows(5).any(|part| part == b"EPSF-")
     {
@@ -53,8 +53,7 @@ pub fn extract_epsi<R: Read + Seek>(
     let mut bounds: Option<(f64, f64)> = None;
     let mut high_resolution_bounds = false;
     loop {
-        line.clear();
-        if input.read_until(b'\n', &mut line)? == 0 {
+        if read_dsc_line(&mut input, &mut line)? == 0 {
             return if section_length > MAX_TEXT_BYTES && input.get_ref().limit() == 0 {
                 Err(Error::Limit)
             } else {
@@ -116,12 +115,10 @@ pub fn extract_epsi<R: Read + Seek>(
             let mut packed = Vec::with_capacity(expected);
             let mut high = None;
             for _ in 0..*lines {
-                line.clear();
-                if input.read_until(b'\n', &mut line)? == 0 {
+                if read_dsc_line(&mut input, &mut line)? == 0 {
                     return Err(Error::Invalid);
                 }
-                let content = line.strip_suffix(b"\n").unwrap_or(&line);
-                let content = content.strip_suffix(b"\r").unwrap_or(content);
+                let content = line.as_slice();
                 if content.len() > 255 || !content.starts_with(b"%") || content.starts_with(b"%%") {
                     return Err(Error::Invalid);
                 }
@@ -144,10 +141,9 @@ pub fn extract_epsi<R: Read + Seek>(
                     }
                 }
             }
-            line.clear();
             if high.is_some()
                 || packed.len() != expected
-                || input.read_until(b'\n', &mut line)? == 0
+                || read_dsc_line(&mut input, &mut line)? == 0
                 || line.trim_ascii() != b"%%EndPreview"
             {
                 return Err(Error::Invalid);
@@ -179,6 +175,29 @@ pub fn extract_epsi<R: Read + Seek>(
                 rgba,
             }));
         }
+    }
+}
+
+// DSCの改行はCR、LF、CRLFのいずれも許され、CRLFはバッファ境界をまたぐ。
+fn read_dsc_line(input: &mut impl BufRead, line: &mut Vec<u8>) -> std::io::Result<usize> {
+    line.clear();
+    loop {
+        let bytes = input.fill_buf()?;
+        if bytes.is_empty() {
+            return Ok(line.len());
+        }
+        if let Some(end) = bytes.iter().position(|byte| matches!(byte, b'\r' | b'\n')) {
+            let delimiter = bytes[end];
+            line.extend_from_slice(&bytes[..end]);
+            input.consume(end + 1);
+            if delimiter == b'\r' && input.fill_buf()?.first() == Some(&b'\n') {
+                input.consume(1);
+            }
+            return Ok(line.len() + 1);
+        }
+        let length = bytes.len();
+        line.extend_from_slice(bytes);
+        input.consume(length);
     }
 }
 
@@ -258,6 +277,37 @@ mod tests {
                 255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255
             ]
         );
+    }
+
+    #[test]
+    fn epsi_accepts_all_dsc_line_endings() {
+        for separator in ["\n", "\r", "\r\n"] {
+            let document = [
+                "%!PS-Adobe-3.0 EPSF-3.0",
+                "%%BeginPreview: 2 2 1 2",
+                "%80",
+                "%40",
+                "%%EndPreview",
+                "",
+            ]
+            .join(separator);
+            let image = extract_epsi(&mut Cursor::new(document), 2)
+                .unwrap()
+                .unwrap();
+            assert_eq!((image.width, image.height), (2, 2));
+            assert_eq!(
+                image.rgba,
+                [
+                    255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255
+                ]
+            );
+        }
+        let mut input = BufReader::with_capacity(1, Cursor::new(b"a\r\nb\r\nc"));
+        let mut line = Vec::new();
+        for expected in [b"a", b"b", b"c"] {
+            assert_ne!(read_dsc_line(&mut input, &mut line).unwrap(), 0);
+            assert_eq!(line, expected);
+        }
     }
 
     #[test]
