@@ -25,12 +25,23 @@ fn restore_thumbnail_records(
      ),
     before_final_removal: &mut impl FnMut() -> Result<()>,
 ) -> Result<()> {
+    let mut failures = Vec::new();
     if record.transition.is_some() {
-        record = record.finish_transition(path, registry, inspector)?;
+        match record.finish_transition(path, registry, inspector) {
+            Ok(finished) => record = finished,
+            Err(error) => failures.push(format!("transition: {error:#}")),
+        }
     }
     let mut index = 0;
-    let mut failures = Vec::new();
     while index < record.groups.len() {
+        if record
+            .transition
+            .as_ref()
+            .is_some_and(|pending| pending.group_index == index)
+        {
+            index += 1;
+            continue;
+        }
         if let Err(error) = record.restore_checked_group(index, registry, inspector) {
             failures.push(format!("group {index}: {error:#}"));
             index += 1;
@@ -1140,6 +1151,111 @@ mod thumbnail_tests {
         assert!(!path.exists());
         assert_eq!(inspector.provider(".svg").unwrap(), None);
         assert_eq!(fs::read(damaged_settings).unwrap(), b"damaged preferences");
+    }
+
+    #[test]
+    fn pending_shared_conflict_does_not_block_independent_restoration() {
+        // 中断組の前後を解除し、保存する組番号と再試行時の復元も検証する。
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("thumbnail-recovery.json");
+        let mut registry = Memory::default();
+        let inspector = Inspector(registry.0.clone());
+        let module = Path::new(r"C:\FileHue\file_icons_thumbnail_shell.dll");
+        let parent =
+            "Software\\Classes\\Example.Vector\\shellex\\{e357fccd-a995-4576-b01f-234630154e96}";
+        let original = Value {
+            kind: 1,
+            bytes: "{11111111-2222-4333-8444-555555555555}"
+                .encode_utf16()
+                .chain(Some(0))
+                .flat_map(u16::to_le_bytes)
+                .collect(),
+        };
+        registry.write(parent, "", Some(&original)).unwrap();
+        let mut groups = Vec::new();
+        for format in [Format::Svg, Format::Ai, Format::Pdf] {
+            let mut group = if format == Format::Ai {
+                thumbnails::plan_shared_group(
+                    &registry,
+                    "Example.Vector",
+                    [".ai".into(), ".ait".into(), ".eps".into()]
+                        .into_iter()
+                        .collect(),
+                    &[".ai".into(), ".eps".into()].into_iter().collect(),
+                )
+                .unwrap()
+            } else {
+                thumbnails::plan_extension_group(&registry, format).unwrap()
+            };
+            group.add_provider(&registry, format, module).unwrap();
+            if format == Format::Ai {
+                group.add_provider(&registry, Format::Eps, module).unwrap();
+            }
+            group.capture_dependencies(&inspector).unwrap();
+            group.capture_providers(&inspector).unwrap();
+            group.capture_created_keys(&registry).unwrap();
+            groups.push(group);
+        }
+        let mut record = Recovery {
+            format_version: 1,
+            groups,
+            transition: None,
+        };
+        record.apply_new(&path, &mut registry, &inspector).unwrap();
+        let ai = record.groups[1]
+            .changes
+            .iter()
+            .find(|c| c.key.contains(".ai\\shellex"))
+            .unwrap();
+        record.transition = Some(thumbnails::Transition {
+            group_index: 1,
+            extension: ".ai".into(),
+            from: ai.after.clone(),
+            to: original.clone(),
+        });
+        fs::write(&path, serde_json::to_vec(&record).unwrap()).unwrap();
+        let ait = "Software\\Classes\\.ait\\shellex\\{e357fccd-a995-4576-b01f-234630154e96}";
+        let external = Value {
+            kind: 3,
+            bytes: vec![7, 9],
+        };
+        registry.write(ait, "", Some(&external)).unwrap();
+        let shared_before: BTreeMap<_, _> = record.groups[1]
+            .changes
+            .iter()
+            .map(|c| {
+                (
+                    (c.key.clone(), c.name.clone()),
+                    registry.read(&c.key, &c.name).unwrap(),
+                )
+            })
+            .collect();
+        let mut final_removals = 0;
+        assert!(
+            restore_thumbnail_records(&path, record, &mut registry, &inspector, &mut || {
+                final_removals += 1;
+                Ok(())
+            })
+            .is_err()
+        );
+        assert_eq!(inspector.provider(".svg").unwrap(), None);
+        assert_eq!(inspector.provider(".pdf").unwrap(), None);
+        assert_eq!(final_removals, 0);
+        let pending = Recovery::load(&path).unwrap().unwrap();
+        assert_eq!(pending.groups.len(), 1);
+        assert_eq!(pending.transition.as_ref().unwrap().group_index, 0);
+        for ((key, name), value) in shared_before {
+            assert_eq!(registry.read(&key, &name).unwrap(), value);
+        }
+        registry.write(ait, "", Some(&original)).unwrap();
+        restore_thumbnail_records(&path, pending, &mut registry, &inspector, &mut || {
+            final_removals += 1;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(final_removals, 1);
+        assert!(!path.exists());
+        assert_eq!(registry.read(parent, "").unwrap(), Some(original));
     }
 
     #[test]

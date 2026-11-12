@@ -23,3 +23,5 @@ When restoring an extension-only registration, an added user-level extension val
 When the last group is disabled, the original registration is restored, the empty selection is saved, and only then is the recovery record removed. A save or removal failure keeps the record for retry. If a saved selection exists but its recovery record is missing, the previous registration cannot be inferred, so new application and clearing the settings are stopped.
 
 Explorer display, compatibility with existing handlers, cloud file retrieval and speed vary by environment and file. The app does not guarantee that every file contains a preview or that a particular display speed will be achieved.
+
+If an interrupted shared-setting change conflicts, its group and pending transition are preserved while independent groups are restored first. Restoration can be retried from the same record after resolving the conflict.

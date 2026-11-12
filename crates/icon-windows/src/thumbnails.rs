@@ -972,8 +972,10 @@ impl Recovery {
     ) -> Result<()> {
         self.validate()?;
         ensure!(
-            self.transition.is_none(),
-            "finish thumbnail transition before restoring"
+            self.transition
+                .as_ref()
+                .is_none_or(|pending| pending.group_index != index),
+            "finish thumbnail transition before restoring this group"
         );
         let group = self.groups.get(index).context("thumbnail group missing")?;
         check_restore_dependencies(group, inspector)?;
@@ -990,8 +992,10 @@ impl Recovery {
     ) -> Result<()> {
         self.validate()?;
         ensure!(
-            self.transition.is_none(),
-            "finish thumbnail transition before restoring"
+            self.transition
+                .as_ref()
+                .is_none_or(|pending| pending.group_index != index),
+            "finish thumbnail transition before restoring this group"
         );
         let group = self.groups.get(index).context("thumbnail group missing")?;
         ensure!(group.keys_captured, "thumbnail keys not recorded");
@@ -1069,8 +1073,10 @@ impl Recovery {
     ) -> Result<Option<Self>> {
         self.validate()?;
         ensure!(
-            self.transition.is_none(),
-            "finish thumbnail transition before removing recovery"
+            self.transition
+                .as_ref()
+                .is_none_or(|pending| pending.group_index != index),
+            "finish thumbnail transition before removing this group"
         );
         let original = read(path)?.context("thumbnail recovery missing")?;
         let stored: Self =
@@ -1097,6 +1103,11 @@ impl Recovery {
         } else {
             let mut remaining = self.clone();
             remaining.groups.remove(index);
+            if let Some(pending) = &mut remaining.transition
+                && pending.group_index > index
+            {
+                pending.group_index -= 1;
+            }
             remaining.replace(path, self)?;
             Ok(Some(remaining))
         }
