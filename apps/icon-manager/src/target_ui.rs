@@ -235,8 +235,8 @@ impl Manager {
     #[cfg(test)]
     pub(crate) fn prepare_guidance_visual(&mut self, page: &str) {
         self.prepare_auxiliary_visual(page == "update" || page == "planned");
-        self.protection.draft = self.settings.preserve_existing_icons;
-        self.protection.rules = self.settings.icon_protection_rules.clone();
+        self.protection.draft.enabled = self.settings.preserve_existing_icons;
+        self.protection.draft.rules = self.settings.icon_protection_rules.clone();
         self.targets.copy_changes = (page == "update").then(|| self.settings.packs[1].id.clone());
         if page == "planned" {
             self.targets.auxiliary = Some(Auxiliary::Details);
@@ -518,7 +518,7 @@ impl Manager {
             .flex()
             .flex_col();
         panel = panel.child(self.target_tools(rows, cx));
-        if self.protection.loading {
+        if self.protection.inspection.loading {
             panel = panel.child(
                 div()
                     .p_3()
@@ -528,7 +528,7 @@ impl Manager {
                     .child(Spinner::new().small())
                     .child(self.text("保護状態を確認中…", "Checking icon protection…")),
             );
-        } else if let Some(error) = &self.protection.error {
+        } else if let Some(error) = &self.protection.inspection.error {
             panel = panel.child(
                 div()
                     .p_3()
@@ -808,7 +808,7 @@ impl Manager {
     }
     fn target_footer(&self, id: String, dirty: usize, cx: &mut Context<Self>) -> AnyElement {
         let blocked = self.operation.busy() || !self.valid;
-        let pending_protection = self.protection.dirty(&self.settings);
+        let pending_protection = self.protection.draft.dirty(&self.settings);
         let mut footer = div()
             .flex_shrink_0()
             .flex()

@@ -350,8 +350,8 @@ impl Manager {
                     }
                 }
                 if kind == Kind::SaveProtection && !this.operation.failed() {
-                    this.protection.draft = this.settings.preserve_existing_icons;
-                    this.protection.rules = this.settings.icon_protection_rules.clone();
+                    this.protection.draft.enabled = this.settings.preserve_existing_icons;
+                    this.protection.draft.rules = this.settings.icon_protection_rules.clone();
                     this.inspect_protection(cx);
                 }
                 cx.notify();

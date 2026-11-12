@@ -48,35 +48,39 @@ fn recommended_rules(
 impl Manager {
     pub(super) fn apply_recommended_protection(&mut self, cx: &mut Context<Self>) {
         if self.operation.busy()
-            || self.protection.loading
+            || self.protection.inspection.loading
             || !self.valid
-            || self.protection.error.is_some()
+            || self.protection.inspection.error.is_some()
         {
             return;
         }
         self.pin_visible_protection_rows();
-        let rules = recommended_rules(self.protection.rules.clone(), &self.protection.sources);
+        let rules = recommended_rules(
+            self.protection.draft.rules.clone(),
+            &self.protection.inspection.sources,
+        );
         let changes = super::changes::compare(
-            &self.protection.sources,
-            self.protection.draft,
-            &self.protection.rules,
+            &self.protection.inspection.sources,
+            self.protection.draft.enabled,
+            &self.protection.draft.rules,
             true,
             &rules,
         );
         let (released, protected, choices) = changes.counts();
-        self.protection.recommendation_changes = Some(changes);
-        self.protection.basis_picker = None;
-        let unchanged = self.protection.draft && rules == self.protection.rules;
+        self.protection.presentation.recommendation_changes = Some(changes);
+        self.protection.presentation.basis_picker = None;
+        let unchanged = self.protection.draft.enabled && rules == self.protection.draft.rules;
         let review = self
             .protection
+            .inspection
             .sources
             .iter()
             .filter(|row| row.needs_review)
             .count();
-        self.protection.draft = true;
-        self.protection.rules = rules;
+        self.protection.draft.enabled = true;
+        self.protection.draft.rules = rules;
         self.refresh_protection_policy(cx);
-        self.protection.recommendation_notice = Some(if unchanged {
+        self.protection.presentation.recommendation_notice = Some(if unchanged {
             self.text(
                 "おすすめ設定になっています。",
                 "Recommended settings are already in place.",

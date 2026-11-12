@@ -96,7 +96,8 @@ impl Manager {
             .small()
             .icon(IconName::ArrowLeft)
             .label(
-                if self.screen == Screen::Protection && self.protection.dirty(&self.settings) {
+                if self.screen == Screen::Protection && self.protection.draft.dirty(&self.settings)
+                {
                     self.text("変更を破棄して戻る", "Discard and return")
                 } else {
                     self.text("戻る", "Back")

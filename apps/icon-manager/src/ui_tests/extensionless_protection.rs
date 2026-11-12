@@ -82,13 +82,19 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
     let provider = manager.update(cx, |this, _| {
         let provider = this
             .protection
+            .inspection
             .source("mts")
             .unwrap()
             .provider_id
             .clone()
             .unwrap();
         assert_eq!(
-            this.protection.source("").unwrap().provider_id.as_ref(),
+            this.protection
+                .inspection
+                .source("")
+                .unwrap()
+                .provider_id
+                .as_ref(),
             Some(&provider)
         );
         provider
@@ -125,7 +131,7 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("元の表示")
         );
-        let inspection = manager.read(cx).protection.inspection;
+        let inspection = manager.read(cx).protection.inspection.revision;
         w.click("pack-icon-", cx);
         w.render_frame(cx);
         assert!(
@@ -146,8 +152,16 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("元の表示")
         );
-        assert!(manager.read(cx).protection.source("mts").unwrap().protect);
-        assert_eq!(manager.read(cx).protection.inspection, inspection);
+        assert!(
+            manager
+                .read(cx)
+                .protection
+                .inspection
+                .source("mts")
+                .unwrap()
+                .protect
+        );
+        assert_eq!(manager.read(cx).protection.inspection.revision, inspection);
         assert!(load().unwrap().icon_protection_rules.extensions.is_empty());
         // 独立した拡張子なしの項目を閉じても、変更一覧から編集に戻ると展開される。
         w.click("provider-toggle-extensionless", cx);
@@ -173,9 +187,10 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
         w.click("provider-toggle-extensionless", cx);
         w.render_frame(cx);
         manager.update(cx, |this, _| {
-            let mut legacy = this.protection.rules.extensions[""].clone();
+            let mut legacy = this.protection.draft.rules.extensions[""].clone();
             legacy.protect = true;
             this.protection
+                .draft
                 .rules
                 .providers
                 .entry(provider.clone())
@@ -192,8 +207,16 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
             w.find(format!("provider-default-{provider}")).checked(),
             Some(true)
         );
-        assert!(manager.read(cx).protection.rules.providers[&provider][""].protect);
-        assert!(!manager.read(cx).protection.source("").unwrap().protect);
+        assert!(manager.read(cx).protection.draft.rules.providers[&provider][""].protect);
+        assert!(
+            !manager
+                .read(cx)
+                .protection
+                .inspection
+                .source("")
+                .unwrap()
+                .protect
+        );
         super::protection_sources::reveal(w, format!("provider-toggle-{provider}"), cx);
         w.click(format!("provider-toggle-{provider}"), cx);
         w.render_frame(cx);
@@ -314,7 +337,7 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
         );
         // 識別子の辞書順では先になるアプリと並べても、拡張子なしを先頭へ出す。
         manager.update(cx, |this, cx| {
-            let mut sources = this.protection.sources.clone();
+            let mut sources = this.protection.inspection.sources.clone();
             for source in &mut sources {
                 if !source.registration.extension.is_empty() {
                     source.provider_id = Some("application:order-fixture".into());

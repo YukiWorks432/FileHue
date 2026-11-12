@@ -42,7 +42,7 @@ impl Manager {
             let elsewhere = all
                 .iter()
                 .any(|t| matches_query(t, &query, &search, &categories));
-            let text = if self.protection.loading && self.targets.filter == 5 {
+            let text = if self.protection.inspection.loading && self.targets.filter == 5 {
                 self.text(
                     "保護状態を確認中です。完了すると対象を表示します。",
                     "Checking protection. Matching targets will appear when inspection completes.",
@@ -178,6 +178,7 @@ impl Manager {
             source
                 .and_then(|source| {
                     self.protection
+                        .inspection
                         .previews
                         .as_ref()
                         .and_then(|previews| previews.paths.get(&source.registration.extension))
@@ -185,7 +186,7 @@ impl Manager {
                 .cloned()
         };
         let icon_missing = icon.is_none();
-        let icon_tip = if icon_missing && self.protection.previews_loading {
+        let icon_tip = if icon_missing && self.protection.inspection.previews_loading {
             self.text("アイコンの見本を読み込み中…", "Loading icon previews…")
         } else if icon_missing {
             self.text("見本を取得できません", "Icon preview unavailable")
@@ -237,7 +238,7 @@ impl Manager {
             .justify_center();
         if let Some(icon) = icon {
             icon_slot = icon_slot.child(img(icon).size_6());
-        } else if self.protection.previews_loading {
+        } else if self.protection.inspection.previews_loading {
             icon_slot = icon_slot.child(Spinner::new().small());
         } else {
             icon_slot = icon_slot.child(
@@ -358,7 +359,9 @@ impl Manager {
                 .selected(expanded)
                 .toggled(expanded)
                 .disabled_elevated(
-                    blocked || self.protection.loading || self.protection.error.is_some(),
+                    blocked
+                        || self.protection.inspection.loading
+                        || self.protection.inspection.error.is_some(),
                 )
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.targets.protection_target = if expanded { None } else { Some(id.clone()) };

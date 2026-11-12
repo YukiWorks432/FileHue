@@ -227,14 +227,14 @@ fn gui_performance_in_child(cx: &mut TestAppContext) {
         let id = this.settings.packs[0].id.clone();
         this.targets
             .performance_seed(id, &this.settings.packs[0].theme);
-        this.protection.sources = sources.clone();
-        this.protection.loading = false;
+        this.protection.inspection.sources = sources.clone();
+        this.protection.inspection.loading = false;
         this.refresh_protection_policy(cx);
     });
     cases.push(measure("inspection_completion_400", || {
         manager.update(cx, |this, _| {
             this.accept_protection_sources(sources.clone());
-            assert_eq!(this.protection.sources.len(), sources.len());
+            assert_eq!(this.protection.inspection.sources.len(), sources.len());
         });
         sources.len() as u64
     }));

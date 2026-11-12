@@ -55,8 +55,8 @@ impl Manager {
                 let result = selection.resolve(&pack.theme, &typed);
                 let protection = self.target_preview_protected(&typed, key == "target-current");
                 let protected = protection == Some(true);
-                let inspected = !self.protection.loading
-                    && self.protection.error.is_none()
+                let inspected = !self.protection.inspection.loading
+                    && self.protection.inspection.error.is_none()
                     && protection.is_some();
                 let use_pack = result.is_some() && !protected && inspected;
                 let reason = if file_icons_core::selection::protected_path(&typed) {
@@ -98,19 +98,22 @@ impl Manager {
                     .role(Role::Status)
                     .aria_label(text.clone())
                     .child(text);
-                let row = if let Some((icon, _)) = result.filter(|_| use_pack) {
-                    row.child(img(icon.to_path_buf()).size_8())
-                } else {
-                    row.children(
-                        self.target_source(&typed)
-                            .and_then(|source| {
-                                self.protection.previews.as_ref().and_then(|previews| {
-                                    previews.paths.get(&source.registration.extension)
+                let row =
+                    if let Some((icon, _)) = result.filter(|_| use_pack) {
+                        row.child(img(icon.to_path_buf()).size_8())
+                    } else {
+                        row.children(
+                            self.target_source(&typed)
+                                .and_then(|source| {
+                                    self.protection.inspection.previews.as_ref().and_then(
+                                        |previews| {
+                                            previews.paths.get(&source.registration.extension)
+                                        },
+                                    )
                                 })
-                            })
-                            .map(|icon| img(icon.clone()).size_8()),
-                    )
-                };
+                                .map(|icon| img(icon.clone()).size_8()),
+                        )
+                    };
                 #[cfg(feature = "test-support")]
                 let row = row.test_support();
                 detail = detail.child(row);

@@ -206,7 +206,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             "比較画像の列幅を揃えること"
         );
         // 同じクラスを共有しても、片方の個別指定はほかの種類へ影響しない。
-        let inspection = manager.read(cx).protection.inspection;
+        let inspection = manager.read(cx).protection.inspection.revision;
         w.click("pack-icon-wfi-a", cx);
         w.render_frame(cx);
         assert!(w.find("protection-row-wfi-a").visible());
@@ -228,18 +228,27 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("元の表示")
         );
-        assert!(!manager.read(cx).protection.source("wfi-a").unwrap().protect);
+        assert!(
+            !manager
+                .read(cx)
+                .protection
+                .inspection
+                .source("wfi-a")
+                .unwrap()
+                .protect
+        );
         assert!(
             manager
                 .read(cx)
                 .protection
+                .inspection
                 .source("wfi-aa")
                 .unwrap()
                 .protect
         );
         assert_eq!(w.find("pack-icon-wfi-a").checked(), Some(true));
         assert_eq!(w.find("default-icon-wfi-aa").checked(), Some(true));
-        assert_eq!(manager.read(cx).protection.inspection, inspection);
+        assert_eq!(manager.read(cx).protection.inspection.revision, inspection);
         assert!(load().unwrap().icon_protection_rules.extensions.is_empty());
         w.click("default-icon-wfi-a", cx);
         w.scroll(
@@ -274,7 +283,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
         w.click("pack-icon-wfi-b", cx);
         assert!(load().unwrap().icon_protection_rules.extensions.is_empty());
         // 表示と詳細の切替は下書きや保存値を変更しない。
-        let draft = serde_json::to_value(&manager.read(cx).protection.rules).unwrap();
+        let draft = serde_json::to_value(&manager.read(cx).protection.draft.rules).unwrap();
         w.click("protection-current", cx);
         w.render_frame(cx);
         assert!(w.try_find("original-icon-wfi-a").is_none());
@@ -300,7 +309,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
         );
         w.render_frame(cx);
         assert_eq!(
-            serde_json::to_value(&manager.read(cx).protection.rules).unwrap(),
+            serde_json::to_value(&manager.read(cx).protection.draft.rules).unwrap(),
             draft
         );
         assert!(load().unwrap().icon_protection_rules.providers.is_empty());
@@ -413,6 +422,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             !manager
                 .read(cx)
                 .protection
+                .draft
                 .rules
                 .extensions
                 .contains_key("wfi-a")
@@ -421,6 +431,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             !manager
                 .read(cx)
                 .protection
+                .inspection
                 .sources
                 .iter()
                 .find(|row| row.registration.extension == "wfi-a")
@@ -527,7 +538,15 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
         reveal(w, "protection-saved-wfi-b", cx);
         let label = w.find("protection-saved-wfi-b").label().unwrap().to_owned();
         assert!(label.contains("パックを許可") && label.contains("要確認"));
-        assert!(manager.read(cx).protection.source("wfi-b").unwrap().protect);
+        assert!(
+            manager
+                .read(cx)
+                .protection
+                .inspection
+                .source("wfi-b")
+                .unwrap()
+                .protect
+        );
         assert!(!load().unwrap().icon_protection_rules.extensions["wfi-b"].protect);
     })
     .unwrap();
@@ -561,7 +580,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             w.find(format!("provider-default-{provider}")).checked(),
             Some(true)
         );
-        assert!(manager.read(cx).protection.rules.extensions["wfi-a"].protect);
+        assert!(manager.read(cx).protection.draft.rules.extensions["wfi-a"].protect);
         assert!(
             w.find("default-icon-wfi-a")
                 .label()
@@ -584,16 +603,16 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
                 w.render_frame(cx);
                 let id = format!("provider-{choice}-{provider}");
                 reveal(w, id.clone(), cx);
-                let before = manager.read(cx).protection.rules.clone();
+                let before = manager.read(cx).protection.draft.rules.clone();
                 w.click(id, cx);
                 w.render_frame(cx);
                 if choice == "reset" {
                     assert!(w.find("dialog").visible());
-                    assert_eq!(manager.read(cx).protection.rules, before);
+                    assert_eq!(manager.read(cx).protection.draft.rules, before);
                     w.within("dialog").click("cancel", cx);
                     w.render_frame(cx);
                     assert!(w.try_find("dialog").is_none());
-                    assert_eq!(manager.read(cx).protection.rules, before);
+                    assert_eq!(manager.read(cx).protection.draft.rules, before);
                 } else {
                     assert_eq!(
                         w.find(format!("provider-original-{provider}")).checked(),
@@ -636,7 +655,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
                 w.press("escape", cx);
                 w.render_frame(cx);
                 assert!(w.try_find("dialog").is_none());
-                assert_eq!(manager.read(cx).protection.rules, before);
+                assert_eq!(manager.read(cx).protection.draft.rules, before);
                 assert!(load().unwrap().icon_protection_rules.extensions["wfi-a"].protect);
             })
             .unwrap();
@@ -668,6 +687,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
                     !manager
                         .read(cx)
                         .protection
+                        .draft
                         .rules
                         .extensions
                         .contains_key("wfi-a")
@@ -826,8 +846,8 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.click(format!("provider-pack-{provider}"), cx);
         w.render_frame(cx);
-        assert!(!manager.read(cx).protection.rules.providers[&provider]["wfi-aa"].protect);
-        let draft_before = serde_json::to_value(&manager.read(cx).protection.rules).unwrap();
+        assert!(!manager.read(cx).protection.draft.rules.providers[&provider]["wfi-aa"].protect);
+        let draft_before = serde_json::to_value(&manager.read(cx).protection.draft.rules).unwrap();
         w.click("protection-collapse-all", cx);
         w.render_frame(cx);
         assert!(w.try_find(format!("provider-pack-{provider}")).is_none());
@@ -843,7 +863,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
         reveal(w, "original-icon-wfi-pkg-b", cx);
         assert!(w.find("original-icon-wfi-pkg-b").visible());
         assert_eq!(
-            serde_json::to_value(&manager.read(cx).protection.rules).unwrap(),
+            serde_json::to_value(&manager.read(cx).protection.draft.rules).unwrap(),
             draft_before
         );
     })
@@ -959,7 +979,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
     })
     .unwrap();
     cx.run_until_parked();
-    cx.update(|cx| assert!(manager.read(cx).protection.sources.is_empty()));
+    cx.update(|cx| assert!(manager.read(cx).protection.inspection.sources.is_empty()));
 }
 
 #[test]

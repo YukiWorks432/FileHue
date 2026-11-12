@@ -48,19 +48,22 @@ impl Manager {
                 cx,
             )
         });
-        self.protection.rules = self.settings.icon_protection_rules.clone();
+        self.protection.draft.rules = self.settings.icon_protection_rules.clone();
         if state == "allow" {
-            let source = self.protection.source("mts").unwrap().clone();
-            self.protection.rules.set_extension(&source, Some(false));
+            let source = self.protection.inspection.source("mts").unwrap().clone();
+            self.protection
+                .draft
+                .rules
+                .set_extension(&source, Some(false));
         }
         if state == "fallback"
-            && let Some(previews) = &mut self.protection.previews
+            && let Some(previews) = &mut self.protection.inspection.previews
         {
             previews.paths.remove("mts");
         }
         if state == "pending" {
-            self.protection.previews_loading = true;
-            self.protection.previews = None;
+            self.protection.inspection.previews_loading = true;
+            self.protection.inspection.previews = None;
         }
         self.refresh_protection_policy(cx);
     }
@@ -74,12 +77,12 @@ impl Manager {
         // 左から調べ、最も長い複合拡張子を先に選ぶ。
         name.match_indices('.')
             .filter(|(offset, _)| offset + 1 < name.len())
-            .find_map(|(offset, _)| self.protection.source(&name[offset + 1..]))
+            .find_map(|(offset, _)| self.protection.inspection.source(&name[offset + 1..]))
             .or_else(|| {
                 std::path::Path::new(&name)
                     .extension()
                     .is_none()
-                    .then(|| self.protection.source(""))
+                    .then(|| self.protection.inspection.source(""))
                     .flatten()
             })
     }
@@ -177,11 +180,13 @@ impl Manager {
         };
         Some(
             self.protection
+                .inspection
                 .class_sources(class)
                 .any(|source| source.always_protected)
                 || (class.eq_ignore_ascii_case("Unknown")
                     && self
                         .protection
+                        .inspection
                         .source("")
                         .is_some_and(|source| self.source_protected(source, saved))),
         )
@@ -210,10 +215,10 @@ impl Manager {
         if value.resolve(&pack.theme, &sample).is_none() {
             return Outcome::Unsupported;
         }
-        if self.protection.loading {
+        if self.protection.inspection.loading {
             return Outcome::Checking;
         }
-        if self.protection.error.is_some() || !self.valid {
+        if self.protection.inspection.error.is_some() || !self.valid {
             return Outcome::Unavailable;
         }
         if self.target_icon_protected(&sample, false) {
@@ -262,12 +267,12 @@ impl Manager {
     }
 
     pub(super) fn target_protection_footer(&self, cx: &mut Context<Self>) -> Option<Div> {
-        if !self.protection.dirty(&self.settings) {
+        if !self.protection.draft.dirty(&self.settings) {
             return None;
         }
         let blocked = self.operation.busy()
-            || self.protection.loading
-            || self.protection.error.is_some()
+            || self.protection.inspection.loading
+            || self.protection.inspection.error.is_some()
             || !self.valid;
         Some(
             div()
@@ -285,8 +290,8 @@ impl Manager {
                         .label(self.text("保護の変更を破棄", "Discard protection changes"))
                         .disabled_elevated(blocked)
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.protection.rules = this.settings.icon_protection_rules.clone();
-                            this.protection.draft = this.settings.preserve_existing_icons;
+                            this.protection.draft.rules = this.settings.icon_protection_rules.clone();
+                            this.protection.draft.enabled = this.settings.preserve_existing_icons;
                             this.refresh_protection_policy(cx);
                         })),
                 )
