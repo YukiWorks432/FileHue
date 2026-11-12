@@ -2,8 +2,8 @@
 
 use super::{
     Dependencies, DependencyInspector, Group, KeyState, ProviderState, Recovery, Reference, Scope,
-    THUMBNAIL_IID, decode_provider, plan_extension_group, plan_shared_group, valid_class,
-    valid_extension,
+    THUMBNAIL_IID, decode_provider, plan_extension_group, plan_shared_group, same_registration,
+    valid_class, valid_extension,
 };
 use anyhow::{Context, Result, ensure};
 use file_icons_core::registry::{Registry, Value};
@@ -52,7 +52,7 @@ where
             Binding::Extension => direct.push(format),
             Binding::SharedUser { class } => {
                 shared
-                    .entry(class.to_ascii_lowercase())
+                    .entry(class.to_lowercase())
                     .or_insert_with(|| (class, BTreeSet::new()))
                     .1
                     .insert(format.extension().into());
@@ -169,8 +169,7 @@ fn class_chain(source: &impl Source, association: String) -> Result<Vec<String>>
     let mut next = Some(association);
     while let Some(class) = next {
         ensure!(
-            class.is_ascii()
-                && !class.is_empty()
+            !class.is_empty()
                 && class.len() <= 255
                 && !class.contains(['/', '\0'])
                 && !class.chars().any(char::is_control),
@@ -180,7 +179,7 @@ fn class_chain(source: &impl Source, association: String) -> Result<Vec<String>>
             chain.len() < 16
                 && !chain
                     .iter()
-                    .any(|prior: &String| prior.eq_ignore_ascii_case(&class)),
+                    .any(|prior: &String| same_registration(prior, &class)),
             "cyclic or too deep CurVer"
         );
         next = source.curver(&class)?;
@@ -194,7 +193,7 @@ impl<S: Source> DependencyInspector for Inspector<S> {
         let members: BTreeSet<_> = group
             .members
             .iter()
-            .map(|extension| extension.to_ascii_lowercase())
+            .map(|extension| extension.to_lowercase())
             .collect();
         let extensions = if group.class.is_some() {
             self.0.extensions()?
@@ -204,7 +203,7 @@ impl<S: Source> DependencyInspector for Inspector<S> {
         ensure!(extensions.len() <= 65536, "too many registered extensions");
         let mut extensions: BTreeSet<_> = extensions
             .into_iter()
-            .map(|extension| extension.to_ascii_lowercase())
+            .map(|extension| extension.to_lowercase())
             .collect();
         extensions.extend(members.iter().cloned());
         let mut associations = BTreeMap::new();
@@ -229,7 +228,7 @@ impl<S: Source> DependencyInspector for Inspector<S> {
                 None => Vec::new(),
             };
             let relevant = match &group.class {
-                Some(target) => chain.iter().any(|class| class.eq_ignore_ascii_case(target)),
+                Some(target) => chain.iter().any(|class| same_registration(class, target)),
                 None => members.contains(&extension),
             };
             if !relevant {
@@ -243,27 +242,25 @@ impl<S: Source> DependencyInspector for Inspector<S> {
             associations.insert(extension.clone(), association.unwrap_or_default());
             ensure!(associations.len() <= 512, "too many shared associations");
             for class in chain {
-                referenced
-                    .insert(format!("Software\\Classes\\{class}\\CurVer").to_ascii_lowercase());
+                referenced.insert(format!("Software\\Classes\\{class}\\CurVer").to_lowercase());
                 referenced.insert(
-                    format!("Software\\Classes\\{class}\\shellex\\{THUMBNAIL_IID}")
-                        .to_ascii_lowercase(),
+                    format!("Software\\Classes\\{class}\\shellex\\{THUMBNAIL_IID}").to_lowercase(),
                 );
             }
-            referenced.insert(format!("Software\\Classes\\{extension}").to_ascii_lowercase());
+            referenced.insert(format!("Software\\Classes\\{extension}").to_lowercase());
             referenced.insert(
-                format!("Software\\Classes\\{extension}\\shellex\\{THUMBNAIL_IID}")
-                    .to_ascii_lowercase(),
+                format!("Software\\Classes\\{extension}\\shellex\\{THUMBNAIL_IID}").to_lowercase(),
             );
-            referenced.insert(format!("Software\\Classes\\SystemFileAssociations\\{extension}\\shellex\\{THUMBNAIL_IID}").to_ascii_lowercase());
+            referenced.insert(format!("Software\\Classes\\SystemFileAssociations\\{extension}\\shellex\\{THUMBNAIL_IID}").to_lowercase());
         }
         let mut references = Vec::new();
         for scope in [Scope::User, Scope::Machine] {
             for key in &referenced {
                 if scope == Scope::User
-                    && group.changes.iter().any(|change| {
-                        change.name.is_empty() && change.key.eq_ignore_ascii_case(key)
-                    })
+                    && group
+                        .changes
+                        .iter()
+                        .any(|change| change.name.is_empty() && same_registration(&change.key, key))
                 {
                     continue;
                 }
@@ -275,7 +272,7 @@ impl<S: Source> DependencyInspector for Inspector<S> {
                 });
             }
         }
-        references.sort_by_key(|reference| (reference.scope, reference.key.to_ascii_lowercase()));
+        references.sort_by_key(|reference| (reference.scope, reference.key.to_lowercase()));
         Ok(Dependencies {
             associations,
             references,
@@ -315,7 +312,7 @@ mod tests {
         fn read(&self, key: &str, name: &str) -> Result<Option<Value>> {
             Ok(self
                 .0
-                .get(&(key.to_ascii_lowercase(), name.to_ascii_lowercase()))
+                .get(&(key.to_lowercase(), name.to_lowercase()))
                 .cloned())
         }
         fn write(&mut self, _: &str, _: &str, _: Option<&Value>) -> Result<()> {
@@ -342,10 +339,10 @@ mod tests {
             Ok(self.associations.get(extension).cloned())
         }
         fn curver(&self, class: &str) -> Result<Option<String>> {
-            Ok(self.curvers.get(&class.to_ascii_lowercase()).cloned())
+            Ok(self.curvers.get(&class.to_lowercase()).cloned())
         }
         fn read(&self, scope: Scope, key: &str) -> Result<Option<Value>> {
-            Ok(self.values.get(&(scope, key.to_ascii_lowercase())).cloned())
+            Ok(self.values.get(&(scope, key.to_lowercase())).cloned())
         }
     }
 
@@ -465,7 +462,7 @@ mod tests {
             group
                 .changes
                 .iter()
-                .all(|change| !change.key.eq_ignore_ascii_case("Software\\Classes\\.psb"))
+                .all(|change| !same_registration(&change.key, "Software\\Classes\\.psb"))
         );
         let unrelated = ::windows::core::GUID::from_u128(0x11111111_2222_4333_8444_555555555555);
         assert!(classify(&inspector.0, ".psb", Some(unrelated)).is_err());
@@ -574,7 +571,10 @@ mod tests {
         }
         source
             .associations
-            .insert(".svg".into(), "Example.Svg".into());
+            .insert(".svg".into(), "Applications\\画像編集.exe".into());
+        source
+            .associations
+            .insert(".unrelated".into(), "Applications\\素材管理.exe".into());
         source.providers.insert(".svg".into(), None);
         let selected = [".ai".into(), ".eps".into(), ".svg".into()]
             .into_iter()
@@ -601,12 +601,7 @@ mod tests {
         let ait = group
             .changes
             .iter()
-            .find(|change| {
-                change
-                    .key
-                    .to_ascii_lowercase()
-                    .contains("\\.ait\\shellex\\")
-            })
+            .find(|change| change.key.to_lowercase().contains("\\.ait\\shellex\\"))
             .unwrap();
         assert_eq!(ait.after, value);
         assert!(registry.0.len() == 1);

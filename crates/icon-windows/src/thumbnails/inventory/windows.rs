@@ -334,8 +334,9 @@ mod tests {
         ))?;
         other_provider.set_value("", &"{AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE}")?;
         let (svg_extension, _) = classes.create_subkey(".svg")?;
-        svg_extension.set_value("", &"Example.Svg")?;
-        let (svg_command, _) = classes.create_subkey("Example.Svg\\shell\\open\\command")?;
+        svg_extension.set_value("", &"Applications\\画像編集.exe")?;
+        let (svg_command, _) =
+            classes.create_subkey("Applications\\画像編集.exe\\shell\\open\\command")?;
         svg_command.set_value("", &"\"X:\\not-executed.exe\" \"%1\"")?;
         let (svg_provider, _) = classes.create_subkey(format!(
             ".svg\\shellex\\{}",
@@ -355,21 +356,30 @@ mod tests {
             },
         )?;
         assert_eq!(svg_provider.get_raw_value("")?.bytes.len(), original_length);
-        let (svg_icon, _) = classes.create_subkey("Example.Svg\\DefaultIcon")?;
+        let (svg_icon, _) = classes.create_subkey("Applications\\画像編集.exe\\DefaultIcon")?;
         svg_icon.set_value("", &"original.ico")?;
-        let (shared_command, _) = classes.create_subkey("Example.Shared\\shell\\open\\command")?;
+        let (shared_command, _) =
+            classes.create_subkey("Applications\\Éditeur.exe\\shell\\open\\command")?;
         shared_command.set_value("", &"\"X:\\not-executed.exe\" \"%1\"")?;
         let (shared_provider, _) = classes.create_subkey(format!(
-            "Example.Shared\\shellex\\{}",
+            "Applications\\Éditeur.exe\\shellex\\{}",
             crate::thumbnails::THUMBNAIL_IID
         ))?;
         shared_provider.set_value("", &"{11111111-2222-4333-8444-555555555555}")?;
-        let (shared_icon, _) = classes.create_subkey("Example.Shared\\DefaultIcon")?;
+        let (shared_icon, _) = classes.create_subkey("Applications\\Éditeur.exe\\DefaultIcon")?;
         shared_icon.set_value("", &"shared.ico")?;
         let mut shared_keys = Vec::new();
         for extension in [".ai", ".ait", ".eps"] {
             let (key, _) = classes.create_subkey(extension)?;
-            key.set_value("", &"Example.Shared")?;
+            // 同じWindowsキーを指す未選択の種類を、大文字・小文字の差で見落とさない。
+            key.set_value(
+                "",
+                &if extension == ".ait" {
+                    "Applications\\éditeur.exe"
+                } else {
+                    "Applications\\Éditeur.exe"
+                },
+            )?;
             let (handler, _) = classes.create_subkey(format!(
                 "{extension}\\shellex\\{}",
                 crate::thumbnails::THUMBNAIL_IID
@@ -414,6 +424,10 @@ mod tests {
             Some("Example.Vector".into())
         );
         assert_eq!(source.association(".wfi-nonexistent")?, None);
+        assert_eq!(
+            source.association(".svg")?,
+            Some("Applications\\画像編集.exe".into())
+        );
         assert_eq!(
             source.shell_provider(probe.path())?,
             Some(GUID::from_u128(0x11111111_2222_4333_8444_555555555555))
@@ -583,8 +597,12 @@ mod tests {
             .into_iter()
             .collect();
         let selected = [".ai".into(), ".eps".into()].into_iter().collect();
-        let mut shared =
-            crate::thumbnails::plan_shared_group(&registry, "Example.Shared", members, &selected)?;
+        let mut shared = crate::thumbnails::plan_shared_group(
+            &registry,
+            "Applications\\Éditeur.exe",
+            members,
+            &selected,
+        )?;
         let module = Path::new("C:\\FileHue\\file_icons_thumbnail_shell.dll");
         shared.add_provider(&registry, Format::Ai, module)?;
         shared.add_provider(&registry, Format::Eps, module)?;
@@ -683,7 +701,7 @@ mod tests {
         let shared = planned
             .groups
             .iter()
-            .find(|group| group.class.as_deref() == Some("Example.Shared"))
+            .find(|group| group.class.as_deref() == Some("Applications\\Éditeur.exe"))
             .context("shared plan missing")?;
         assert_eq!(
             shared.members,

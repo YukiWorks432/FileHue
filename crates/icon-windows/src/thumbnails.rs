@@ -183,14 +183,14 @@ impl Group {
                     .references
                     .iter()
                     .any(|reference| reference.scope == Scope::Machine
-                        && reference.key.eq_ignore_ascii_case(&key)
+                        && same_registration(&reference.key, &key)
                         && reference.value.is_some()),
                 "machine shared provider requires separate validation"
             );
             let parent = self
                 .changes
                 .iter()
-                .find(|change| change.key.eq_ignore_ascii_case(&key) && change.name.is_empty())
+                .find(|change| same_registration(&change.key, &key) && change.name.is_empty())
                 .context("shared thumbnail provider missing")?;
             Some(decode_provider(
                 parent
@@ -217,7 +217,7 @@ impl Group {
                 );
             }
             result.insert(
-                extension.to_ascii_lowercase(),
+                extension.to_lowercase(),
                 current.map(|guid| format!("{{{guid:?}}}")),
             );
         }
@@ -247,12 +247,12 @@ impl Group {
                     "software\\classes\\applications",
                     "software\\classes\\systemfileassociations",
                 ]
-                .contains(&key.to_ascii_lowercase().as_str())
+                .contains(&key.to_lowercase().as_str())
                 {
                     continue;
                 }
                 if !registry.key_exists(&key)? {
-                    missing.insert(key.to_ascii_lowercase(), key);
+                    missing.insert(key.to_lowercase(), key);
                 }
             }
         }
@@ -289,7 +289,7 @@ impl Group {
         ensure!(
             self.changes
                 .iter()
-                .any(|change| change.key.eq_ignore_ascii_case(&member)
+                .any(|change| same_registration(&change.key, &member)
                     && (self.class.is_some() || change.after == provider_value(format))),
             "thumbnail format is not a member of this group"
         );
@@ -299,7 +299,7 @@ impl Group {
             !self
                 .changes
                 .iter()
-                .any(|change| change.key.eq_ignore_ascii_case(&key)),
+                .any(|change| same_registration(&change.key, &key)),
             "thumbnail provider already planned"
         );
         let encode = |text: &str| Value {
@@ -419,8 +419,7 @@ pub fn plan_shared_group(
     ensure!(
         members
             .iter()
-            .all(|extension| valid_extension(extension)
-                && *extension == extension.to_ascii_lowercase()),
+            .all(|extension| valid_extension(extension) && *extension == extension.to_lowercase()),
         "invalid thumbnail group extension"
     );
     ensure!(
@@ -503,7 +502,7 @@ impl Recovery {
                 .flat_map(|group| &group.changes)
                 .any(|change| {
                     change.name.is_empty()
-                        && change.key.eq_ignore_ascii_case(&key)
+                        && same_registration(&change.key, &key)
                         && change.after == provider_value(format)
                 })
             {
@@ -560,7 +559,7 @@ impl Recovery {
                     "invalid thumbnail group extension"
                 );
                 ensure!(
-                    members.insert(extension.to_ascii_lowercase()),
+                    members.insert(extension.to_lowercase()),
                     "duplicate thumbnail group extension"
                 );
             }
@@ -581,24 +580,24 @@ impl Recovery {
             }
             let mut parent_seen = false;
             for change in &group.changes {
-                let key = change.key.to_ascii_lowercase();
+                let key = change.key.to_lowercase();
                 let parent = group.class.as_ref().map(|class| {
                     format!(
                         "software\\classes\\{}\\shellex\\{}",
-                        class.to_ascii_lowercase(),
+                        class.to_lowercase(),
                         THUMBNAIL_IID
                     )
                 });
                 let is_parent = parent.as_ref() == Some(&key);
                 let is_member = group.members.iter().any(|extension| {
-                    let extension = extension.to_ascii_lowercase();
+                    let extension = extension.to_lowercase();
                     key == format!("software\\classes\\{extension}\\shellex\\{THUMBNAIL_IID}")
                         || key == format!("software\\classes\\systemfileassociations\\{extension}\\shellex\\{THUMBNAIL_IID}")
                 });
                 let is_clsid = Format::ALL.iter().any(|format| {
                     let guid = windows::core::GUID::from_u128(format.clsid());
                     key == format!("software\\classes\\clsid\\{{{guid:?}}}\\inprocserver32")
-                        .to_ascii_lowercase()
+                        .to_lowercase()
                 });
                 ensure!(
                     is_parent || is_member || is_clsid,
@@ -611,13 +610,13 @@ impl Recovery {
                 ensure!(!parent_seen, "thumbnail parent must follow its members");
                 parent_seen = is_parent;
                 ensure!(
-                    seen.insert((key, change.name.to_ascii_lowercase())),
+                    seen.insert((key, change.name.to_lowercase())),
                     "duplicate thumbnail recovery value"
                 );
             }
             let mut created = BTreeSet::new();
             for key in &group.created_keys {
-                let key = key.to_ascii_lowercase();
+                let key = key.to_lowercase();
                 ensure!(
                     created.insert(key.clone()),
                     "duplicate thumbnail recovery directory"
@@ -627,7 +626,7 @@ impl Recovery {
                     "invalid thumbnail recovery directory"
                 );
                 let member_root = group.members.iter().any(|extension| {
-                    let extension = extension.to_ascii_lowercase();
+                    let extension = extension.to_lowercase();
                     [
                         format!("software\\classes\\{extension}"),
                         format!("software\\classes\\systemfileassociations\\{extension}"),
@@ -636,13 +635,12 @@ impl Recovery {
                     .any(|root| key == *root || key.starts_with(&format!("{root}\\")))
                 });
                 let class_root = group.class.as_ref().is_some_and(|class| {
-                    let root = format!("software\\classes\\{}", class.to_ascii_lowercase());
+                    let root = format!("software\\classes\\{}", class.to_lowercase());
                     key == root || key.starts_with(&format!("{root}\\"))
                 });
                 let clsid_root = Format::ALL.iter().any(|format| {
                     let guid = windows::core::GUID::from_u128(format.clsid());
-                    let root =
-                        format!("software\\classes\\clsid\\{{{guid:?}}}").to_ascii_lowercase();
+                    let root = format!("software\\classes\\clsid\\{{{guid:?}}}").to_lowercase();
                     key == root || key.starts_with(&format!("{root}\\"))
                 });
                 ensure!(
@@ -651,7 +649,7 @@ impl Recovery {
                 );
                 ensure!(
                     group.changes.iter().any(|change| {
-                        let path = change.key.to_ascii_lowercase();
+                        let path = change.key.to_lowercase();
                         path == key || path.starts_with(&format!("{key}\\"))
                     }),
                     "unrelated thumbnail recovery directory"
@@ -664,8 +662,8 @@ impl Recovery {
                     ensure!(
                         reference.scope != Scope::User
                             || !seen.contains(&(
-                                reference.key.to_ascii_lowercase(),
-                                reference.name.to_ascii_lowercase()
+                                reference.key.to_lowercase(),
+                                reference.name.to_lowercase()
                             )),
                         "thumbnail reference overlaps another group's change"
                     );
@@ -852,13 +850,13 @@ impl Recovery {
         let member = group
             .changes
             .iter()
-            .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&key))
+            .find(|change| change.name.is_empty() && same_registration(&change.key, &key))
             .context("thumbnail member registration missing")?;
         let parent_key = format!("Software\\Classes\\{class}\\shellex\\{THUMBNAIL_IID}");
         let parent = group
             .changes
             .iter()
-            .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&parent_key))
+            .find(|change| change.name.is_empty() && same_registration(&change.key, &parent_key))
             .context("shared thumbnail provider missing")?;
         let to = if enabled {
             provider_value(format)
@@ -904,7 +902,7 @@ impl Recovery {
         );
         for change in &group.changes {
             let current = registry.read(&change.key, &change.name)?;
-            if change.name.is_empty() && change.key.eq_ignore_ascii_case(&key) {
+            if change.name.is_empty() && same_registration(&change.key, &key) {
                 ensure!(
                     current.as_ref() == Some(&transition.from)
                         || current.as_ref() == Some(&transition.to),
@@ -929,7 +927,7 @@ impl Recovery {
                 .changes
                 .iter()
                 .find(|change| {
-                    change.name.is_empty() && change.key.eq_ignore_ascii_case(&member_key)
+                    change.name.is_empty() && same_registration(&change.key, &member_key)
                 })
                 .context("thumbnail member registration missing")?;
             let current = registry
@@ -955,7 +953,7 @@ impl Recovery {
         let member = group
             .changes
             .iter_mut()
-            .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&key))
+            .find(|change| change.name.is_empty() && same_registration(&change.key, &key))
             .context("thumbnail member registration missing")?;
         member.after = transition.to.clone();
         finished.transition = None;
@@ -1010,7 +1008,7 @@ impl Recovery {
             let parent = group
                 .changes
                 .iter()
-                .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&key))
+                .find(|change| change.name.is_empty() && same_registration(&change.key, &key))
                 .context("shared thumbnail provider missing")?;
             let current = registry.read(&parent.key, &parent.name)?;
             current != parent.before && current.as_ref() == Some(&parent.after)
@@ -1026,7 +1024,7 @@ impl Recovery {
             let change = group
                 .changes
                 .iter()
-                .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&key))
+                .find(|change| change.name.is_empty() && same_registration(&change.key, &key))
                 .context("thumbnail member registration missing")?;
             let current = registry.read(&change.key, &change.name)?;
             let effective_after = if group.class.is_some() {
@@ -1038,7 +1036,7 @@ impl Recovery {
                 Some(decode_provider(&change.after)?)
             } else {
                 previous
-                    .get(&extension.to_ascii_lowercase())
+                    .get(&extension.to_lowercase())
                     .context("thumbnail provider missing")?
                     .as_deref()
                     .map(parse_provider)
@@ -1157,7 +1155,7 @@ fn validate_apply_group(group: &Group) -> Result<()> {
         let parent = group
             .changes
             .iter()
-            .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&key))
+            .find(|change| change.name.is_empty() && same_registration(&change.key, &key))
             .context("shared thumbnail provider missing")?;
         ensure!(
             parent.after.kind == 1 && parent.after.bytes == [0, 0],
@@ -1184,7 +1182,7 @@ fn validate_apply_group(group: &Group) -> Result<()> {
             .find(|reference| {
                 reference.scope == Scope::Machine
                     && reference.name.is_empty()
-                    && reference.key.eq_ignore_ascii_case(&key)
+                    && same_registration(&reference.key, &key)
             })
             .context("machine shared provider not inspected")?;
         ensure!(
@@ -1216,7 +1214,7 @@ fn validate_apply_group(group: &Group) -> Result<()> {
         let change = group
             .changes
             .iter()
-            .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&key))
+            .find(|change| change.name.is_empty() && same_registration(&change.key, &key))
             .context("thumbnail member registration missing")?;
         let guid = decode_provider(&change.after)?;
         if let Some(format) = Format::ALL.iter().find(|format| {
@@ -1237,7 +1235,7 @@ fn validate_apply_group(group: &Group) -> Result<()> {
         let entries: Vec<_> = group
             .changes
             .iter()
-            .filter(|change| change.key.eq_ignore_ascii_case(&key))
+            .filter(|change| same_registration(&change.key, &key))
             .collect();
         if !selected.contains(&format)
             && !(group.class.is_some() && group.members.contains(format.extension()))
@@ -1299,7 +1297,7 @@ fn validate_transition(record: &Recovery, transition: &Transition) -> Result<()>
     let parent = group
         .changes
         .iter()
-        .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&parent_key))
+        .find(|change| change.name.is_empty() && same_registration(&change.key, &parent_key))
         .context("shared thumbnail provider missing")?;
     let original = parent
         .before
@@ -1317,7 +1315,7 @@ fn validate_transition(record: &Recovery, transition: &Transition) -> Result<()>
     let member = group
         .changes
         .iter()
-        .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&key))
+        .find(|change| change.name.is_empty() && same_registration(&change.key, &key))
         .context("thumbnail member registration missing")?;
     let owned = provider_value(format);
     ensure!(
@@ -1340,7 +1338,7 @@ fn validate_transition(record: &Recovery, transition: &Transition) -> Result<()>
         let change = group
             .changes
             .iter()
-            .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&key))
+            .find(|change| change.name.is_empty() && same_registration(&change.key, &key))
             .context("thumbnail member registration missing")?;
         let value = if extension == &transition.extension {
             &transition.to
@@ -1361,7 +1359,7 @@ fn validate_transition(record: &Recovery, transition: &Transition) -> Result<()>
         group
             .changes
             .iter()
-            .filter(|change| change.key.eq_ignore_ascii_case(&clsid)
+            .filter(|change| same_registration(&change.key, &clsid)
                 && (change.name.is_empty() || change.name == "ThreadingModel"))
             .count()
             == 2,
@@ -1413,7 +1411,7 @@ fn check_target_providers(group: &Group, provider: &impl ProviderState) -> Resul
         let change = group
             .changes
             .iter()
-            .find(|change| change.name.is_empty() && change.key.eq_ignore_ascii_case(&key))
+            .find(|change| change.name.is_empty() && same_registration(&change.key, &key))
             .context("thumbnail member registration missing")?;
         let expected = decode_provider(&change.after)?;
         ensure!(
@@ -1439,7 +1437,7 @@ fn validate_dependencies(group: &Group, dependencies: &Dependencies) -> Result<(
     let members: BTreeSet<_> = group
         .members
         .iter()
-        .map(|value| value.to_ascii_lowercase())
+        .map(|value| value.to_lowercase())
         .collect();
     let observed: BTreeSet<_> = dependencies.associations.keys().cloned().collect();
     ensure!(
@@ -1456,7 +1454,7 @@ fn validate_dependencies(group: &Group, dependencies: &Dependencies) -> Result<(
     );
     let mut previous = None;
     for reference in &dependencies.references {
-        let key = reference.key.to_ascii_lowercase();
+        let key = reference.key.to_lowercase();
         ensure!(
             key.starts_with("software\\classes\\")
                 && !key.contains(['/', '\0'])
@@ -1468,7 +1466,7 @@ fn validate_dependencies(group: &Group, dependencies: &Dependencies) -> Result<(
                 .changes
                 .iter()
                 .any(|change| reference.scope == Scope::User
-                    && change.key.eq_ignore_ascii_case(&reference.key)
+                    && same_registration(&change.key, &reference.key)
                     && change.name.eq_ignore_ascii_case(&reference.name)),
             "thumbnail reference overlaps a changed value"
         );
@@ -1505,6 +1503,11 @@ fn valid_extension(extension: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
 }
 
+// 関連付けの識別はアイコン側と同じ小文字化を使い、登録・復元用の綴りは保持する。
+fn same_registration(left: &str, right: &str) -> bool {
+    left.to_lowercase() == right.to_lowercase()
+}
+
 fn valid_class(class: &str) -> bool {
     if class.is_empty()
         || class.len() > 255
@@ -1537,10 +1540,7 @@ fn valid_class(class: &str) -> bool {
         ]
         .iter()
         .any(|name| class.eq_ignore_ascii_case(name));
-    simple
-        || (parts.len() == 2
-            && parts[0].eq_ignore_ascii_case("applications")
-            && parts[1].to_ascii_lowercase().ends_with(".exe"))
+    simple || super::application_association(class)
 }
 
 #[cfg(test)]
@@ -1564,7 +1564,7 @@ mod transaction_tests {
                 .0
                 .borrow()
                 .values
-                .get(&(key.to_ascii_lowercase(), name.to_ascii_lowercase()))
+                .get(&(key.to_lowercase(), name.to_lowercase()))
                 .cloned())
         }
         fn write(&mut self, key: &str, name: &str, value: Option<&Value>) -> Result<()> {
@@ -1574,7 +1574,7 @@ mod transaction_tests {
                 state.fail_at != Some(state.writes),
                 "simulated write failure"
             );
-            let id = (key.to_ascii_lowercase(), name.to_ascii_lowercase());
+            let id = (key.to_lowercase(), name.to_lowercase());
             if let Some(value) = value {
                 state.values.insert(id, value.clone());
             } else {
@@ -2102,11 +2102,11 @@ mod tests {
         fn read(&self, key: &str, name: &str) -> Result<Option<Value>> {
             Ok(self
                 .0
-                .get(&(key.to_ascii_lowercase(), name.to_ascii_lowercase()))
+                .get(&(key.to_lowercase(), name.to_lowercase()))
                 .cloned())
         }
         fn write(&mut self, key: &str, name: &str, value: Option<&Value>) -> Result<()> {
-            let key = (key.to_ascii_lowercase(), name.to_ascii_lowercase());
+            let key = (key.to_lowercase(), name.to_lowercase());
             if let Some(value) = value {
                 self.0.insert(key, value.clone());
             } else {
@@ -2140,7 +2140,7 @@ mod tests {
         struct Keys(BTreeSet<String>);
         impl KeyState for Keys {
             fn key_exists(&self, key: &str) -> Result<bool> {
-                Ok(self.0.contains(&key.to_ascii_lowercase()))
+                Ok(self.0.contains(&key.to_lowercase()))
             }
             fn cleanup_created_keys(&mut self, _: &[String]) -> Result<()> {
                 unreachable!()
@@ -2170,7 +2170,7 @@ mod tests {
         let found: BTreeSet<_> = group
             .created_keys
             .iter()
-            .map(|key| key.to_ascii_lowercase())
+            .map(|key| key.to_lowercase())
             .collect();
         assert_eq!(
             found,
