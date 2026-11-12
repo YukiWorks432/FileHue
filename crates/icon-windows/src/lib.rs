@@ -346,6 +346,30 @@ fn wide(text: &str) -> Vec<u16> {
 }
 
 pub fn association(extension: &str) -> Result<String> {
+    let result = query_association(extension)?;
+    ensure!(
+        !result.contains(['\\', '/', '\0']) || application_association(&result),
+        "invalid ProgID for extension .{extension}: {result}"
+    );
+    Ok(result)
+}
+
+// Windowsのアプリ登録は複数の種類に共有される。照会には使うが、登録は保護する。
+fn application_association(class: &str) -> bool {
+    let Some((root, executable)) = class.split_once('\\') else {
+        return false;
+    };
+    root.eq_ignore_ascii_case("Applications")
+        && executable.len() > 4
+        && executable.to_ascii_lowercase().ends_with(".exe")
+        && !executable
+            .chars()
+            .any(|c| c.is_control() || "\\/:*?\"<>|".contains(c))
+}
+
+// WindowsはApplications\\Illustrator.exeのような関連付けも返す。
+// 復旧一覧の照会には利用できるが、書き込み先のクラスにはそのまま使わない。
+pub(crate) fn query_association(extension: &str) -> Result<String> {
     if extension.is_empty() {
         return Ok("Unknown".into());
     }
@@ -392,8 +416,8 @@ pub fn association(extension: &str) -> Result<String> {
             .unwrap_or(buffer.len())],
     )?;
     ensure!(
-        !result.is_empty() && !result.contains(['\\', '/', '\0']),
-        "invalid ProgID"
+        !result.is_empty(),
+        "empty association for extension .{bare_extension}"
     );
     if result.eq_ignore_ascii_case("Unknown") {
         Ok(format!(".{bare_extension}"))
@@ -473,7 +497,10 @@ pub fn handler_clsid(value: &str) -> Result<GUID> {
 
 /// 別拡張子が同じクラスを共有していても、保護対象の登録を上書きしない。
 pub fn protected_class(progid: &str) -> Result<bool> {
-    if progid.eq_ignore_ascii_case("lnkfile") || progid.eq_ignore_ascii_case("exefile") {
+    if application_association(progid)
+        || progid.eq_ignore_ascii_case("lnkfile")
+        || progid.eq_ignore_ascii_case("exefile")
+    {
         return Ok(true);
     }
     for extension in ["lnk", "exe"] {
