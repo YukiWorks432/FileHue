@@ -51,9 +51,9 @@ fn final_move_preserves_existing_files_and_directories() {
 fn metadata(root: &Path) -> Value {
     let package = |name: &str, external: bool| json!({"id":name,"name":name,"version":"1","source":if external {Some("registry")}else{None},"manifest_path":root.join(name).join("Cargo.toml"),"license":"MIT","authors":["Fixture Author"],"repository":"https://example.invalid/fixture"});
     let dep = |name: &str, kind: Value| json!({"pkg":name,"dep_kinds":[{"kind":kind}]});
-    json!({"packages":[package("file-icons-manager",false),package("file-icons-cli",false),package("library",true),package("build-helper",true),package("transitive",true),package("test-only",true),package("cli-library",true)],
+    json!({"packages":[package("file-icons-manager",false),package("file-icons-cli",false),package("file-icons-thumbnail-shell",false),package("library",true),package("build-helper",true),package("transitive",true),package("test-only",true),package("cli-library",true),package("thumbnail-runtime",true)],
     "resolve":{"nodes":[{"id":"file-icons-manager","deps":[dep("library",Value::Null),dep("build-helper",json!("build")),dep("test-only",json!("dev"))]},
-    {"id":"file-icons-cli","deps":[dep("cli-library",Value::Null)]},{"id":"library","deps":[dep("transitive",Value::Null)]},{"id":"cli-library","deps":[]},{"id":"build-helper","deps":[]},{"id":"transitive","deps":[]},{"id":"test-only","deps":[]}]}})
+    {"id":"file-icons-cli","deps":[dep("cli-library",Value::Null)]},{"id":"file-icons-thumbnail-shell","deps":[dep("thumbnail-runtime",Value::Null)]},{"id":"library","deps":[dep("transitive",Value::Null)]},{"id":"cli-library","deps":[]},{"id":"thumbnail-runtime","deps":[]},{"id":"build-helper","deps":[]},{"id":"transitive","deps":[]},{"id":"test-only","deps":[]}]}})
 }
 #[test]
 fn dependency_closure_keeps_runtime_build_and_transitive_dependencies_but_not_dev() {
@@ -65,7 +65,13 @@ fn dependency_closure_keeps_runtime_build_and_transitive_dependencies_but_not_de
         .collect();
     assert_eq!(
         names,
-        std::collections::BTreeSet::from(["library", "build-helper", "transitive", "cli-library"])
+        std::collections::BTreeSet::from([
+            "library",
+            "build-helper",
+            "transitive",
+            "cli-library",
+            "thumbnail-runtime"
+        ])
     );
 }
 #[test]
@@ -98,6 +104,26 @@ fn manifest_checks_known_hash_and_rejects_modified_extra_missing_and_unsafe_file
     ] {
         assert!(package::relative(name).is_err(), "{name}");
     }
+}
+
+#[test]
+fn package_requires_thumbnail_dll_even_if_manifest_omits_it() {
+    let root = tempfile::tempdir().unwrap();
+    let payload = root.path().join("payload-dir");
+    let mut manifest = public_package::payload(&payload, package::Purpose::Validation);
+    package::verify(&payload, root.path(), package::Purpose::Validation).unwrap();
+    fs::remove_file(payload.join("file_icons_thumbnail_shell.dll")).unwrap();
+    manifest["files"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["path"] != "file_icons_thumbnail_shell.dll");
+    fs::write(
+        root.path().join("manifest.json"),
+        serde_json::to_vec(&manifest).unwrap(),
+    )
+    .unwrap();
+    let error = package::verify(&payload, root.path(), package::Purpose::Validation).unwrap_err();
+    assert!(error.to_string().contains("file_icons_thumbnail_shell.dll"));
 }
 #[test]
 fn source_changes_are_detected_even_when_dirty_status_is_unchanged() {
@@ -210,6 +236,18 @@ fn document_links_must_stay_within_the_payload_and_target_files() {
         assert!(documents::verify(&folder).is_err(), "{target}");
     }
 }
+
+#[test]
+fn bundled_guides_link_to_documents_in_the_actual_payload() {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let output = tempfile::tempdir().unwrap();
+    for name in package::PAYLOAD {
+        let destination = output.path().join(name);
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        fs::copy(source.join(name), destination).unwrap();
+    }
+    documents::verify(output.path()).unwrap();
+}
 #[test]
 fn archives_reject_traversal_mixed_roots_duplicates_links_and_resource_overflow() {
     let root = tempfile::tempdir().unwrap();
@@ -266,4 +304,10 @@ fn valid_archive_and_compiler_messages_choose_exact_probe() {
     assert_eq!(fs::read(folder.join("payload")).unwrap(), b"abc");
     assert_eq!(release::probe("{\"reason\":\"compiler-artifact\",\"target\":{\"name\":\"isolated_shell\"},\"executable\":\"probe.exe\"}").unwrap(),Path::new("probe.exe"));
     assert!(release::probe("{\"reason\":\"build-finished\",\"success\":true}").is_err());
+    let messages = "{\"reason\":\"compiler-artifact\",\"target\":{\"name\":\"isolated_shell\"},\"executable\":\"icon.exe\"}\n{\"reason\":\"compiler-artifact\",\"target\":{\"name\":\"pdf\"},\"executable\":\"thumbnail.exe\"}";
+    assert_eq!(
+        release::probe_for(messages, "pdf").unwrap(),
+        Path::new("thumbnail.exe")
+    );
+    assert!(release::probe_for(messages, "unknown").is_err());
 }

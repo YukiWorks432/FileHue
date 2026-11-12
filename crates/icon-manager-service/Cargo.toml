@@ -7,7 +7,13 @@ publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 file-icons-core = { path = "../icon-core" }
 file-icons-windows = { path = "../icon-windows" }
 file-icons-catalog = { path = "../icon-catalog" }
+
+[dev-dependencies]
+file-icons-thumbnail-core = { path = "../thumbnail-core", default-features = false }
+tempfile = "3"
+windows-core = "0.62.2"

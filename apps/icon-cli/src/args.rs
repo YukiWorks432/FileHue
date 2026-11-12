@@ -102,7 +102,7 @@ impl Args {
         let head = values.remove(0);
         result.command = if matches!(
             head.as_str(),
-            "pack" | "catalog" | "targets" | "conflicts" | "protection"
+            "pack" | "catalog" | "targets" | "conflicts" | "protection" | "thumbnails"
         ) {
             ensure!(!values.is_empty(), "missing subcommand");
             format!("{head} {}", values.remove(0))
@@ -111,9 +111,9 @@ impl Args {
         };
         let count = match result.command.as_str() {
             "status" | "catalog list" | "pack list" | "restore" | "recover" | "cleanup"
-            | "conflicts list" => 0,
+            | "conflicts list" | "thumbnails show" | "thumbnails restore" => 0,
             "catalog show" | "pack show" | "pack download" | "pack inspect" | "pack import"
-            | "pack remove" | "apply" => 1,
+            | "pack remove" | "apply" | "thumbnails set" => 1,
             "resolve" => 2,
             "targets list" => 1,
             "protection show" => 0,
@@ -153,6 +153,8 @@ impl Args {
                         | "targets copy"
                         | "targets edit"
                         | "protection set"
+                        | "thumbnails set"
+                        | "thumbnails restore"
                 ),
             "--dry-run is not supported by this command"
         );

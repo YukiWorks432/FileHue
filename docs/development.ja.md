@@ -23,7 +23,10 @@ PowerShell 7.4以降、RustのMSVC環境、justを用意する。リポジトリ
 | `just fmt` / `just fmt-check` | Rustの整形／整形確認 |
 | `just clippy` | GPUI試験構成を含む全対象を警告なしで静的解析 |
 | `just test` | 既存のモック・契約試験、COMの単体試験、GPUI操作試験を実行（実Shellは別途） |
-| `just test-shell` | Windows 11の通常権限で実DLLとShellの隔離結合試験を実行 |
+| `just test-thumbnails` | サムネイル資源の抽出とDLLの画像返却を検証 |
+| `just probe-thumbnails <ファイル>` | 登録せずに一つのファイルから画像を取得 |
+| `just perf-thumbnails <未作成のJSON> <ファイル>...` | 準備済みの最適化ビルドで明示したファイルの時間とメモリーを計測 |
+| `just test-shell` | Windows 11の通常権限でアイコンDLLのShell隔離試験とサムネイルDLLの直接呼び出し試験を実行 |
 | `just test-scripts` | 配布・プロセス制御・言語表更新のRust試験 |
 | `just smoke` | 専用プロファイルでGUIの起動と終了を確認 |
 | `just verify` | 整形確認、Clippy、ビルド・Rust試験、xtaskの契約試験、GUI起動確認 |
@@ -52,11 +55,15 @@ pwsh -NoProfile -File scripts/smoke-gui.ps1
 just test-shell
 ```
 
-実DLLへのShell呼び出し、STA/MTA、既存画像の保護、共有する関連付け、復元後の登録を検証する。専用プロファイルと専用HKCUキーを使う。`shell-integration`機能を明示したときだけ結合試験をビルド・実行し、既定の`cargo test`と`just verify`には含めない。実Shellを使わない通常試験でも、本体ロジックとCOMの引数・戻り値の契約を検証する。
+アイコンDLLへのShell呼び出し、STA/MTA、既存画像の保護、共有する関連付け、復元後の登録を検証する。専用プロファイルと専用HKCUキーを使う。`shell-integration`機能を明示したときだけアイコンの結合試験をビルド・実行し、既定の`cargo test`と`just verify`には含めない。サムネイルは専用の隔離登録でShellの提供元検索を確認し、DLLをSTA/MTAの子プロセスから直接呼び出して画像を確認する。これらはExplorerでの表示確認とは別である。
 
-公開候補では、同じソースコミットから`just verify-release --public-candidate --archive <候補ZIP> --report <新しい報告書>`を実行し、同梱DLLの`shell_sta_mta=passed`とZIPのハッシュを確認する。続いて[実Explorerの受け入れ](explorer-acceptance.ja.md)を行う。CIの成功や`not-run`の報告を、この確認の代わりにしない。
+公開候補では、同じソースコミットから`just verify-release --public-candidate --archive <候補ZIP> --report <新しい報告書>`を実行し、同梱DLLの`shell_sta_mta=passed`と`thumbnail_sta_mta=passed`、ZIPのハッシュを確認する。続いて[実Explorerの受け入れ](explorer-acceptance.ja.md)を行う。CIの成功や`not-run`の報告を、この確認の代わりにしない。
 
 同じPCで負荷の高い試験・性能測定を同時に実行しない。個人環境の共通CPU排他を使う場合はその手順に従う。ビルド単独は排他対象としない。
+
+登録せずに一つのファイルをDLLへ渡す場合は、`cargo build -p file-icons-thumbnail-shell --example provider_probe --locked` で試験用実行ファイルを作り、`target/debug/examples/provider_probe.exe <DLLの絶対パス> <対象ファイルの絶対パス>` を実行する。結果はプレビューの有無と、ストリームを開いてから返却されるまでの時間、および試験プロセス全体の最大ワーキングセットである。Explorerの表示時間やWindows全体のメモリー使用量ではない。クラウド同期領域の自動調査では、内容を開く前に状態を確認し、未取得・一部取得・不明なファイルを除く。対象ファイルやそのプレビュー画像をリポジトリへコピーしない。
+
+Windowsの取得経路を切り分ける場合は、利用者の登録許可と復元手順を確認したうえで、`cargo build -p file-icons-thumbnail-shell --example shell_image_probe --locked` を実行し、`target/debug/examples/shell_image_probe.exe <検証用ファイルの絶対パス>` を使う。これは直接のCOM生成、プロセス内のハンドラー呼び出し、`IShellItemImageFactory`による取得を区別する。キャッシュの影響を避けるため、毎回新しく作成した検証用ファイルを使う。検証プロセスとExplorerではユーザー単位のCOM登録の見え方が異なり、前者だけが `0x80040154` で失敗する場合がある。この取得試験は実Explorerの表示確認の代わりにはならない。詳細は [PowerToysのExplorer試験手順](https://github.com/microsoft/PowerToys/blob/main/.github/skills/ui-tests-migration/references/explorer-shell-tests.md)を参照する。
 
 GUIの起動だけでは登録は変わらない。通常のGUI・CLI操作は実際の設定を使うため、開発PCへの適用には明示的な許可を得る。適用ではビルド出力のDLLを直接登録せず、ユーザー領域へコピーした内容ハッシュ別のDLLを使う。
 
@@ -67,7 +74,7 @@ GUIの起動だけでは登録は変わらない。通常のGUI・CLI操作は�
 - `just package [--profile debug|release] [--allow-dirty]`: 検証用ZIP・展開内容・`SHA256SUMS.txt`を一つの出力フォルダーへ作成する。
 - `just package --public-candidate`: 公開リポジトリのクリーンなコミットから未署名の公開候補を作成する。GitHub CLIも必要とする。
 - `cargo xtask package --verify <展開先> [--metadata <外部記録のフォルダー>] [--public-candidate]`: 指定した用途とZIP外のマニフェスト・権利確認記録を照合する。外部記録の既定は展開先の親フォルダー。
-- `just verify-release --report <報告書> [--public-candidate]`: Windows 11で、作成から配布DLL・GUI・CLI・文書の確認まで行う。CIでは`--skip-shell`を指定し、同梱DLLの実Shell試験を省略する。省略時は報告書に`shell_sta_mta=not-run`と`probe_sha256=null`を記録する。既存ZIPには `--archive <ZIP>` を指定し、隣接する`SHA256SUMS.txt`も保持する。公開候補の報告にはローカルパスと生ログの場所を含めない。
+- `just verify-release --report <報告書> [--public-candidate]`: Windows 11で、作成から配布DLL・GUI・CLI・文書の確認まで行う。CIでは`--skip-shell`を指定し、同梱DLLを呼び出す試験を省略する。省略時は報告書の`shell_sta_mta`と`thumbnail_sta_mta`を`not-run`、両試験のハッシュを`null`とする。既存ZIPには `--archive <ZIP>` を指定し、隣接する`SHA256SUMS.txt`も保持する。公開候補の報告にはローカルパスと生ログの場所を含めない。
 - `just check-docs`: 文書の相対リンクを照合する。
 - `just test-tools` / `just test-scripts`: 開発補助のRust試験を実行する。
 

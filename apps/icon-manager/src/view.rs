@@ -33,7 +33,11 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
-        if self.about.open {
+        if self.thumbnails.open {
+            self.thumbnails.open = false;
+            self.focus.focus(window, cx);
+            cx.notify();
+        } else if self.about.open {
             if self.about.license_text.take().is_none() {
                 self.about.open = false;
             }
@@ -93,7 +97,8 @@ impl Manager {
                     .items_center()
                     .gap_3()
                     .when(
-                        self.about.open
+                        self.thumbnails.open
+                            || self.about.open
                             || self.targets.pack.is_some()
                             || self.protection.open
                             || self.recovery.is_open()
@@ -183,6 +188,7 @@ impl Manager {
                             .selected(self.recovery.is_open())
                             .disabled_elevated(
                                 self.about.open
+                                    || self.thumbnails.open
                                     || self.operation.busy()
                                     || self._guard.is_none()
                                     || self.recovery.is_open()
@@ -203,6 +209,7 @@ impl Manager {
                             .label(self.text("アイコンの保護", "Icon protection"))
                             .disabled_elevated(
                                 self.about.open
+                                    || self.thumbnails.open
                                     || self.operation.busy()
                                     || !self.valid
                                     || self.protection.open,
@@ -270,6 +277,13 @@ impl Manager {
                     ))
                     .disabled_elevated(blocked)
                     .on_click(cx.listener(|this, _, _, cx| this.choose(cx))),
+            )
+            .child(
+                theme::button("thumbnails-open", cx)
+                    .small()
+                    .label(self.text("内容のサムネイル", "Content thumbnails"))
+                    .disabled_elevated(self.operation.busy() || self._guard.is_none())
+                    .on_click(cx.listener(|this, _, _, cx| this.open_thumbnails(cx))),
             )
             .child(
                 theme::button("about-open", cx)
@@ -462,6 +476,25 @@ impl Manager {
 impl Render for Manager {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = cx.theme().colors;
+        if self.thumbnails.open {
+            return self
+                .navigation_root(cx)
+                .track_focus(&self.focus)
+                .tab_stop(false)
+                .size_full()
+                .bg(colors.background)
+                .text_color(colors.foreground)
+                .flex()
+                .flex_col()
+                .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                    if event.keystroke.key == "escape" {
+                        this.navigate_back(window, cx);
+                    }
+                }))
+                .child(self.header(cx))
+                .child(self.thumbnail_panel(cx))
+                .child(self.footer(cx));
+        }
         if self.about.open {
             return self
                 .navigation_root(cx)

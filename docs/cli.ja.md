@@ -1,6 +1,6 @@
 # 補助CLI
 
-Windows 11 x64用の `file-icons.exe` は、GUIと同じパック一覧、設定、登録・復元処理を使うコンソール用の入口です。配布ZIPにはGUI、CLI、Shell DLLを同じフォルダーへ収録します。CLIからも日常の管理操作を実行でき、GUIの操作にCLI入力は必要ありません。
+Windows 11 x64用の `file-icons.exe` は、GUIと同じパック一覧、設定、登録・復元処理を使うコンソール用の入口です。配布ZIPにはGUI、CLI、アイコン用とサムネイル用のShell DLLを同じフォルダーへ収録します。CLIからも日常の管理操作を実行でき、GUIの操作にCLI入力は必要ありません。
 
 ## 基本操作
 
@@ -62,6 +62,20 @@ Windows 11 x64用の `file-icons.exe` は、GUIと同じパック一覧、設定
 ```
 
 Explorerは自動終了しません。適用・復元後に表示が更新されなければ、コピーや移動を終えてからタスク マネージャーでExplorerを再起動します。
+
+## 内容のサムネイル
+
+GUIを閉じてから現在の選択を照会し、表示する種類をカンマ区切りで指定します。`set` は指定した集合へ変更します。空に戻す場合は `restore` を使います。`--dry-run` は変更予定を照会し、実行時には登録状態を再確認します。
+
+```powershell
+.\file-icons.exe thumbnails show --json
+.\file-icons.exe thumbnails set ai,psd --dry-run
+.\file-icons.exe thumbnails set ai,psd
+.\file-icons.exe thumbnails restore --dry-run
+.\file-icons.exe thumbnails restore
+```
+
+拡張子は `ai` または `.ai` のように指定できます。`show` の `saved_selection` は保存済みの選択、`planned_selection` は復元記録にある選択であり、`group_errors` に不一致がある場合は適用完了を意味しません。`restore` はサムネイル登録だけを戻します。形式ごとの対応条件と競合時の扱いは[内容のサムネイル](thumbnails.ja.md)を参照します。
 
 ## 出力と言語
 

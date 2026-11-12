@@ -60,10 +60,25 @@ clippy:
 test: build
     cargo test --workspace --features file-icons-manager/test-support --locked
 
+# サムネイル資源の抽出と描画の契約を確認する
+test-thumbnails:
+    cargo build -p file-icons-thumbnail-shell --locked
+    cargo test -p file-icons-thumbnail-core -p file-icons-thumbnail-shell --locked
+
+# 指定したファイルのサムネイル取得を登録せずに確認する
+probe-thumbnails input:
+    cargo build -p file-icons-thumbnail-shell --lib --example provider_probe --locked; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; & ./target/debug/examples/provider_probe.exe ([IO.Path]::GetFullPath('target/debug/file_icons_thumbnail_shell.dll')) ([IO.Path]::GetFullPath($args[1])); exit $LASTEXITCODE
+
+# 準備済みの最適化ビルドで明示したファイルを計測する
+perf-thumbnails output *inputs:
+    $forward = @($args | Select-Object -Skip 2); & ./scripts/measure-thumbnails.ps1 -OutputPath $args[1] -InputPaths $forward
+
 # Windows 11の通常権限で、実DLLとShellの隔離結合試験を実行する
 test-shell:
-    cargo build -p file-icons-shell --locked
+    cargo build -p file-icons-shell -p file-icons-thumbnail-shell --locked
     cargo test -p file-icons-shell --features shell-integration --test isolated_shell --locked -- --nocapture
+    cargo test -p file-icons-windows --lib thumbnails::inventory::windows::tests::reads_only_redirected_registry --locked -- --nocapture
+    cargo test -p file-icons-thumbnail-shell --test pdf --locked -- --nocapture
 
 # 配布・プロセス制御・更新処理のRust試験を実行する
 test-tools:

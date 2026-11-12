@@ -1,6 +1,6 @@
 # Command-line management
 
-On Windows 11 x64, `file-icons.exe` uses the same pack library, lock, settings and registration/recovery operations as the GUI. Keep the CLI, GUI and `file_icons_shell.dll` together in the extracted distribution. Close the GUI before commands that access saved state. Catalog queries, local inspection, help and version remain available while the GUI is running.
+On Windows 11 x64, `file-icons.exe` uses the same pack library, lock, settings and registration/recovery operations as the GUI. Keep the CLI, GUI, `file_icons_shell.dll` and `file_icons_thumbnail_shell.dll` together in the extracted distribution. Close the GUI before commands that access saved state. Catalog queries, local inspection, help and version remain available while the GUI is running.
 
 ```powershell
 .\file-icons.exe --help --lang en
@@ -44,6 +44,20 @@ Removal deletes the library entry and owned generated assets used exclusively by
 `--dry-run` is available for `apply`, `restore`, `recover`, `pack remove` and `cleanup`. It does not save settings, convert icons, alter registration or delete assets. Coordination may create the management folder and lock file. Plans describe affected classes, existing restoration records and shared storage; execution rechecks ownership, content, permissions and conflicts. A successful preview does not guarantee later execution will succeed.
 
 Explorer is never terminated automatically. If icons do not refresh, finish file operations and restart Explorer through Task Manager.
+
+## Content thumbnails
+
+Close the GUI, inspect the current selection, and specify the extensions as a comma-separated set. `set` replaces the selection; use `restore` to clear it. `--dry-run` previews the changes, and execution rechecks the registration.
+
+```powershell
+.\file-icons.exe thumbnails show --json
+.\file-icons.exe thumbnails set ai,psd --dry-run
+.\file-icons.exe thumbnails set ai,psd
+.\file-icons.exe thumbnails restore --dry-run
+.\file-icons.exe thumbnails restore
+```
+
+Extensions may be written as `ai` or `.ai`. In `show`, `saved_selection` is the saved selection and `planned_selection` is the selection in the recovery record. A mismatch in `group_errors` means the registration is not fully applied. `restore` only restores thumbnail registration. See [content thumbnails](thumbnails.en.md) for supported formats and conflict handling.
 
 ## Output and automation
 
