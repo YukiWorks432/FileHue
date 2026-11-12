@@ -5,6 +5,7 @@ use windows::Win32::System::Registry::{
     HKEY, HKEY_CLASSES_ROOT as HKCR, HKEY_CURRENT_USER as HKCU, RegOverridePredefKey,
 };
 use winreg::{RegKey, enums::*};
+mod applications;
 mod conflicts;
 
 struct Redirect {

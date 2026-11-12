@@ -332,7 +332,7 @@ fn prepare(strategy: Strategy, source: &Path) -> Result<Prepared> {
     {
         for extension in pack.theme.registration_extensions() {
             affected
-                .entry(crate::association(&extension)?.to_lowercase())
+                .entry(crate::query_association(&extension)?.to_lowercase())
                 .or_default()
                 .push(extension);
         }
