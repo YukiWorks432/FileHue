@@ -304,6 +304,29 @@ fn confirmed_recovery_resumes_after_save_failure() {
 
     dispatch(&manager, &["apply", &id]).unwrap();
     icon.set_value("", &"external-three.ico,2").unwrap();
+    // 別アプリへの関連付け変更は、記録済みアイコンの解除を妨げない。
+    let application = r"Applications\Illustrator.exe";
+    let association = classes
+        .open_subkey_with_flags(".wfi-recovery", KEY_ALL_ACCESS)
+        .unwrap();
+    association.set_value("", &application).unwrap();
+    let application_key = classes.create_subkey(application).unwrap().0;
+    application_key
+        .create_subkey(r"shell\open\command")
+        .unwrap()
+        .0
+        .set_value("", &"illustrator.exe %1")
+        .unwrap();
+    let application_icon = application_key.create_subkey("DefaultIcon").unwrap().0;
+    application_icon
+        .set_value("", &"illustrator.ico,3")
+        .unwrap();
+    assert!(
+        file_icons_windows::association("wfi-recovery").is_err(),
+        "書き込み対象の検査は維持する"
+    );
+    let listed = dispatch(&manager, &["conflicts", "list"]).unwrap();
+    assert_eq!(listed["conflicts"], 1);
     fs::remove_file(&asset).unwrap();
     let preview = dispatch(
         &manager,
@@ -360,6 +383,11 @@ fn confirmed_recovery_resumes_after_save_failure() {
         "notepad.exe %1"
     );
     assert!(!root.join("recovery.json").exists());
+    assert_eq!(association.get_value::<String, _>("").unwrap(), application);
+    assert_eq!(
+        application_icon.get_value::<String, _>("").unwrap(),
+        "illustrator.ico,3"
+    );
     // 不正な記録による起動設定の書き換えと、未知形式の読み飛ばしは許可しない。
     let mut invalid = settings.clone();
     invalid.journal.push(file_icons_core::registry::Change {

@@ -341,6 +341,17 @@ fn wide(text: &str) -> Vec<u16> {
 }
 
 pub fn association(extension: &str) -> Result<String> {
+    let result = query_association(extension)?;
+    ensure!(
+        !result.contains(['\\', '/', '\0']),
+        "invalid ProgID for extension .{extension}: {result}"
+    );
+    Ok(result)
+}
+
+// WindowsはApplications\\Illustrator.exeのような関連付けも返す。
+// 復旧一覧の照会には利用できるが、書き込み先のクラスにはそのまま使わない。
+pub(crate) fn query_association(extension: &str) -> Result<String> {
     if extension.is_empty() {
         return Ok("Unknown".into());
     }
@@ -387,8 +398,8 @@ pub fn association(extension: &str) -> Result<String> {
             .unwrap_or(buffer.len())],
     )?;
     ensure!(
-        !result.is_empty() && !result.contains(['\\', '/', '\0']),
-        "invalid ProgID"
+        !result.is_empty(),
+        "empty association for extension .{bare_extension}"
     );
     if result.eq_ignore_ascii_case("Unknown") {
         Ok(format!(".{bare_extension}"))
