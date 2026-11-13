@@ -723,6 +723,14 @@ fn library_visual_probe() {
             .unwrap();
         }
     }
+    std::fs::write(
+        fixture.join("LICENSE"),
+        format!(
+            "表示確認用の利用条件\n{}ライセンス本文の末尾",
+            "全文をアプリ内でスクロールして確認します。\n".repeat(80)
+        ),
+    )
+    .unwrap();
     {
         let manager = crate::ManagerService::acquire().unwrap();
         for id in ["sample", "long"] {
@@ -946,7 +954,7 @@ fn library_visual_probe() {
                                 view.operation = crate::operation::Operation::default();
                                 cx.notify();
                             });
-                            w.resize(size(px(1000.), px(1000.)));
+                            w.resize(size(px(1000.), px(760.)));
                             w.render_frame(cx);
                             w.click(pack_button(&manager, cx, "details", 0), cx);
                         })
@@ -960,6 +968,16 @@ fn library_visual_probe() {
                             w.render_to_image()
                                 .unwrap()
                                 .save(output.join("library-details-ja.png"))
+                                .unwrap();
+                        })
+                        .unwrap();
+                    window
+                        .update(cx, |_, w, cx| {
+                            w.click("toggle-rights", cx);
+                            w.render_frame(cx);
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join("library-license-ja.png"))
                                 .unwrap();
                         })
                         .unwrap();
@@ -979,6 +997,7 @@ fn target_editor_visual_probe() {
     // 出力と同じ親の下に隔離保存先を用意し、通常の利用者設定での誤実行を拒否する。
     assert!(home().unwrap().starts_with(output.parent().unwrap()));
     std::fs::create_dir_all(&output).unwrap();
+    let _registry = IsolatedRegistryProfile::new();
     application()
         .with_assets(crate::ui_assets::Assets)
         .run(move |cx| {
@@ -1019,6 +1038,24 @@ fn target_editor_visual_probe() {
                         ThemeMode::Dark,
                         "ja",
                         "normal",
+                    ),
+                    (
+                        "targets-collapsed-ja",
+                        1120.,
+                        780.,
+                        16.,
+                        ThemeMode::Dark,
+                        "ja",
+                        "collapsed",
+                    ),
+                    (
+                        "targets-filters-ja",
+                        1120.,
+                        780.,
+                        16.,
+                        ThemeMode::Dark,
+                        "ja",
+                        "filters",
                     ),
                     (
                         "targets-en-light",
@@ -1092,6 +1129,17 @@ fn target_editor_visual_probe() {
                     cx.background_executor()
                         .timer(std::time::Duration::from_millis(500))
                         .await;
+                    if category_view == "filters" {
+                        window
+                            .update(cx, |_, w, cx| {
+                                w.render_frame(cx);
+                                w.click("target-filter-open", cx);
+                            })
+                            .unwrap();
+                        cx.background_executor()
+                            .timer(std::time::Duration::from_millis(400))
+                            .await;
+                    }
                     window
                         .update(cx, |_, w, cx| {
                             w.render_frame(cx);
@@ -1099,6 +1147,9 @@ fn target_editor_visual_probe() {
                                 .unwrap()
                                 .save(output.join(format!("{name}.png")))
                                 .unwrap();
+                            if category_view == "filters" {
+                                w.press("escape", cx);
+                            }
                             if category_view == "normal" {
                                 w.scroll(
                                     "target-rows",
@@ -1434,6 +1485,24 @@ fn protection_visual_probe() {
                     w.press("home", cx);
                     w.render_frame(cx);
                     if details { w.click("protection-details", cx); }
+                }).unwrap();
+            }
+            for (lang, mode, width, height, font) in [
+                ("ja", ThemeMode::Dark, 1000., 760., 16.),
+                ("en", ThemeMode::Light, 640., 640., 18.),
+            ] {
+                window.update(cx, |_, w, cx| {
+                    theme::apply(mode, cx);
+                    gpui_kit::component::theme::Theme::update(cx, |theme| theme.font_size = px(font));
+                    manager.update(cx, |this, cx| { this.settings.language = lang.into(); cx.notify(); });
+                    w.resize(size(px(width), px(height)));
+                    w.render_frame(cx);
+                    w.hover("protection-help", cx);
+                }).unwrap();
+                cx.background_executor().timer(std::time::Duration::from_millis(1000)).await;
+                window.update(cx, |_, w, cx| {
+                    w.render_frame(cx);
+                    w.render_to_image().unwrap().save(output.join(format!("protection-help-{lang}.png"))).unwrap();
                 }).unwrap();
             }
             cx.update(|cx| cx.quit());

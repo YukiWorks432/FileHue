@@ -192,11 +192,16 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
         w.input("sample.mts", cx);
         w.render_frame(cx);
         assert!(!w.find("typed-preview").label().unwrap().contains("Windows"));
-        w.click("check-typed-preview", cx);
+        w.click("navigate-back", cx);
+        w.render_frame(cx);
+        assert!(w.find("pack-scroll").visible());
+        w.click(pack_button(&manager, cx, "targets", 0), cx);
     })
     .unwrap();
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("target-details-open", cx);
         w.render_frame(cx);
         assert!(
             w.find("target-planned")
@@ -379,7 +384,7 @@ fn pack_guidance_visual_probe() {
                                         .unwrap();
                                     super::protection_sources::reveal_in(
                                         w,
-                                        "check-typed-preview",
+                                        "typed-preview",
                                         "pack-scroll",
                                         cx,
                                     );

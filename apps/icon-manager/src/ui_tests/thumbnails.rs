@@ -50,129 +50,88 @@ fn selection_in_child(cx: &mut TestAppContext) {
         .unwrap()
     });
     let brand_origin = cx
-        .update_window(window, |_, window, cx| {
-            window.render_frame(cx);
-            let origin = window.find("app-brand").bounds().origin;
-            window.click("thumbnails-open", cx);
+        .update_window(window, |_, w, cx| {
+            w.resize(size(px(1120.), px(780.)));
+            w.render_frame(cx);
+            let origin = w.find("app-brand").bounds().origin;
+            w.click("thumbnails-open", cx);
             origin
         })
         .unwrap();
     cx.run_until_parked();
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        assert_eq!(window.find("app-brand").bounds().origin, brand_origin);
-        window.click("thumbnail-.ai", cx);
-        window.click("thumbnail-.eps", cx);
-        manager.update(cx, |view, _| {
-            assert_eq!(
-                view.thumbnails.draft,
-                [".ai".into(), ".eps".into()].into_iter().collect()
-            )
-        });
-        assert!(!home().unwrap().join("thumbnail-settings.json").exists());
-        assert!(!home().unwrap().join("thumbnail-recovery.json").exists());
-        // アプリ情報から戻った時は、元の画面と下書きを保つ。
-        window.render_frame(cx);
-        window.click("about-open", cx);
-        window.render_frame(cx);
-        assert_eq!(window.find("app-brand").bounds().origin, brand_origin);
-        window.click("navigate-back", cx);
-        window.render_frame(cx);
-        assert!(window.find("thumbnail-.ai").visible());
-        manager.update(cx, |view, _| assert!(view.thumbnails.draft.contains(".ai")));
-        // 上部の画面切り替えでも保存せず、下書きを残して戻れる。
-        window.render_frame(cx);
-        window.click("library", cx);
-        window.render_frame(cx);
-        window.click("thumbnails-open", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        manager.update(cx, |view, _| {
-            assert_eq!(
-                view.thumbnails.draft,
-                [".ai".into(), ".eps".into()].into_iter().collect()
-            )
-        });
-        assert!(!home().unwrap().join("thumbnail-settings.json").exists());
-        window.scroll(
-            "thumbnail-scroll",
-            gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-900.))),
-            cx,
-        );
-        window.render_frame(cx);
-        window.click("thumbnail-.pdf", cx);
-        manager.update(cx, |view, _| {
-            assert!(view.thumbnails.draft.contains(".pdf"))
-        });
-        window.click("navigate-back", cx);
-        window.render_frame(cx);
-        window.click("thumbnails-open", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        manager.update(cx, |view, _| {
-            assert_eq!(
-                view.thumbnails.draft,
-                [".ai".into(), ".eps".into(), ".pdf".into()]
-                    .into_iter()
-                    .collect()
-            )
-        });
-        window.click("thumbnail-discard", cx);
-        manager.update(cx, |view, _| assert!(view.thumbnails.draft.is_empty()));
-        window.click("thumbnail-apply", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    assert!(!home().unwrap().join("thumbnail-recovery.json").exists());
     let settings = home().unwrap().join("thumbnail-settings.json");
-    assert!(!settings.exists(), "確認だけでは設定を保存しない");
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        assert!(window.find("thumbnail-plan").visible());
-        window.scroll(
-            "thumbnail-scroll",
-            gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-500.))),
-            cx,
-        );
-        window.render_frame(cx);
-        window.click("thumbnail-.ai", cx);
-        window.click("thumbnail-discard", cx);
-        window.click("thumbnail-apply", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    assert!(!settings.exists(), "選択の変更後は再確認を必要とする");
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        assert!(window.find("thumbnail-plan").visible());
-        window.click("thumbnail-apply", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        assert_eq!(w.find("app-brand").bounds().origin, brand_origin);
+        w.click("thumbnail-apply", cx);
+        manager.update(cx, |view, _| assert!(view.thumbnails.plan.is_none()));
+        w.click("thumbnail-.ai", cx);
+        super::protection_sources::reveal_in(w, "thumbnail-.eps", "thumbnail-scroll", cx);
+        w.click("thumbnail-.eps", cx);
+        w.render_frame(cx);
+        assert_eq!(w.find("thumbnail-state-.ai").label(), Some("変更あり"));
         manager.update(cx, |view, _| {
-            assert!(matches!(
-                view.operation.status(),
-                crate::status::Status::Complete
-            ));
+            assert_eq!(
+                view.thumbnails.draft,
+                [".ai".into(), ".eps".into()].into_iter().collect()
+            );
         });
-        assert!(!settings.exists(), "未選択の適用では不要な設定を作成しない");
-        window.click("thumbnail-apply", cx);
+        assert!(!settings.exists());
+        // 画面を離れる前に確認し、キャンセルなら編集を続ける。
+        w.click("about-open", cx);
+        w.render_frame(cx);
+        w.within("dialog").click("cancel", cx);
+        w.render_frame(cx);
+        assert!(w.find("thumbnail-.ai").visible());
+        w.click("about-open", cx);
+        w.render_frame(cx);
+        w.within("dialog").click("ok", cx);
+        w.render_frame(cx);
+        w.click("navigate-back", cx);
+        w.render_frame(cx);
+        manager.update(cx, |view, _| assert!(view.thumbnails.draft.is_empty()));
+        // 一括切り替えも適用するまでは保存・登録しない。
+        w.click("thumbnail-enable-all", cx);
+        manager.update(cx, |view, _| assert_eq!(view.thumbnails.draft.len(), 6));
+        w.click("thumbnail-disable-all", cx);
+        manager.update(cx, |view, _| assert!(view.thumbnails.draft.is_empty()));
+        w.click("thumbnail-.ai", cx);
+        w.click("navigate-back", cx);
+        w.render_frame(cx);
+        w.within("dialog").click("ok", cx);
+        w.render_frame(cx);
+        w.click("thumbnails-open", cx);
     })
     .unwrap();
     cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        manager.update(cx, |view, _| assert!(view.thumbnails.draft.is_empty()));
+        w.click("thumbnail-.ai", cx);
+        w.click("thumbnail-apply", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(!settings.exists(), "変更内容の確認では保存しない");
+    assert!(!home().unwrap().join("thumbnail-recovery.json").exists());
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        assert!(w.find("thumbnail-plan").visible());
+        // 選択を変えたら、確認済みの変更予定は使い回さない。
+        super::protection_sources::reveal_in(w, "thumbnail-.eps", "thumbnail-scroll", cx);
+        w.click("thumbnail-.eps", cx);
+        w.render_frame(cx);
+        assert!(w.try_find("thumbnail-plan").is_none());
+        w.click("thumbnail-apply", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(!settings.exists());
     let orphaned = br#"{"format_version":1,"selected":[".svg"]}"#;
     std::fs::write(&settings, orphaned).unwrap();
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        window.click("thumbnail-apply", cx);
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("thumbnail-apply", cx);
     })
     .unwrap();
     cx.run_until_parked();
@@ -181,28 +140,33 @@ fn selection_in_child(cx: &mut TestAppContext) {
         orphaned,
         "確認後の外部変更を上書きしない"
     );
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        window.click("navigate-back", cx);
-        window.render_frame(cx);
-        window.click("thumbnails-open", cx);
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("navigate-back", cx);
+        w.render_frame(cx);
+        if w.try_find("dialog").is_some() {
+            w.within("dialog").click("ok", cx);
+        }
+        w.render_frame(cx);
+        w.click("thumbnails-open", cx);
     })
     .unwrap();
     cx.run_until_parked();
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        window.scroll(
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.scroll(
             "thumbnail-scroll",
             gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-900.))),
             cx,
         );
-        window.render_frame(cx);
-        assert!(window.find("thumbnail-missing-recovery").visible());
-        window.click("thumbnail-apply", cx);
-        window.click("thumbnail-restore", cx);
+        w.render_frame(cx);
+        assert!(w.find("thumbnail-missing-recovery").visible());
+        w.click("thumbnail-apply", cx);
+        manager.update(cx, |view, _| assert!(view.thumbnails.plan.is_none()));
+        w.click("thumbnail-restore", cx);
+        manager.update(cx, |view, _| assert!(!view.operation.busy()));
     })
     .unwrap();
-    cx.run_until_parked();
     assert_eq!(std::fs::read(settings).unwrap(), orphaned);
 }
 

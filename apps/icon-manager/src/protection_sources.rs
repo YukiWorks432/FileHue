@@ -248,7 +248,12 @@ impl Manager {
                         .size(if large { px(48.) } else { px(20.) })
                         .text_color(colors.muted_foreground),
                 )
-                .tooltip(move |window, cx| Tooltip::new(missing_tip).build(window, cx))
+                .tooltip(move |window, cx| {
+                    Tooltip::new(missing_tip)
+                        .max_w(rems(28.))
+                        .whitespace_normal()
+                        .build(window, cx)
+                })
                 .into_any_element()
         };
         let label = if large && !has_preview {

@@ -172,10 +172,16 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         assert_eq!(w.find("target-search").value(), Some(".mts"));
         assert!(w.find("target-toggle-extension:mts").visible());
-        w.click(("target-filter", 5usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 5, cx);
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         assert!(w.find("target-toggle-extension:mts").visible());
-        w.click(("target-filter", 0usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 0, cx);
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("target-protection-extension:mts", cx);
         w.render_frame(cx);

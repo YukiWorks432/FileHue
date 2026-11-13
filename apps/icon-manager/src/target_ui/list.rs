@@ -213,7 +213,7 @@ impl Manager {
             );
         if self.targets.selecting {
             row = row.child(
-                Checkbox::new(SharedString::from(format!("target-mark-{}", target.id)))
+                theme::checkbox(SharedString::from(format!("target-mark-{}", target.id)))
                     .small()
                     .checked(self.targets.marked.contains(&target.id))
                     .accessibility_label(format!(
@@ -256,7 +256,12 @@ impl Manager {
             .child(
                 icon_slot
                     .id(SharedString::from(format!("target-icon-{}", target.id)))
-                    .tooltip(move |window, cx| Tooltip::new(icon_tip).build(window, cx)),
+                    .tooltip(move |window, cx| {
+                        Tooltip::new(icon_tip)
+                            .max_w(rems(28.))
+                            .whitespace_normal()
+                            .build(window, cx)
+                    }),
             )
             .child(
                 div()
@@ -274,7 +279,10 @@ impl Manager {
                             .aria_label(name.clone())
                             .child(name.clone())
                             .tooltip(move |window, cx| {
-                                Tooltip::new(name.clone()).build(window, cx)
+                                Tooltip::new(name.clone())
+                                    .max_w(rems(28.))
+                                    .whitespace_normal()
+                                    .build(window, cx)
                             }),
                     )
                     .child({
@@ -296,7 +304,7 @@ impl Manager {
                     }),
             )
             .child(
-                Checkbox::new(SharedString::from(format!("target-toggle-{}", target.id)))
+                theme::checkbox(SharedString::from(format!("target-toggle-{}", target.id)))
                     .small()
                     .checked(enabled)
                     .label(self.text("対象", "Include"))

@@ -898,7 +898,10 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
     assert_eq!(key.get_value::<String, _>("").unwrap(), "%1");
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        assert_eq!(w.find("recovery-status").label(), Some("完了しました。"));
+        assert_eq!(
+            w.find("recovery-status").label(),
+            Some("アイコン設定を復旧しました。")
+        );
         assert!(w.try_find("recovery-progress").is_none());
         w.click("recovery-close", cx);
         w.render_frame(cx);

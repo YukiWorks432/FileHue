@@ -130,6 +130,14 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.click(pack_button(&manager, cx, "targets", 0), cx);
         w.render_frame(cx);
+        // カテゴリ欄を閉じると一覧へ幅を渡し、再度開いて同じ作業を続けられる。
+        let initial_width = w.find("target-rows").bounds().size.width;
+        w.click("target-categories-open", cx);
+        w.render_frame(cx);
+        assert!(w.find("target-rows").bounds().size.width > initial_width);
+        w.click("target-categories-open", cx);
+        w.render_frame(cx);
+        assert!(w.find("target-all-categories").visible());
         // 初回・幅変更直後も、検索や絞り込みで再初期化せずページ末尾へ到達する。
         let last = manager.read(cx).settings.packs[0].theme.targets()[99]
             .id
@@ -166,6 +174,21 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         w.click("target-category-data", cx);
         w.render_frame(cx);
         assert!(w.find("target-toggle-extension:json").visible());
+        let hit = w.find("target-toggle-extension:json").bounds().size;
+        assert!(hit.height >= px(32.));
+        // ラベル側をクリックしても切り替わり、箱の16pxに操作を限定しない。
+        w.click_at(
+            "target-toggle-extension:json",
+            gpui_kit::point(hit.width - px(2.), hit.height / 2.),
+            cx,
+        );
+        w.render_frame(cx);
+        assert_eq!(
+            w.find("target-toggle-extension:json").checked(),
+            Some(false)
+        );
+        w.click("target-undo", cx);
+        w.render_frame(cx);
         assert!(w.try_find("target-toggle-extension:md").is_none());
         w.press("down", cx);
         w.render_frame(cx);
@@ -328,11 +351,17 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         assert_eq!(w.find("target-save").label(), Some("Save selection"));
         assert!(w.try_find("target-save-progress").is_none());
-        w.click(("target-filter", 2usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 2, cx);
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         assert!(w.try_find("target-toggle-file:package.json").is_none());
         assert!(w.find("target-toggle-extension:json").visible());
-        w.click(("target-filter", 0usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 0, cx);
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("target-toggle-file:package.json", cx);
         w.render_frame(cx);
@@ -431,9 +460,9 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
             cx,
         );
         w.render_frame(cx);
-        assert!(w.try_find("target-search").is_none());
-        w.click(pack_button(&manager, cx, "targets", 1), cx);
+        w.within("dialog").click("cancel", cx);
         w.render_frame(cx);
+        assert!(w.find("target-search").visible());
         w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.press("backspace", cx);
@@ -650,7 +679,10 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("zprobe", cx);
-        w.click(("target-filter", 1usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 1, cx);
+    cx.update_window(window, |_, w, cx| {
         w.scroll(
             "target-rows",
             gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-100000.))),

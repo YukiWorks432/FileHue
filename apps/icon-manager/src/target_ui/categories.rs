@@ -161,6 +161,7 @@ impl Manager {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.targets.categories_visible = view != "collapsed";
         self.targets.auxiliary = (view == "categories").then_some(Auxiliary::Categories);
         if view == "focus" {
             self.targets.categories.update(cx, |state, cx| {
@@ -238,7 +239,14 @@ impl Manager {
                     .px_3()
                     .py_2()
                     .text_xs()
+                    .flex()
+                    .items_center()
+                    .gap_2()
                     .text_color(cx.theme().colors.muted_foreground)
+                    .child(
+                        gpui_kit::component::Icon::new(gpui_kit::assets::IconName::ListFilter)
+                            .size_4(),
+                    )
                     .child(self.text("カテゴリで絞り込み", "Browse categories")),
             )
             .child(

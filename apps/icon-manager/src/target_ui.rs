@@ -2,8 +2,8 @@
 use super::*;
 use file_icons_core::selection::{CATEGORIES, Selection, Target, TargetQuery};
 use gpui_kit::component::button::ButtonVariants;
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_kit::component::scroll::ScrollableElement;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
@@ -67,8 +67,31 @@ pub(super) struct Editor {
     focused: Option<Target>,
     protection_target: Option<String>,
     preview_class: Option<protection::PreviewClass>,
+    categories_visible: bool,
 }
 impl Editor {
+    pub(super) fn has_changes(&self, settings: &Settings) -> bool {
+        self.pack
+            .as_ref()
+            .and_then(|id| self.drafts.get(id).map(|draft| (id, draft)))
+            .is_some_and(|(id, draft)| {
+                draft
+                    .value
+                    .changes_from(settings.selections.get(id).unwrap_or(&Selection::default()))
+                    > 0
+            })
+    }
+    pub(super) fn is_main(&self) -> bool {
+        self.auxiliary.is_none()
+    }
+    pub(super) fn discard(&mut self, settings: &Settings) {
+        if let Some(id) = &self.pack
+            && let Some(draft) = self.drafts.get_mut(id)
+        {
+            draft.reset(settings.selections.get(id).cloned().unwrap_or_default());
+        }
+        self.invalidate();
+    }
     pub(super) fn invalidate(&mut self) {
         self.results = None;
         self.list.remeasure();
@@ -164,6 +187,7 @@ impl Editor {
             focused: None,
             protection_target: None,
             preview_class: None,
+            categories_visible: true,
         }
     }
     fn reset_page(&mut self) {
@@ -199,20 +223,6 @@ impl Manager {
         self.targets.copy_changes = None;
     }
 
-    pub(super) fn open_preview_outcome(
-        &mut self,
-        id: &str,
-        name: String,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.open_targets(id, cx);
-        self.preview
-            .update(cx, |input, cx| input.set_value(name, window, cx));
-        self.targets.auxiliary = Some(Auxiliary::Details);
-        self.inspect_target_preview(cx);
-        self.focus.focus(window, cx);
-    }
     #[cfg(test)]
     pub(crate) fn prepare_auxiliary_visual(&mut self, copy: bool) {
         let pack = &self.settings.packs[0];
@@ -254,6 +264,13 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
+        if self.targets.is_main() && self.targets.has_changes(&self.settings) {
+            self.confirm_navigation(window, cx, |this, window, cx| {
+                this.back_from_targets(window, cx)
+            });
+            return;
+        }
+        self.operation.clear_result();
         if self.targets.auxiliary.take().is_none() {
             self.targets.pack = None;
             self.screen = Screen::Packs;
@@ -265,6 +282,7 @@ impl Manager {
         cx.notify();
     }
     pub(super) fn open_targets(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.operation.clear_result();
         self.targets.all = self
             .settings
             .packs
@@ -395,7 +413,7 @@ impl Manager {
         let header = self.target_header(&pack.label, compact, cx);
         let mut body = div().flex_1().min_h_0().min_w_0().flex().p_3().gap_3();
         if self.targets.auxiliary == Some(Auxiliary::Categories)
-            || (!compact && self.targets.auxiliary.is_none())
+            || (!compact && self.targets.categories_visible && self.targets.auxiliary.is_none())
         {
             body = body.child(self.target_categories(all, compact, window, cx));
         }
@@ -445,9 +463,14 @@ impl Manager {
                     .truncate()
                     .aria_label(full_title.clone())
                     .child(full_title.clone())
-                    .tooltip(move |window, cx| Tooltip::new(full_title.clone()).build(window, cx)),
+                    .tooltip(move |window, cx| {
+                        Tooltip::new(full_title.clone())
+                            .max_w(rems(28.))
+                            .whitespace_normal()
+                            .build(window, cx)
+                    }),
             );
-        if compact {
+        {
             tools = tools
                 .child(
                     theme::button("protection-open", cx)
@@ -505,16 +528,26 @@ impl Manager {
                 Auxiliary::Copy,
             ),
         ] {
-            if section == Auxiliary::Categories && !compact {
-                continue;
-            }
             tools = tools.child(
                 theme::button(id, cx)
                     .small()
                     .label(self.text(ja, en))
-                    .selected(self.targets.auxiliary == Some(section))
-                    .toggled(self.targets.auxiliary == Some(section))
+                    .when(section == Auxiliary::Categories, |button| {
+                        button.icon(IconName::PanelLeft)
+                    })
+                    .selected(if section == Auxiliary::Categories && !compact {
+                        self.targets.categories_visible
+                    } else {
+                        self.targets.auxiliary == Some(section)
+                    })
                     .on_click(cx.listener(move |this, _, window, cx| {
+                        this.operation.clear_result();
+                        if section == Auxiliary::Categories && !compact {
+                            this.targets.categories_visible = !this.targets.categories_visible;
+                            this.targets.list.remeasure();
+                            cx.notify();
+                            return;
+                        }
                         this.targets.auxiliary = if this.targets.auxiliary == Some(section) {
                             None
                         } else {
@@ -691,7 +724,7 @@ impl Manager {
                 .unwrap_or_default();
             let enable = enabled != total;
             heading = heading.child(
-                Checkbox::new(SharedString::from(format!(
+                theme::checkbox(SharedString::from(format!(
                     "target-category-toggle-{category}"
                 )))
                 .small()
@@ -716,6 +749,43 @@ impl Manager {
                 })),
             );
         }
+        let filters = [
+            self.text("すべて", "All"),
+            self.text("対象に含む", "Included"),
+            self.text("対象外", "Excluded"),
+            self.text("個別設定あり", "Overrides"),
+            self.text("変更あり", "Changed"),
+            self.text("保護中", "Protected"),
+        ];
+        let selected = self.targets.filter as usize;
+        let owner = cx.entity().downgrade();
+        let filter = theme::button("target-filter-open", cx)
+            .small()
+            .icon(IconName::ListFilter)
+            .label(if selected == 0 {
+                self.text("絞り込み", "Filter")
+            } else {
+                filters[selected]
+            })
+            .accessibility_label(self.text("対象の表示を絞り込む", "Filter target list"))
+            .selected(selected != 0)
+            .dropdown_menu(move |mut menu, _, _| {
+                for (index, label) in filters.into_iter().enumerate() {
+                    let owner = owner.clone();
+                    menu = menu.item(
+                        PopupMenuItem::new(label)
+                            .checked(index == selected)
+                            .on_click(move |_, _, cx| {
+                                let _ = owner.update(cx, |this, cx| {
+                                    this.targets.filter = index as u8;
+                                    this.targets.reset_page();
+                                    cx.notify();
+                                });
+                            }),
+                    );
+                }
+                menu
+            });
         let mut tools = div()
             .flex_shrink_0()
             .flex()
@@ -725,8 +795,15 @@ impl Manager {
             .border_b_1()
             .border_color(cx.theme().colors.border)
             .child(heading)
-            .child(div().text_xs().text_color(cx.theme().colors.muted_foreground)
-                .child(self.text("下書きを含む、保存後の表示予定です。対象に含めても保護設定が優先されます。", "Results include draft changes. Protection takes priority over inclusion.")))
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().colors.muted_foreground)
+                    .child(self.text(
+                        "下部の適用ボタンを押すまで、実際のアイコンは変わりません。",
+                        "Actual icons stay unchanged until you use the apply button below.",
+                    )),
+            )
             .child(
                 div()
                     .flex()
@@ -746,32 +823,9 @@ impl Manager {
                             )
                             .flex_1()
                             .min_w_0(),
-                    ),
+                    )
+                    .child(filter),
             );
-        let filters = [
-            self.text("すべて", "All"),
-            self.text("対象に含む", "Included"),
-            self.text("対象外", "Excluded"),
-            self.text("個別設定あり", "Overrides"),
-            self.text("変更あり", "Changed"),
-            self.text("保護中", "Protected"),
-        ];
-        let mut filter_row = div().flex().flex_wrap().gap_1();
-        for (index, label) in filters.into_iter().enumerate() {
-            filter_row = filter_row.child(
-                theme::button(("target-filter", index), cx)
-                    .small()
-                    .label(label)
-                    .selected(self.targets.filter == index as u8)
-                    .toggled(self.targets.filter == index as u8)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.targets.filter = index as u8;
-                        this.targets.reset_page();
-                        cx.notify();
-                    })),
-            );
-        }
-        tools = tools.child(filter_row);
         let marked: Vec<_> = self.targets.marked.iter().cloned().collect();
         let ids: Arc<[String]> = if self.targets.selecting {
             marked.clone().into()
@@ -977,7 +1031,7 @@ impl Manager {
                 } else { format!("{}: {dirty}", self.text("未保存の変更", "Unsaved changes")) }))
                 .child(theme::button("target-restart-help", cx).small().icon(IconName::Info)
                     .accessibility_label(self.text("Explorerの表示更新について", "About refreshing Explorer icons"))
-                    .tooltip(self.text("チェックを外した対象はWindowsの元の表示になります。反映されない場合は、ファイル操作を終えてからExplorerを再起動してください。", "Unchecked targets use the original Windows icons. If icons do not update, finish file operations and restart Explorer.")))
+                    .tooltip(self.text("チェックを外した対象はWindowsの元の表示になります。\n反映されない場合は、ファイル操作を終えてから\nExplorerを再起動してください。", "Unchecked targets use the original Windows icons.\nIf icons do not update, finish file operations\nand restart Explorer.")))
                 .child(
                     theme::button("target-undo", cx)
                         .small()
@@ -1016,10 +1070,7 @@ impl Manager {
                 .child(div().flex_1())
                 .child(commits),
         );
-        let message = self
-            .operation
-            .status()
-            .render(self.settings.language == "en");
+        let message = self.operation.message(self.settings.language == "en");
         let has_message = !message.is_empty()
             && !self.operation.running(Kind::SaveTargets)
             && !self.operation.running(Kind::Apply);

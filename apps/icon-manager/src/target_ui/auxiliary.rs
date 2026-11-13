@@ -148,6 +148,7 @@ impl Manager {
                     .small()
                     .label(self.text("対象一覧に戻る", "Back to targets"))
                     .on_click(cx.listener(|this, _, window, cx| {
+                        this.operation.clear_result();
                         this.targets.auxiliary = None;
                         window.focus(&this.focus, cx);
                         cx.notify();

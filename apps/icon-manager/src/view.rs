@@ -20,6 +20,57 @@ pub(super) enum Screen {
 }
 
 impl Manager {
+    pub(super) fn confirm_navigation(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        proceed: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + 'static,
+    ) {
+        let dirty = match self.screen {
+            Screen::Targets => self.targets.has_changes(&self.settings),
+            Screen::Thumbnails => self.thumbnails.dirty(),
+            _ => false,
+        };
+        if !dirty {
+            self.operation.clear_result();
+            proceed(self, window, cx);
+            return;
+        }
+        use gpui_kit::component::WindowExt as _;
+        let title = self.text("未適用の変更を破棄しますか？", "Discard unapplied changes?");
+        let description = self.text(
+            "変更を反映せずに、この画面を離れます。",
+            "Leave this screen without applying the changes.",
+        );
+        let cancel = self.text("編集を続ける", "Keep editing");
+        let discard = self.text("破棄して移動", "Discard and leave");
+        let owner = cx.entity().downgrade();
+        let proceed = std::rc::Rc::new(proceed);
+        window.open_alert_dialog(cx, move |dialog, _, _| {
+            let owner = owner.clone();
+            let proceed = proceed.clone();
+            dialog
+                .entrance(gpui_kit::component::dialog::DialogEntrance::None)
+                .title(title)
+                .description(description)
+                .confirm()
+                .cancel_text(cancel)
+                .ok_text(discard)
+                .on_ok(move |_, window, cx| {
+                    let _ = owner.update(cx, |this, cx| {
+                        if this.screen == Screen::Targets {
+                            this.targets.discard(&this.settings);
+                        }
+                        if this.screen == Screen::Thumbnails {
+                            this.thumbnails.discard();
+                        }
+                        this.operation.clear_result();
+                        proceed(this, window, cx);
+                    });
+                    true
+                })
+        });
+    }
     fn navigation_root(&self, cx: &mut Context<Self>) -> Stateful<Div> {
         div()
             .id("manager")
@@ -62,6 +113,13 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
+        if self.screen == Screen::Thumbnails && self.thumbnails.dirty() {
+            self.confirm_navigation(window, cx, |this, window, cx| {
+                this.navigate_back(window, cx)
+            });
+            return;
+        }
+        self.operation.clear_result();
         if self.screen == Screen::Thumbnails {
             self.screen = self.thumbnails.return_to.take().unwrap_or(Screen::Packs);
             self.focus.focus(window, cx);
@@ -85,7 +143,7 @@ impl Manager {
             self.focus.focus(window, cx);
             cx.notify();
         } else if self.selected.take().is_some() {
-            self.rights.clear();
+            self.rights = None;
             self.show_rights = false;
             self.focus.focus(window, cx);
             cx.notify();
@@ -180,7 +238,8 @@ impl Manager {
                         theme::button("about-open", cx)
                             .small()
                             .icon(IconName::Info)
-                            .label(self.text("アプリ情報", "About"))
+                            .accessibility_label(self.text("アプリ情報", "About"))
+                            .tooltip(self.text("アプリ情報", "About"))
                             .disabled_elevated(
                                 self.operation.busy()
                                     || matches!(
@@ -190,12 +249,14 @@ impl Manager {
                             )
                             .on_click(cx.listener(|this, _, window, cx| {
                                 if this.screen != Screen::About {
-                                    this.about.return_to = Some(this.screen);
-                                    this.about.license_text = None;
-                                    this.screen = Screen::About;
-                                    this.about.scroll.set_offset(point(px(0.), px(0.)));
-                                    this.focus.focus(window, cx);
-                                    cx.notify();
+                                    this.confirm_navigation(window, cx, |this, window, cx| {
+                                        this.about.return_to = Some(this.screen);
+                                        this.about.license_text = None;
+                                        this.screen = Screen::About;
+                                        this.about.scroll.set_offset(point(px(0.), px(0.)));
+                                        this.focus.focus(window, cx);
+                                        cx.notify();
+                                    });
                                 }
                             })),
                     ),
@@ -245,7 +306,7 @@ impl Manager {
     }
 
     pub(super) fn toolbar(&self, compact: bool, cx: &mut Context<Self>) -> Div {
-        if compact && self.screen == Screen::Targets {
+        if self.screen == Screen::Targets {
             return div();
         }
         if compact && self.screen == Screen::Protection {
@@ -308,8 +369,10 @@ impl Manager {
                                     .font_weight(FontWeight::SEMIBOLD)
                             })
                             .on_click(cx.listener(|this, _, window, cx| {
-                                this.screen = Screen::Packs;
-                                this.show_library(false, window, cx);
+                                this.confirm_navigation(window, cx, |this, window, cx| {
+                                    this.screen = Screen::Packs;
+                                    this.show_library(false, window, cx);
+                                });
                             })),
                     )
                     .child(
@@ -324,29 +387,12 @@ impl Manager {
                                     .font_weight(FontWeight::SEMIBOLD)
                             })
                             .on_click(cx.listener(|this, _, window, cx| {
-                                this.screen = Screen::Packs;
-                                this.show_library(true, window, cx);
+                                this.confirm_navigation(window, cx, |this, window, cx| {
+                                    this.screen = Screen::Packs;
+                                    this.show_library(true, window, cx);
+                                });
                             })),
                     ),
-            )
-            .child(
-                theme::button("thumbnails-open", cx)
-                    .small()
-                    .ml_4()
-                    .icon(IconName::FileImage)
-                    .label(self.text("ファイルのプレビュー", "File previews"))
-                    .tooltip(self.text(
-                        "エクスプローラーで内容を表示するファイル形式を選びます。",
-                        "Choose file types to preview in Explorer.",
-                    ))
-                    .selected(self.screen == Screen::Thumbnails)
-                    .when(self.screen == Screen::Thumbnails, |b| b.primary())
-                    .disabled_elevated(locked || self._guard.is_none())
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        if this.screen != Screen::Thumbnails {
-                            this.open_thumbnails(cx);
-                        }
-                    })),
             )
             .child(
                 theme::button("protection-open", cx)
@@ -358,7 +404,11 @@ impl Manager {
                     .disabled_elevated(
                         self.operation.busy() || !self.valid || self.screen == Screen::Protection,
                     )
-                    .on_click(cx.listener(|this, _, window, cx| this.open_protection(window, cx))),
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.confirm_navigation(window, cx, |this, window, cx| {
+                            this.open_protection(window, cx)
+                        });
+                    })),
             )
             .child(
                 theme::button("conflicts-open", cx)
@@ -382,6 +432,25 @@ impl Manager {
                             window,
                             cx,
                         )
+                    })),
+            )
+            .child(
+                theme::button("thumbnails-open", cx)
+                    .small()
+                    .ml_4()
+                    .icon(IconName::FileImage)
+                    .label(self.text("ファイルのプレビュー", "File previews"))
+                    .tooltip(self.text(
+                        "エクスプローラーで内容を表示するファイル形式を選びます。",
+                        "Choose file types to preview in Explorer.",
+                    ))
+                    .selected(self.screen == Screen::Thumbnails)
+                    .when(self.screen == Screen::Thumbnails, |b| b.primary())
+                    .disabled_elevated(locked || self._guard.is_none())
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        if this.screen != Screen::Thumbnails {
+                            this.open_thumbnails(cx);
+                        }
                     })),
             )
     }
@@ -431,8 +500,8 @@ impl Manager {
                         self.text("設定を退避して元に戻す", "Back up settings and restore")
                     })
                     .tooltip(self.text(
-                        "元のアイコン設定に戻します。表示が変わらない場合は、ファイル操作を終えてからタスク マネージャーでExplorerを再起動し、フォルダーを開き直してください。",
-                        "Restore the original icon settings. If icons do not update, finish file operations, restart Windows Explorer in Task Manager, then reopen folders.",
+                        "元のアイコン設定に戻します。\n表示が変わらない場合は、ファイル操作を終えてから\nタスク マネージャーでExplorerを再起動し、\nフォルダーを開き直してください。",
+                        "Restore the original icon settings.\nIf icons do not update, finish file operations,\nrestart Windows Explorer in Task Manager,\nthen reopen folders.",
                     ))
                     .disabled_elevated(
                         self.operation.busy()
@@ -450,10 +519,7 @@ impl Manager {
 
     fn footer(&self, cx: &mut Context<Self>) -> Div {
         let colors = cx.theme().colors;
-        let message = self
-            .operation
-            .status()
-            .render(self.settings.language == "en");
+        let message = self.operation.message(self.settings.language == "en");
         let status = div()
             .id("status")
             .role(Role::Status)
@@ -609,7 +675,7 @@ impl Render for Manager {
                 .standard_root(cx)
                 .child(self.header(cx))
                 .child(self.toolbar(compact, cx))
-                .child(self.thumbnail_panel(cx));
+                .child(self.thumbnail_panel(window, cx));
         }
         if self.screen == Screen::About {
             return self

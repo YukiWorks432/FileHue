@@ -82,6 +82,13 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
+        if self.screen == Screen::Thumbnails && self.thumbnails.dirty() {
+            self.confirm_navigation(window, cx, move |this, window, cx| {
+                this.open_conflicts(strategy, window, cx)
+            });
+            return;
+        }
+        self.operation.clear_result();
         let Some(service) = self._guard.clone() else {
             return;
         };
@@ -657,9 +664,7 @@ impl Manager {
         let message = if busy {
             String::new()
         } else {
-            self.operation
-                .status()
-                .render(self.settings.language == "en")
+            self.operation.message(self.settings.language == "en")
         };
         let has_message = !message.is_empty();
         let status = div()

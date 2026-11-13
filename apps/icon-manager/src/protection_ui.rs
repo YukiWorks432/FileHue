@@ -10,7 +10,6 @@ mod recommendations;
 mod sources;
 use gpui_kit::component::{
     Sizable,
-    checkbox::Checkbox,
     scroll::ScrollableElement,
     select::{Select, SelectEvent, SelectItem, SelectState},
     spinner::Spinner,
@@ -285,6 +284,7 @@ impl Manager {
     }
 
     pub(super) fn open_protection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.operation.clear_result();
         let from_targets = self.targets.pack.is_some();
         self.protection.presentation.previous_focus = window.focused(cx);
         self.focus.focus(window, cx);
@@ -786,10 +786,10 @@ impl Manager {
                     cx.notify();
                 }
             }));
-        let mut settings = theme::card(cx).mx_4().mt_3().mb_2().p_3()
+        let mut settings = theme::card(cx).mx_4().mt_3().mb_2().px_3().py_2()
             .flex_shrink_0().flex().flex_col().gap_2()
             .child(div().flex().items_center().gap_2()
-                .child(Checkbox::new("protection-toggle")
+                .child(theme::checkbox("protection-toggle")
                     .checked(self.protection.draft.enabled).disabled(blocked)
                     .label(self.text("既定では既存アイコンを保護する", "Protect existing icons by default"))
                     .on_click(cx.listener(|this, checked, _, cx| {
@@ -800,8 +800,8 @@ impl Manager {
                 .child(theme::button("protection-help", cx).small().icon(IconName::Info)
                     .accessibility_label(self.text("保護と表示見本について", "About protection and previews"))
                     .tooltip(self.text(
-                        "保護設定は全パック共通で、ソフト・種類ごとに変更できます。.lnk・.exeは常に保護します。見本は代表ファイルの設定から算出します。ファイル名やExplorerの更新状況により表示が異なる場合があります。",
-                        "Protection applies to all packs and can be changed by software or file type. .lnk and .exe are always protected. Previews use representative filenames and settings; filenames and Explorer refresh can affect the display.",
+                        "保護設定は全パック共通です。\nソフト・種類ごとに変更できます。\n.lnk・.exeは常に保護します。\n見本は代表ファイルの設定から算出します。\nファイル名やExplorerの更新状況により表示が異なります。",
+                        "Protection applies to all packs.\nChange settings by software or file type.\n.lnk and .exe are always protected.\nPreviews use representative filenames and settings.\nFilenames and Explorer refresh can affect the display.",
                     ))));
         let mut packs = div().flex().items_center().gap_2().min_w_0().child(
             div()
@@ -1179,9 +1179,7 @@ impl Manager {
                             colors.muted_foreground
                         })
                         .child(if self.operation.busy() || self.operation.failed() {
-                            self.operation
-                                .status()
-                                .render(self.settings.language == "en")
+                            self.operation.message(self.settings.language == "en")
                         } else if dirty {
                             self.text("未保存の変更", "Unsaved changes").to_owned()
                         } else {

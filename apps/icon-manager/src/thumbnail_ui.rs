@@ -5,7 +5,9 @@ use file_icons_windows::thumbnails::Format;
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{
     assets::IconName,
-    component::{Sizable, button::ButtonVariants, scroll::ScrollableElement},
+    component::{
+        Icon, Sizable, button::ButtonVariants, scroll::ScrollableElement, switch::Switch, tag::Tag,
+    },
 };
 use std::collections::BTreeSet;
 
@@ -18,6 +20,23 @@ pub(super) struct Editor {
     pub(super) plan: Option<ThumbnailSelectionPlan>,
     error: Option<String>,
     scroll: ScrollHandle,
+}
+
+impl Editor {
+    pub(super) fn applied(&self) -> BTreeSet<String> {
+        self.status
+            .as_ref()
+            .and_then(|status| status.recovery.as_ref())
+            .and_then(|record| record.selected_extensions().ok())
+            .unwrap_or_default()
+    }
+    pub(super) fn dirty(&self) -> bool {
+        self.status.is_some() && self.draft != self.applied()
+    }
+    pub(super) fn discard(&mut self) {
+        self.draft = self.applied();
+        self.plan = None;
+    }
 }
 
 impl Manager {
@@ -121,71 +140,162 @@ impl Manager {
         cx.notify();
     }
 
-    pub(super) fn thumbnail_panel(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn thumbnail_panel(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let colors = cx.theme().colors;
         let failed = self.thumbnails.error.is_some()
             || self.thumbnails.status.as_ref().is_some_and(|status| {
                 status.missing_recovery || status.group_errors.iter().any(Option::is_some)
             });
         let busy = self.operation.busy();
-        let actual = self
-            .thumbnails
-            .status
-            .as_ref()
-            .and_then(|status| status.recovery.as_ref())
-            .and_then(|record| record.selected_extensions().ok())
-            .unwrap_or_default();
-        let mut list = theme::card(cx).flex().flex_col();
+        let actual = self.thumbnails.applied();
+        let dirty = self.thumbnails.dirty();
+        let unavailable = busy || failed || self.thumbnails.status.is_none();
+        let compact = window.viewport_size().width < window.rem_size() * 48.;
+        let mut list = theme::card(cx)
+            .grid()
+            .grid_cols(if compact { 1 } else { 2 });
         for format in Format::ALL {
             let extension = format.extension();
             let chosen = self.thumbnails.draft.contains(extension);
+            let applied = actual.contains(extension);
             let description = match format {
-                Format::Ai => self.text("埋め込みプレビュー", "Embedded preview"),
-                Format::Eps => self.text("埋め込みプレビュー", "Embedded preview"),
                 Format::Svg => self.text("画像を描画", "Render image"),
-                Format::Psd | Format::Psb => self.text("埋め込みプレビュー", "Embedded preview"),
                 Format::Pdf => self.text("先頭ページ", "First page"),
+                _ => self.text("埋め込みプレビュー", "Embedded preview"),
             };
-            let applied = if failed || self.thumbnails.status.is_none() {
-                self.text("要確認", "Unknown")
-            } else if actual.contains(extension) {
-                self.text("適用中", "Applied")
+            let (state, badge) = if failed || self.thumbnails.status.is_none() {
+                (self.text("要確認", "Needs review"), Tag::warning())
+            } else if chosen != applied {
+                (self.text("変更あり", "Changed"), Tag::info())
+            } else if applied {
+                (
+                    self.text("プレビュー有効", "Previews enabled"),
+                    Tag::secondary(),
+                )
             } else {
-                self.text("未適用", "Not applied")
+                (
+                    self.text("プレビュー無効", "Previews disabled"),
+                    Tag::secondary(),
+                )
             };
+            let status = div()
+                .id(SharedString::from(format!("thumbnail-state-{extension}")))
+                .role(Role::Status)
+                .aria_label(state)
+                .flex()
+                .items_center()
+                .child(badge.small().outline().child(state));
+            #[cfg(feature = "test-support")]
+            let status = status.test_support();
+            let name = format!("sample{extension}");
+            let icon = self
+                .settings
+                .active
+                .as_ref()
+                .and_then(|id| self.settings.packs.iter().find(|pack| &pack.id == id))
+                .and_then(|pack| {
+                    self.settings
+                        .selections
+                        .get(&pack.id)
+                        .cloned()
+                        .unwrap_or_default()
+                        .resolve(&pack.theme, &name)
+                        .map(|(icon, _)| icon.to_path_buf())
+                });
+            let artwork = match icon {
+                Some(icon) => crate::icon_preview::preview(icon, rems(2.)).into_any_element(),
+                None => Icon::new(match format {
+                    Format::Svg => IconName::FileCode,
+                    Format::Pdf => IconName::FileText,
+                    _ => IconName::FileImage,
+                })
+                .size_8()
+                .text_color(colors.muted_foreground)
+                .into_any_element(),
+            };
+            let control = Switch::new(format!("thumbnail-{extension}"))
+                .label(extension)
+                .min_h(rems(2.))
+                .checked(chosen)
+                .accessibility_label(format!(
+                    "{} {extension}",
+                    self.text("ファイルプレビュー", "File previews")
+                ))
+                .disabled(unavailable)
+                .on_click(cx.listener(move |this, checked, _, cx| {
+                    this.thumbnails.plan = None;
+                    if *checked {
+                        this.thumbnails.draft.insert(extension.into());
+                    } else {
+                        this.thumbnails.draft.remove(extension);
+                    }
+                    cx.notify();
+                }));
             list = list.child(
                 div()
                     .flex()
-                    .flex_wrap()
-                    .items_center()
+                    .items_start()
                     .gap_3()
                     .p_3()
-                    .child(
-                        theme::button(format!("thumbnail-{extension}"), cx)
-                            .small()
-                            .label(extension.to_owned())
-                            .selected(chosen)
-                            .when(chosen, |button| button.primary().icon(IconName::Check))
-                            .disabled_elevated(busy || failed || self.thumbnails.status.is_none())
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.thumbnails.plan = None;
-                                if !this.thumbnails.draft.remove(extension) {
-                                    this.thumbnails.draft.insert(extension.into());
-                                }
-                                cx.notify();
-                            })),
-                    )
+                    .min_w_0()
+                    .border_b_1()
+                    .border_color(colors.border)
+                    .child(div().size_8().flex_shrink_0().mt_1().child(artwork))
                     .child(
                         div()
-                            .text_sm()
-                            .text_color(colors.muted_foreground)
-                            .child(description),
-                    )
-                    .child(div().flex_1().min_w_0())
-                    .child(div().text_sm().child(applied)),
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .flex_wrap()
+                                    .gap_2()
+                                    .child(control)
+                                    .child(status),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(colors.muted_foreground)
+                                    .child(description),
+                            ),
+                    ),
+            );
+        }
+
+        let mut bulk = div().flex().items_center().gap_2();
+        for (id, ja, en, enabled) in [
+            ("thumbnail-enable-all", "すべて有効", "Enable all", true),
+            ("thumbnail-disable-all", "すべて無効", "Disable all", false),
+        ] {
+            bulk = bulk.child(
+                theme::button(id, cx)
+                    .small()
+                    .label(self.text(ja, en))
+                    .disabled_elevated(unavailable)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.thumbnails.draft = if enabled {
+                            Format::ALL
+                                .iter()
+                                .map(|format| format.extension().into())
+                                .collect()
+                        } else {
+                            BTreeSet::new()
+                        };
+                        this.thumbnails.plan = None;
+                        cx.notify();
+                    })),
             );
         }
         let heading = div()
+            .w_full()
+            .max_w(rems(56.))
+            .mx_auto()
             .flex_shrink_0()
             .px_4()
             .pt_4()
@@ -200,8 +310,10 @@ impl Manager {
                     .child(self.text("ファイルのプレビュー", "File previews")),
             )
             .child(div().flex_1())
+            .child(bulk)
             .child(
                 theme::button("thumbnail-restore", cx)
+                    .small()
                     .label(self.text("すべて元に戻す", "Restore all"))
                     .disabled_elevated(
                         busy || self._guard.is_none()
@@ -223,8 +335,11 @@ impl Manager {
         let mut panel = div()
             .flex()
             .flex_col()
-            .gap_4()
+            .gap_3()
             .p_4()
+            .w_full()
+            .max_w(rems(56.))
+            .mx_auto()
             .child(
                 div()
                     .flex()
@@ -337,17 +452,7 @@ impl Manager {
             let preview = preview.id("thumbnail-plan").test_support();
             panel = panel.child(preview);
         }
-        panel = panel
-            .child(list)
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(colors.muted_foreground)
-                    .child(self.text(
-                        "上の選択は適用するまで下書きです。",
-                        "The selection above is a draft until applied.",
-                    )),
-            );
+        panel = panel.child(list);
         if failed {
             panel = panel.child(div().text_color(colors.danger).child(self.text(
                 "登録を確認できません。詳細を確認してください。",
@@ -371,10 +476,7 @@ impl Manager {
                 }
             }
         }
-        let message = self
-            .operation
-            .status()
-            .render(self.settings.language == "en");
+        let message = self.operation.message(self.settings.language == "en");
         let status = div()
             .id("status")
             .role(Role::Status)
@@ -402,19 +504,19 @@ impl Manager {
             .border_color(colors.border)
             .child(self.back_button("navigate-back", cx))
             .child(status)
+            .when(dirty, |actions| {
+                actions.child(
+                    div()
+                        .text_sm()
+                        .child(self.text("未適用の変更があります", "There are unapplied changes")),
+                )
+            })
             .child(
                 theme::button("thumbnail-discard", cx)
                     .label(self.text("変更を破棄", "Discard changes"))
-                    .disabled_elevated(busy || failed || self.thumbnails.status.is_none())
+                    .disabled_elevated(unavailable || !dirty)
                     .on_click(cx.listener(|this, _, _, cx| {
-                        this.thumbnails.plan = None;
-                        this.thumbnails.draft = this
-                            .thumbnails
-                            .status
-                            .as_ref()
-                            .and_then(|status| status.recovery.as_ref())
-                            .and_then(|record| record.selected_extensions().ok())
-                            .unwrap_or_default();
+                        this.thumbnails.discard();
                         cx.notify();
                     })),
             )
@@ -422,11 +524,11 @@ impl Manager {
                 theme::button("thumbnail-apply", cx)
                     .primary()
                     .label(if self.thumbnails.plan.is_some() {
-                        self.text("選択を適用", "Apply selection")
+                        self.text("変更を適用", "Apply changes")
                     } else {
                         self.text("変更内容を確認", "Review changes")
                     })
-                    .disabled_elevated(busy || failed || self.thumbnails.status.is_none())
+                    .disabled_elevated(unavailable || !dirty)
                     .on_click(cx.listener(|this, _, _, cx| {
                         if !this
                             .thumbnails
