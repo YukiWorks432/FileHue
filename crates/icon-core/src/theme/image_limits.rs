@@ -164,7 +164,8 @@ fn parse_svg(data: &[u8], budget: Arc<Budget>, depth: u8) -> Result<Tree> {
     Ok(tree)
 }
 
-pub(super) fn validate_icon(data: &[u8]) -> Result<()> {
+/// ICOのフレーム表、画像寸法と資源使用量を復号前に検証する。
+pub fn validate_icon(data: &[u8]) -> Result<()> {
     ensure!(
         data.len() >= 6 && data[..4] == [0, 0, 1, 0],
         "invalid ICO header"

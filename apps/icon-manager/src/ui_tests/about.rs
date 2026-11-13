@@ -57,6 +57,13 @@ fn about_in_child(cx: &mut TestAppContext) {
             manager.read(cx).about.license_text.as_deref(),
             Some("fixture license")
         );
+        w.render_frame(cx);
+        w.click("library", cx);
+        w.render_frame(cx);
+        w.click("about-open", cx);
+        w.render_frame(cx);
+        assert!(w.find("about-license").visible());
+        w.click("about-license", cx);
         w.press("escape", cx);
         w.render_frame(cx);
         assert!(w.find("about-license").visible());

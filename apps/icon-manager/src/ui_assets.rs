@@ -12,6 +12,7 @@ gpui_kit::assets::icon_assets!(
         Download,
         ExternalLink,
         File,
+        FileImage,
         FolderOpen,
         Info,
         Library,
@@ -59,6 +60,7 @@ mod tests {
         for path in [
             "icons/package.svg",
             "icons/monitor.svg",
+            "icons/file-image.svg",
             "icons/trash.svg",
             "icons/brush-cleaning.svg",
             "icons/chevron-down.svg",

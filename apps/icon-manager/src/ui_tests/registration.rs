@@ -223,7 +223,7 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
                 .is_some_and(|row| row.visible())
         );
         assert_eq!(w.find("protection-save").bounds(), save);
-        w.click("navigate-back", cx);
+        w.click("protection-back", cx);
     })
     .unwrap();
     assert!(load().unwrap().preserve_existing_icons);
@@ -646,8 +646,12 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
         );
         w.click(pack_button(&manager, cx, "apply", 0), cx);
         w.click(pack_button(&manager, cx, "remove-pack", 0), cx);
+        w.click("about-open", cx);
+        w.render_frame(cx);
         w.click("cleanup-shell", cx);
         manager.update(cx, |v, _| assert!(!v.operation.busy()));
+        w.click("navigate-back", cx);
+        w.render_frame(cx);
         w.click("en", cx);
     })
     .unwrap();
@@ -819,7 +823,7 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
         assert_eq!(w.find("recovery-preserve").checked(), Some(true));
     })
     .unwrap();
-    cx.update_window(window, |_, w, cx| w.click("navigate-back", cx))
+    cx.update_window(window, |_, w, cx| w.click("recovery-close", cx))
         .unwrap();
     assert_eq!(snapshot(&registry._classes), before_review);
     for (mode, language) in [(ThemeMode::Dark, "ja"), (ThemeMode::Light, "en")] {
@@ -1034,6 +1038,8 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
     assert!(!home().unwrap().join("recovery.json").exists());
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        w.click("about-open", cx);
+        w.render_frame(cx);
         w.click("cleanup-shell", cx);
     })
     .unwrap();
@@ -1044,6 +1050,11 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
             .next()
             .is_none()
     );
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("navigate-back", cx);
+    })
+    .unwrap();
     for _ in 0..2 {
         cx.update_window(window, |_, w, cx| {
             w.render_frame(cx);

@@ -7,6 +7,7 @@ use gpui_kit::prelude::FluentBuilder;
 const DISTRIBUTION_URL: &str = "https://github.com/YukiWorks432/FileHue/releases";
 
 pub(super) struct About {
+    pub(super) return_to: Option<Screen>,
     pub(super) executable_dir: Option<PathBuf>,
     pub(super) license_text: Option<String>,
     license_error: bool,
@@ -16,6 +17,7 @@ pub(super) struct About {
 impl Default for About {
     fn default() -> Self {
         Self {
+            return_to: None,
             executable_dir: std::env::current_exe()
                 .ok()
                 .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf)),
@@ -70,6 +72,10 @@ impl Manager {
                 .child(self.about_license("about-license", "LICENSE", self.text("本体のライセンスを開く", "Open FileHue license"), cx))
                 .child(self.about_license("about-third-party", "licenses/THIRD_PARTY_LICENSES.html", self.text("第三者ライセンスを開く", "Open third-party licenses"), cx))
                 .when(self.about.license_error, |card| card.child(self.about_notice("about-license-error", self.text("ライセンスを読み取れませんでした。ファイルを確認してください。", "Could not read the license. Check the bundled file."), cx))))
+            .child(theme::card(cx).p_4().flex().flex_col().gap_3()
+                .child(div().text_lg().font_weight(FontWeight::SEMIBOLD)
+                    .child(self.text("メンテナンス", "Maintenance")))
+                .child(div().flex().items_start().child(self.cleanup_button(cx))))
         };
         let scroll = div()
             .id("about-scroll")

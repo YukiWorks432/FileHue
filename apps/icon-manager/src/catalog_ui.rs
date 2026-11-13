@@ -35,24 +35,15 @@ impl Manager {
 
     pub(super) fn catalog(&self, cx: &mut Context<Self>) -> Div {
         let colors = cx.theme().colors;
-        let mut section = div()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .child(
-                div()
-                    .text_lg()
-                    .child(self.text("パックを探す", "Browse packs")),
-            )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(colors.muted_foreground)
-                    .child(self.text(
-                        "公式配布元の確認済みバージョンです。取得後に適用できます。",
-                        "Reviewed versions from official releases. Download, then apply.",
-                    )),
-            );
+        let mut section = div().flex().flex_col().gap_3().child(
+            div()
+                .text_sm()
+                .text_color(colors.muted_foreground)
+                .child(self.text(
+                    "公式配布元の確認済みバージョンです。取得後に適用できます。",
+                    "Reviewed versions from official releases. Download, then apply.",
+                )),
+        );
         for (index, entry) in CATALOG.iter().enumerate() {
             let installed = entry.themes.iter().all(|theme| {
                 self.settings
@@ -192,11 +183,7 @@ impl Manager {
             .flex()
             .flex_col()
             .gap_3()
-            .child(format!("{} · {}", pack.label, pack.version))
-            .child(div().text_sm().child(self.text(
-                "パックの見本です。保存済みの対象選択を反映しますが、既存アイコンの保護は含みません。保護を含む結果は「表示予定を確認」から確認できます。",
-                "Pack samples reflect saved target selections, without icon protection. Use Check planned icon to see the result including protection.",
-            )));
+            .child(format!("{} · {}", pack.label, pack.version));
         if !pack.warnings.is_empty() {
             details = details.child(self.text(
                 "警告: 次の規則はアイコンが未定義のため除外しました（先頭20件）。完全な記録は出典ファイルに保存しています。",
@@ -319,7 +306,9 @@ impl Manager {
             ),
         };
         let artwork = match icon {
-            Some(path) => img(path.to_path_buf()).size_8().into_any_element(),
+            Some(path) => {
+                crate::icon_preview::preview(path.to_path_buf(), rems(2.)).into_any_element()
+            }
             None => Icon::new(IconName::File).size_8().into_any_element(),
         };
         let mut description = div()

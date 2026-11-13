@@ -1709,6 +1709,8 @@ dependencies = [
  "file-icons-manager-service",
  "file-icons-windows",
  "gpui-kit",
+ "ico",
+ "image",
  "serde_json",
  "tempfile",
  "windows 0.62.2",

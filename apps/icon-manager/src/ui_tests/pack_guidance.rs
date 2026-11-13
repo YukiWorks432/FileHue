@@ -16,6 +16,7 @@ pub(super) fn fixture() -> super::IsolatedRegistryProfile {
     new.label = "TypeScript icons / 日本語の長いパック名".into();
     let mut rules = file_icons_core::ThemeRules::default();
     let icon = old.theme.rules().extensions["json"].clone();
+    rules.files.insert("makefile".into(), icon.clone());
     rules.extensions.insert("json".into(), icon.clone());
     rules.extensions.insert("mts".into(), icon.clone());
     rules.extensions.insert("md".into(), icon.clone());
@@ -24,6 +25,9 @@ pub(super) fn fixture() -> super::IsolatedRegistryProfile {
     rules.extensions.insert("rs".into(), icon);
     new.theme = file_icons_core::CompiledTheme::new(rules).unwrap();
     settings.packs = vec![new.clone(), old.clone()];
+    let mut new_selection = Selection::default();
+    new_selection.set("extension:rs", Some(false)).unwrap();
+    settings.selections.insert(new.id.clone(), new_selection);
     let mut selection = Selection::default();
     selection.set("extension:json", Some(false)).unwrap();
     selection.set("extension:md", Some(false)).unwrap();
@@ -84,12 +88,32 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
     let copy = SharedString::from(format!("target-copy-{old_id}"));
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        assert!(
+            w.try_find(pack_button(&manager, cx, "sample:sample.rs", 0))
+                .is_none()
+        );
+        assert!(
+            w.try_find(pack_button(&manager, cx, "sample:sample.rs", 1))
+                .is_none()
+        );
+        assert!(
+            w.try_find(pack_button(&manager, cx, "sample:sample.mts", 1))
+                .is_some()
+        );
+        assert!(
+            w.try_find(pack_button(&manager, cx, "sample:makefile", 1))
+                .is_some()
+        );
+        assert!(
+            w.try_find(pack_button(&manager, cx, "sample:sample.json", 1))
+                .is_none()
+        );
         w.click(pack_button(&manager, cx, "update-settings", 0), cx);
         w.render_frame(cx);
         assert_eq!(
             w.find(SharedString::from(format!("version-summary-{old_id}")))
                 .label(),
-            Some("一致 2 · 追加 1 · 削除 1")
+            Some("一致 3 · 追加 1 · 削除 1")
         );
         w.click(changes.clone(), cx);
         w.render_frame(cx);
@@ -106,7 +130,7 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
             w.find("target-toggle-extension:json").checked(),
             Some(false)
         );
-        assert_eq!(w.find("target-toggle-extension:rs").checked(), Some(true));
+        assert_eq!(w.find("target-toggle-extension:rs").checked(), Some(false));
         w.click("target-undo", cx);
         w.render_frame(cx);
         assert_eq!(w.find("target-toggle-extension:json").checked(), Some(true));
@@ -117,6 +141,8 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
         w.click("target-copy-open", cx);
         w.render_frame(cx);
         w.click(copy, cx);
+        w.render_frame(cx);
+        w.click("target-toggle-extension:rs", cx);
         w.render_frame(cx);
         w.click("target-save", cx);
     })
@@ -134,6 +160,22 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.click("target-back", cx);
         w.render_frame(cx);
+        assert!(
+            w.try_find(pack_button(&manager, cx, "sample:sample.rs", 0))
+                .is_some()
+        );
+        assert!(
+            w.try_find(pack_button(&manager, cx, "sample:sample.rs", 1))
+                .is_none()
+        );
+        assert!(
+            w.try_find(pack_button(&manager, cx, "sample:sample.mts", 0))
+                .is_some()
+        );
+        assert!(
+            w.try_find(pack_button(&manager, cx, "sample:sample.json", 0))
+                .is_none()
+        );
         w.click(pack_button(&manager, cx, "details", 0), cx);
     })
     .unwrap();

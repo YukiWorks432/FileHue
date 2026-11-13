@@ -40,11 +40,11 @@ impl Status {
             Self::Error(kind, detail) => {
                 let (ja, en) = match kind {
                     Failure::IncompleteRecovery => (
-                        "未完了の登録復旧があります。「競合を確認…」から内容を再確認して続けてください。",
+                        "未完了の登録復旧があります。「競合を確認」から内容を再確認して続けてください。",
                         "Registration recovery is incomplete. Open Review conflicts to review and resume.",
                     ),
                     Failure::RegistrationConflict => (
-                        "外部アプリによってアイコン設定が変更されています。「競合を確認…」から復旧できます。",
+                        "外部アプリによってアイコン設定が変更されています。「競合を確認」から復旧できます。",
                         "Icon settings have changed outside this app. Open Review conflicts to recover.",
                     ),
                     Failure::OpenSettings => (

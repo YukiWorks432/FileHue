@@ -2,6 +2,8 @@ mod image_limits;
 mod json_limits;
 mod notices;
 
+pub use image_limits::validate_icon;
+
 use crate::language_catalog::{Catalog, Language};
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};

@@ -231,7 +231,10 @@ impl Manager {
         let icon = if let Some(path) = path {
             div()
                 .size(if large { px(48.) } else { px(20.) })
-                .child(img(path).size(if large { px(48.) } else { px(20.) }))
+                .child(crate::icon_preview::preview(
+                    path,
+                    if large { px(48.) } else { px(20.) },
+                ))
                 .into_any_element()
         } else {
             div()
@@ -317,7 +320,7 @@ impl Manager {
                     .id(SharedString::from(format!("provider-icon-{group_id}")))
                     .role(Role::Image)
                     .aria_label(self.text("ソフトのアイコン", "Software icon"))
-                    .child(img(path.clone()).size_8());
+                    .child(crate::icon_preview::preview(path.clone(), rems(2.)));
                 #[cfg(feature = "test-support")]
                 let icon = icon.test_support();
                 heading = heading.child(icon);
@@ -784,7 +787,7 @@ impl Manager {
         };
         let mut image = div().size_8().opacity(if selected { 1. } else { 0.35 });
         if let Some(path) = path {
-            image = image.child(img(path).size_8());
+            image = image.child(crate::icon_preview::preview(path, rems(2.)));
         } else if self.protection.inspection.previews_loading {
             image = image.child(super::Spinner::new().small());
         } else {

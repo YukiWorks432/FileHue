@@ -1,11 +1,13 @@
 //! 対象の編集は下書きに保持し、明示操作で共通管理処理へ保存する。
 use super::*;
 use file_icons_core::selection::{CATEGORIES, Selection, Target, TargetQuery};
+use gpui_kit::component::button::ButtonVariants;
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::scroll::ScrollableElement;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{assets::IconName, component::Sizable};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -445,6 +447,44 @@ impl Manager {
                     .child(full_title.clone())
                     .tooltip(move |window, cx| Tooltip::new(full_title.clone()).build(window, cx)),
             );
+        if compact {
+            tools = tools
+                .child(
+                    theme::button("protection-open", cx)
+                        .small()
+                        .icon(IconName::ShieldCheck)
+                        .accessibility_label(self.text("アイコンの保護", "Icon protection"))
+                        .tooltip(self.text("アイコンの保護", "Icon protection"))
+                        .disabled_elevated(self.operation.busy() || !self.valid)
+                        .on_click(
+                            cx.listener(|this, _, window, cx| this.open_protection(window, cx)),
+                        ),
+                )
+                .child(
+                    theme::button("conflicts-open", cx)
+                        .small()
+                        .icon(IconName::TriangleAlert)
+                        .when(self.conflict_attention, |b| b.warning())
+                        .accessibility_label(if self.conflict_attention {
+                            self.text("競合あり・確認", "Conflicts detected · Review")
+                        } else {
+                            self.text("競合を確認", "Review conflicts")
+                        })
+                        .tooltip(if self.conflict_attention {
+                            self.text("競合あり・確認", "Conflicts detected · Review")
+                        } else {
+                            self.text("競合を確認", "Review conflicts")
+                        })
+                        .disabled_elevated(self.operation.busy() || self._guard.is_none())
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.open_conflicts(
+                                file_icons_windows::conflict::Strategy::PreserveExternal,
+                                window,
+                                cx,
+                            )
+                        })),
+                );
+        }
         for (id, ja, en, section) in [
             (
                 "target-categories-open",
@@ -500,6 +540,7 @@ impl Manager {
             .border_b_1()
             .border_color(cx.theme().colors.border)
             .child(self.header(cx))
+            .child(self.toolbar(compact, cx))
             .child(tools)
             .into_any_element()
     }
@@ -536,10 +577,20 @@ impl Manager {
                     .flex_wrap()
                     .items_center()
                     .gap_2()
-                    .child(div().flex_1().text_sm().child(format!(
-                        "{}: {error}",
-                        self.text("保護状態を取得できません", "Could not inspect protection")
-                    )))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .whitespace_normal()
+                            .text_sm()
+                            .child(format!(
+                                "{}: {error}",
+                                self.text(
+                                    "保護状態を取得できません",
+                                    "Could not inspect protection"
+                                )
+                            )),
+                    )
                     .child(
                         theme::button("target-protection-retry", cx)
                             .small()
@@ -920,6 +971,7 @@ impl Manager {
                 .flex_wrap()
                 .items_center()
                 .gap_2()
+                .child(self.back_button("target-back", cx))
                 .child(div().text_sm().child(if dirty == 0 {
                     self.text("保存済み", "Saved").to_string()
                 } else { format!("{}: {dirty}", self.text("未保存の変更", "Unsaved changes")) }))

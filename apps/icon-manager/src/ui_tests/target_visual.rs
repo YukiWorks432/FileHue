@@ -684,12 +684,45 @@ fn library_visual_probe() {
         fixture.join("theme.json"),
         r#"{
         "iconDefinitions":{"icon":{"iconPath":"icon.svg"}},
-        "fileExtensions":{"json":"icon","md":"icon","rs":"icon"},
+        "fileExtensions":{"json":"icon","md":"icon","js":"icon","ts":"icon","py":"icon","rs":"icon","html":"icon"},
         "fileNames":{"Cargo.toml":"icon","package.json":"icon","README.md":"icon"}}
     "#,
     )
     .unwrap();
     std::fs::write(fixture.join("icon.svg"), r##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" rx="3" fill="#7760dd"/></svg>"##).unwrap();
+    if let Some(input) = std::env::var_os("WFI_VISUAL_REAL_ICONS") {
+        let input = std::path::PathBuf::from(input);
+        std::fs::write(
+            fixture.join("package.json"),
+            r#"{
+            "name":"visual-library", "publisher":"test", "version":"1.0.0",
+            "contributes":{"iconThemes":[
+                {"id":"sample","label":"Material sample","path":"material.json"},
+                {"id":"long","label":"Catppuccin sample","path":"cat.json"}]}}
+        "#,
+        )
+        .unwrap();
+        for prefix in ["material", "cat"] {
+            let mut definitions = serde_json::Map::new();
+            let mut extensions = serde_json::Map::new();
+            for ext in ["js", "ts", "py", "rs", "html"] {
+                let name = format!("{prefix}-{ext}.ico");
+                std::fs::copy(input.join(&name), fixture.join(&name)).unwrap();
+                definitions.insert(ext.into(), serde_json::json!({"iconPath": name}));
+                extensions.insert(ext.into(), serde_json::json!(ext));
+            }
+            let theme = serde_json::json!({
+                "iconDefinitions": definitions,
+                "fileExtensions": extensions,
+                "fileNames": {"Cargo.toml": "rs", "settings.toml": "ts", "package.json": "js", "data.json": "js", "README.md": "html", "notes.md": "html"}
+            });
+            std::fs::write(
+                fixture.join(format!("{prefix}.json")),
+                serde_json::to_vec(&theme).unwrap(),
+            )
+            .unwrap();
+        }
+    }
     {
         let manager = crate::ManagerService::acquire().unwrap();
         for id in ["sample", "long"] {
@@ -857,6 +890,77 @@ fn library_visual_probe() {
                                 w.press("escape", cx);
                                 w.render_frame(cx);
                             }
+                        })
+                        .unwrap();
+                }
+                for active in [false, true, false] {
+                    window
+                        .update(cx, |_, w, cx| {
+                            theme::apply(ThemeMode::Dark, cx);
+                            manager.update(cx, |view, cx| {
+                                view.settings.language = "ja".into();
+                                view.browsing = false;
+                                view.conflict_attention = false;
+                                view.pending = None;
+                                view.operation = crate::operation::Operation::default();
+                                view.settings.active =
+                                    active.then(|| view.settings.packs[0].id.clone());
+                                cx.notify();
+                            });
+                            w.resize(size(px(1000.), px(760.)));
+                            w.render_frame(cx);
+                            w.hover("app-brand", cx);
+                            w.render_frame(cx);
+                            w.hover(pack_button(&manager, cx, "remove-pack", 0), cx);
+                            w.render_frame(cx);
+                        })
+                        .unwrap();
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(1000))
+                        .await;
+                    window
+                        .update(cx, |_, w, cx| {
+                            w.render_frame(cx);
+                            let name = if active {
+                                "remove-tooltip-active"
+                            } else {
+                                "remove-tooltip-normal"
+                            };
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join(format!("{name}.png")))
+                                .unwrap();
+                        })
+                        .unwrap();
+                }
+                if std::env::var_os("WFI_VISUAL_REAL_ICONS").is_some() {
+                    window
+                        .update(cx, |_, w, cx| {
+                            theme::apply(ThemeMode::Dark, cx);
+                            manager.update(cx, |view, cx| {
+                                view.settings.language = "ja".into();
+                                view.settings.active = None;
+                                view.browsing = false;
+                                view.conflict_attention = false;
+                                view.pending = None;
+                                view.operation = crate::operation::Operation::default();
+                                cx.notify();
+                            });
+                            w.resize(size(px(1000.), px(1000.)));
+                            w.render_frame(cx);
+                            w.click(pack_button(&manager, cx, "details", 0), cx);
+                        })
+                        .unwrap();
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(1000))
+                        .await;
+                    window
+                        .update(cx, |_, w, cx| {
+                            w.render_frame(cx);
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join("library-details-ja.png"))
+                                .unwrap();
                         })
                         .unwrap();
                 }

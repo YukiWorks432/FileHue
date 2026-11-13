@@ -2,7 +2,7 @@
 
 [日本語](thumbnails.ja.md) | English
 
-Choose `.ai`, `.eps`, `.svg`, `.psd`, `.psb` and `.pdf` independently in **Content thumbnails**. Select **Review changes** to inspect the extensions being enabled or restored and the affected registration locations, then choose **Apply selection**. When an association is shared, the review includes the resulting display for unselected extensions. If the selection or registration changes after review, review it again. Returning to the previous screen keeps the draft; **Discard changes** restores the current registration as the selection. Each row's applied state reflects the checked Windows registration. Icon registration, default applications and file contents are not changed.
+Choose `.ai`, `.eps`, `.svg`, `.psd`, `.psb` and `.pdf` independently in **File previews**. Select **Review changes** to inspect the extensions being enabled or restored and the affected registration locations, then choose **Apply selection**. When an association is shared, the review includes the resulting display for unselected extensions. If the selection or registration changes after review, review it again. Returning to the previous screen keeps the draft; **Discard changes** restores the current registration as the selection. Each row's applied state reflects the checked Windows registration. Icon registration, default applications and file contents are not changed.
 
 | Extension | Preview source |
 | --- | --- |

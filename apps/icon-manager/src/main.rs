@@ -17,6 +17,7 @@ use gpui_kit::{
 use std::path::PathBuf;
 mod about_ui;
 mod catalog_ui;
+mod icon_preview;
 mod library_ui;
 mod operation;
 mod original_icons;
