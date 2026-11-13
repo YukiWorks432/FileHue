@@ -14,6 +14,8 @@ file-icons-windows = { path = "../../crates/icon-windows" }
 gpui-kit = "=0.7.3"
 anyhow.workspace = true
 tempfile = "3"
+ico = "0.6"
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [features]
 test-support = ["gpui-kit/test-support", "file-icons-catalog/test-support"]

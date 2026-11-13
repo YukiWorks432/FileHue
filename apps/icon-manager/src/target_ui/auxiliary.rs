@@ -100,7 +100,13 @@ impl Manager {
                     .child(text);
                 let row =
                     if let Some((icon, _)) = result.filter(|_| use_pack) {
-                        row.child(img(icon.to_path_buf()).size_8())
+                        row.child(
+                            crate::icon_preview::preview(
+                                icon.to_path_buf(),
+                                crate::icon_preview::PreviewSize::Rem(2.),
+                            )
+                            .size_8(),
+                        )
                     } else {
                         row.children(
                             self.target_source(&typed)
@@ -111,7 +117,13 @@ impl Manager {
                                         },
                                     )
                                 })
-                                .map(|icon| img(icon.clone()).size_8()),
+                                .map(|icon| {
+                                    crate::icon_preview::preview(
+                                        icon.clone(),
+                                        crate::icon_preview::PreviewSize::Rem(2.),
+                                    )
+                                    .size_8()
+                                }),
                         )
                     };
                 #[cfg(feature = "test-support")]

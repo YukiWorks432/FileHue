@@ -237,7 +237,10 @@ impl Manager {
             .items_center()
             .justify_center();
         if let Some(icon) = icon {
-            icon_slot = icon_slot.child(img(icon).size_6());
+            icon_slot = icon_slot.child(
+                crate::icon_preview::preview(icon, crate::icon_preview::PreviewSize::Rem(1.5))
+                    .size_6(),
+            );
         } else if self.protection.inspection.previews_loading {
             icon_slot = icon_slot.child(Spinner::new().small());
         } else {
