@@ -144,6 +144,7 @@ impl Manager {
     }
 
     pub(super) fn close_recovery(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.operation.clear_result();
         if self.recovery.reviewed {
             self.recovery.reviewed = false;
             if let Some(focus) = &self.recovery.focus {

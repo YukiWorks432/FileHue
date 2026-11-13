@@ -351,6 +351,7 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
+        self.operation.clear_result();
         self.screen = self.protection_return;
         // 同じ対象画面へ戻る場合は、進行中の調査をその画面で受け取る。
         if self.targets.pack.is_none() || self.targets.pack != self.protection.inspection.pack {

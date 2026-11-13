@@ -26,6 +26,7 @@ fn selection_is_a_draft_in_an_isolated_profile() {
 #[ignore = "専用プロファイルを持つ親試験からのみ起動する"]
 fn selection_in_child(cx: &mut TestAppContext) {
     assert_eq!(std::env::var("WFI_THUMBNAIL_GUI_PROBE").as_deref(), Ok("1"));
+    let _registry = IsolatedRegistryProfile::new();
     std::fs::create_dir_all(home().unwrap()).unwrap();
     std::fs::write(
         home().unwrap().join("settings.json"),
@@ -69,7 +70,12 @@ fn selection_in_child(cx: &mut TestAppContext) {
         super::protection_sources::reveal_in(w, "thumbnail-.eps", "thumbnail-scroll", cx);
         w.click("thumbnail-.eps", cx);
         w.render_frame(cx);
-        assert_eq!(w.find("thumbnail-state-.ai").label(), Some("変更あり"));
+        assert_eq!(
+            w.find("thumbnail-state-.ai").label(),
+            Some("プレビュー無効")
+        );
+        assert_eq!(w.find("thumbnail-change-.ai").label(), Some("変更あり"));
+        assert_eq!(w.find("thumbnail-.ai").checked(), Some(true));
         manager.update(cx, |view, _| {
             assert_eq!(
                 view.thumbnails.draft,
@@ -95,6 +101,55 @@ fn selection_in_child(cx: &mut TestAppContext) {
         manager.update(cx, |view, _| assert_eq!(view.thumbnails.draft.len(), 6));
         w.click("thumbnail-disable-all", cx);
         manager.update(cx, |view, _| assert!(view.thumbnails.draft.is_empty()));
+        // 有効な登録がある場合も、無効化の下書きで現在の状態を隠さない。
+        let group = file_icons_windows::thumbnails::plan_extension_group(
+            &file_icons_windows::UserRegistry,
+            file_icons_windows::thumbnails::Format::Ai,
+        )
+        .unwrap();
+        let previous_status = manager.update(cx, |view, cx| {
+            let previous_status = view.thumbnails.status.take();
+            view.thumbnails.status = Some(file_icons_manager_service::ThumbnailStatus {
+                settings: file_icons_windows::thumbnails::Settings {
+                    selected: [".ai".into()].into_iter().collect(),
+                    ..Default::default()
+                },
+                recovery: Some(file_icons_windows::thumbnails::Recovery {
+                    format_version: 1,
+                    groups: vec![group],
+                    transition: None,
+                }),
+                missing_recovery: false,
+                group_errors: vec![None],
+            });
+            view.thumbnails.draft = [".ai".into()].into_iter().collect();
+            cx.notify();
+            previous_status
+        });
+        w.render_frame(cx);
+        assert_eq!(
+            w.find("thumbnail-state-.ai").label(),
+            Some("プレビュー有効")
+        );
+        assert!(w.try_find("thumbnail-change-.ai").is_none());
+        w.click("thumbnail-.ai", cx);
+        w.render_frame(cx);
+        assert_eq!(w.find("thumbnail-.ai").checked(), Some(false));
+        assert_eq!(
+            w.find("thumbnail-state-.ai").label(),
+            Some("プレビュー有効")
+        );
+        assert_eq!(w.find("thumbnail-change-.ai").label(), Some("変更あり"));
+        w.click("thumbnail-.ai", cx);
+        w.render_frame(cx);
+        assert!(w.try_find("thumbnail-change-.ai").is_none());
+        assert!(!settings.exists(), "切り替えだけでは登録を保存しない");
+        manager.update(cx, |view, cx| {
+            view.thumbnails.status = previous_status;
+            view.thumbnails.draft.clear();
+            cx.notify();
+        });
+        w.render_frame(cx);
         w.click("thumbnail-.ai", cx);
         w.click("navigate-back", cx);
         w.render_frame(cx);

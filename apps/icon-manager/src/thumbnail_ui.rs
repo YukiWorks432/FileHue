@@ -165,8 +165,6 @@ impl Manager {
             };
             let (state, badge) = if failed || self.thumbnails.status.is_none() {
                 (self.text("要確認", "Needs review"), Tag::warning())
-            } else if chosen != applied {
-                (self.text("変更あり", "Changed"), Tag::info())
             } else if applied {
                 (
                     self.text("プレビュー有効", "Previews enabled"),
@@ -183,8 +181,24 @@ impl Manager {
                 .role(Role::Status)
                 .aria_label(state)
                 .flex()
+                .flex_wrap()
+                .gap_1()
                 .items_center()
-                .child(badge.small().outline().child(state));
+                .child(badge.small().outline().child(state))
+                .when(
+                    !failed && self.thumbnails.status.is_some() && chosen != applied,
+                    |status| {
+                        let label = self.text("変更あり", "Changed");
+                        let change = div()
+                            .id(SharedString::from(format!("thumbnail-change-{extension}")))
+                            .role(Role::Status)
+                            .aria_label(label)
+                            .child(Tag::info().small().outline().child(label));
+                        #[cfg(feature = "test-support")]
+                        let change = change.test_support();
+                        status.child(change)
+                    },
+                );
             #[cfg(feature = "test-support")]
             let status = status.test_support();
             let name = format!("sample{extension}");

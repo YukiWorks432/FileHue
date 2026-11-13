@@ -27,7 +27,7 @@ impl Manager {
         proceed: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + 'static,
     ) {
         let dirty = match self.screen {
-            Screen::Targets => self.targets.has_changes(&self.settings),
+            Screen::Targets => self.target_changes_pending(),
             Screen::Thumbnails => self.thumbnails.dirty(),
             _ => false,
         };
@@ -60,6 +60,9 @@ impl Manager {
                     let _ = owner.update(cx, |this, cx| {
                         if this.screen == Screen::Targets {
                             this.targets.discard(&this.settings);
+                            this.protection.draft.enabled = this.settings.preserve_existing_icons;
+                            this.protection.draft.rules =
+                                this.settings.icon_protection_rules.clone();
                         }
                         if this.screen == Screen::Thumbnails {
                             this.thumbnails.discard();

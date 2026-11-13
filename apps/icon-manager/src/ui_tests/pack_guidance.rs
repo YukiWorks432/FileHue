@@ -239,6 +239,12 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.click("target-back", cx);
         w.render_frame(cx);
+        w.within("dialog").click("ok", cx);
+        w.render_frame(cx);
+        assert_eq!(
+            fs::read(home().unwrap().join("settings.library.json")).unwrap(),
+            after_save
+        );
         manager.update(cx, |view, _| {
             let progress = Arc::new(file_icons_catalog::Progress::default());
             progress.begin_theme(2, 4);

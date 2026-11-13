@@ -305,6 +305,26 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.press("alt-left", cx);
         w.render_frame(cx);
+        w.within("dialog").click("cancel", cx);
+        w.render_frame(cx);
+        assert!(
+            manager
+                .read(cx)
+                .protection
+                .draft
+                .dirty(&manager.read(cx).settings)
+        );
+        w.click("target-back", cx);
+        w.render_frame(cx);
+        w.within("dialog").click("ok", cx);
+        w.render_frame(cx);
+        assert!(
+            !manager
+                .read(cx)
+                .protection
+                .draft
+                .dirty(&manager.read(cx).settings)
+        );
     })
     .unwrap();
     assert_eq!(

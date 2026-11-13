@@ -217,6 +217,9 @@ fn matches_query(target: &Target, query: &str, search: &TargetQuery, categories:
     search.matches(target) || target.kind.contains(query) || categories.contains(&target.category)
 }
 impl Manager {
+    pub(super) fn target_changes_pending(&self) -> bool {
+        self.targets.has_changes(&self.settings) || self.protection.draft.dirty(&self.settings)
+    }
     pub(super) fn open_target_copy(&mut self, id: &str, cx: &mut Context<Self>) {
         self.open_targets(id, cx);
         self.targets.auxiliary = Some(Auxiliary::Copy);
@@ -264,7 +267,7 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
-        if self.targets.is_main() && self.targets.has_changes(&self.settings) {
+        if self.targets.is_main() && self.target_changes_pending() {
             self.confirm_navigation(window, cx, |this, window, cx| {
                 this.back_from_targets(window, cx)
             });
