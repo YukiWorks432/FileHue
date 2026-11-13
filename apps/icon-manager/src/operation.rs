@@ -59,6 +59,43 @@ impl Operation {
             .map(|(_, status)| status)
             .unwrap_or(&self.status)
     }
+    pub fn clear_result(&mut self) {
+        if matches!(self.status, Status::Complete | Status::Cancelled) {
+            self.status = Status::Idle;
+        }
+    }
+    pub fn message(&self, english: bool) -> String {
+        if !matches!(self.status(), Status::Complete) {
+            return self.status().render(english);
+        }
+        let (ja, en) = match self.kind {
+            Kind::Import => ("パックを取り込みました。", "Pack imported."),
+            Kind::Download(_) => ("パックを取得しました。", "Pack downloaded."),
+            Kind::Apply => ("アイコンパックを適用しました。", "Icon pack applied."),
+            Kind::SaveTargets => ("適用対象の変更を保存しました。", "Target selection saved."),
+            Kind::SaveProtection => (
+                "アイコンの保護設定を保存しました。",
+                "Icon protection saved.",
+            ),
+            Kind::Restore => (
+                "元のアイコン設定に戻しました。",
+                "Original icon settings restored.",
+            ),
+            Kind::Remove => ("パックを削除しました。", "Pack removed."),
+            Kind::Cleanup => (
+                "残っていたアプリ用ファイルを整理しました。",
+                "Remaining app files cleaned up.",
+            ),
+            Kind::InspectConflicts => ("競合の確認が完了しました。", "Conflict review completed."),
+            Kind::ResolveConflicts => ("アイコン設定を復旧しました。", "Icon settings recovered."),
+            Kind::Thumbnails => (
+                "ファイルプレビューの設定を更新しました。",
+                "File preview settings updated.",
+            ),
+            _ => ("", ""),
+        };
+        if english { en } else { ja }.into()
+    }
     pub fn progress(&self) -> Option<&Arc<file_icons_catalog::Progress>> {
         self.progress.as_ref()
     }

@@ -192,11 +192,18 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
         w.input("sample.mts", cx);
         w.render_frame(cx);
         assert!(!w.find("typed-preview").label().unwrap().contains("Windows"));
-        w.click("check-typed-preview", cx);
+        w.click("navigate-back", cx);
+        w.render_frame(cx);
+        assert!(w.find("pack-scroll").visible());
+        w.click(pack_button(&manager, cx, "targets", 0), cx);
     })
     .unwrap();
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.input("sample.mts", cx);
         w.render_frame(cx);
         assert!(
             w.find("target-planned")
@@ -210,13 +217,17 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("sample.mts")
         );
-        w.press("escape", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.input(".mts", cx);
         w.render_frame(cx);
         w.click("target-protection-extension:mts", cx);
         w.render_frame(cx);
         w.click("pack-icon-mts", cx);
         w.render_frame(cx);
-        w.click("target-details-open", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.input("sample.mts", cx);
         w.render_frame(cx);
         assert!(
             w.find("target-planned")
@@ -234,6 +245,12 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.click("target-back", cx);
         w.render_frame(cx);
+        w.within("dialog").click("ok", cx);
+        w.render_frame(cx);
+        assert_eq!(
+            fs::read(home().unwrap().join("settings.library.json")).unwrap(),
+            after_save
+        );
         manager.update(cx, |view, _| {
             let progress = Arc::new(file_icons_catalog::Progress::default());
             progress.begin_theme(2, 4);
@@ -311,6 +328,9 @@ fn pack_guidance_visual_probe() {
                                     this.operation = crate::Operation::default();
                                     this.settings.language = language.into();
                                     this.prepare_guidance_visual(page);
+                                    if page == "planned" {
+                                        this.prepare_guidance_query(w, cx);
+                                    }
                                     this.preview.update(cx, |input, cx| {
                                         input.set_value("sample.mts", w, cx)
                                     });
@@ -379,7 +399,7 @@ fn pack_guidance_visual_probe() {
                                         .unwrap();
                                     super::protection_sources::reveal_in(
                                         w,
-                                        "check-typed-preview",
+                                        "typed-preview",
                                         "pack-scroll",
                                         cx,
                                     );

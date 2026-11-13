@@ -105,11 +105,15 @@ impl Manager {
     }
 
     pub(crate) fn inspect_target_preview(&mut self, cx: &mut Context<Self>) {
-        if self.targets.pack.is_none() || self.targets.auxiliary != Some(Auxiliary::Details) {
+        if self.targets.pack.is_none() {
             return;
         }
-        let name = self.preview.read(cx).value();
-        if name.is_empty() || self.target_source(&name).is_some() {
+        let name = self.targets.search.read(cx).value();
+        if !is_preview_filename(&name, &self.targets.all) {
+            self.targets.preview_class = None;
+            return;
+        }
+        if self.target_source(&name).is_some() {
             self.targets.preview_class = None;
             return;
         }

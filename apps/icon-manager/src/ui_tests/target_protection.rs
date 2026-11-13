@@ -172,10 +172,16 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         assert_eq!(w.find("target-search").value(), Some(".mts"));
         assert!(w.find("target-toggle-extension:mts").visible());
-        w.click(("target-filter", 5usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 5, cx);
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         assert!(w.find("target-toggle-extension:mts").visible());
-        w.click(("target-filter", 0usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 0, cx);
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("target-protection-extension:mts", cx);
         w.render_frame(cx);
@@ -277,9 +283,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("保護中")
         );
-        w.click("target-details-open", cx);
-        w.render_frame(cx);
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.mts", cx);
         w.render_frame(cx);
@@ -295,10 +299,28 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("Windowsの元の表示")
         );
-        w.press("escape", cx);
-        w.render_frame(cx);
         w.press("alt-left", cx);
         w.render_frame(cx);
+        w.within("dialog").click("cancel", cx);
+        w.render_frame(cx);
+        assert!(
+            manager
+                .read(cx)
+                .protection
+                .draft
+                .dirty(&manager.read(cx).settings)
+        );
+        w.click("target-back", cx);
+        w.render_frame(cx);
+        w.within("dialog").click("ok", cx);
+        w.render_frame(cx);
+        assert!(
+            !manager
+                .read(cx)
+                .protection
+                .draft
+                .dirty(&manager.read(cx).settings)
+        );
     })
     .unwrap();
     assert_eq!(
@@ -387,9 +409,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
 
     // 拡張子として未登録でも、名前パターンが一致すればUnknownの保護を引き継ぐ。
     cx.update_window(window, |_, w, cx| {
-        w.click("target-details-open", cx);
-        w.render_frame(cx);
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.wfi-test", cx);
     })
@@ -405,7 +425,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                     .contains("Original icon protected")
             );
         }
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.wfi-unprotected", cx);
     })
@@ -444,7 +464,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
         for id in ["target-current", "target-planned"] {
             assert!(w.find(id).label().unwrap().contains("Pack icon"));
         }
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.wfi-test", cx);
     })
@@ -460,7 +480,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                     .contains("Original icon protected")
             );
         }
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.wfi-unprotected", cx);
         w.press("ctrl-a", cx);
@@ -473,7 +493,9 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
         for id in ["target-current", "target-planned"] {
             assert!(w.find(id).label().unwrap().contains("Pack icon"));
         }
-        w.click("target-auxiliary-back", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.press("backspace", cx);
     })
     .unwrap();
     manager.update(cx, |this, cx| {

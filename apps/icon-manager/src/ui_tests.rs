@@ -18,6 +18,21 @@ use gpui_kit::component::theme::{ActiveTheme, ThemeMode};
 use gpui_kit::test::TestWindowExt;
 use gpui_kit::{AppContext, Bounds, TestAppContext, WindowBounds, WindowOptions, px, size};
 
+fn select_target_filter(window: gpui_kit::AnyWindowHandle, index: usize, cx: &mut TestAppContext) {
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("target-filter-open", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.within("popup-menu").click(index, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+}
+
 /// ユーザー設定と同時起動ロックを、子プロセス専用の保存先に隔離する。
 #[test]
 fn gui_contract_in_isolated_profile() {
@@ -158,7 +173,10 @@ fn gui_contract_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, window, cx| {
         window.render_frame(cx);
-        assert_eq!(window.find("status").label(), Some("完了しました。"));
+        assert_eq!(
+            window.find("status").label(),
+            Some("パックを取り込みました。")
+        );
         // 復帰済みのバックエンド応答を、失敗・未復帰の案内と区別して表示する。
         manager.update(cx, |view, cx| {
             view.run(
@@ -550,13 +568,7 @@ fn gui_contract_in_child(cx: &mut TestAppContext) {
     })
     .unwrap();
 
-    // 同一IDの再取り込みで消えた対象を下書きと取り消しから除き、残る指定は保持する。
-    let theme_path = fixture.join("theme.json");
-    let original_theme: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(&theme_path).unwrap()).unwrap();
-    let mut expanded_theme = original_theme.clone();
-    expanded_theme["fileExtensions"]["md"] = "icon".into();
-    std::fs::write(&theme_path, serde_json::to_vec(&expanded_theme).unwrap()).unwrap();
+    // 対象編集を離れるときだけ変更を確認し、保存せずに破棄できる。
     cx.update_window(recovery_window, |_, w, cx| {
         w.render_frame(cx);
         w.click("import", cx);
@@ -575,129 +587,19 @@ fn gui_contract_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         w.click(pack_button(&recovered_manager, cx, "targets", 0), cx);
         w.render_frame(cx);
-        w.click("target-toggle-extension:md", cx);
-        w.render_frame(cx);
         w.click("target-toggle-extension:json", cx);
         w.render_frame(cx);
         w.click("target-back", cx);
-    })
-    .unwrap();
-    std::fs::write(&theme_path, serde_json::to_vec(&original_theme).unwrap()).unwrap();
-    cx.update_window(recovery_window, |_, w, cx| {
         w.render_frame(cx);
-        w.click("import", cx);
-    })
-    .unwrap();
-    cx.simulate_path_prompt_response(|_| Some(vec![fixture.clone()]));
-    cx.run_until_parked();
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click(("theme", 0usize), cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click(pack_button(&recovered_manager, cx, "targets", 0), cx);
+        w.within("dialog").click("cancel", cx);
         w.render_frame(cx);
         assert_eq!(
             w.find("target-toggle-extension:json").checked(),
             Some(false)
         );
-        w.click("target-save", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    let saved = load().unwrap();
-    assert!(!saved.selections[&id].enabled("data.json"));
-    saved.selections[&id]
-        .validate_for(&saved.packs[0].theme)
-        .unwrap();
-    // 再取り込み直後の保存とは別に、消失対象を含む履歴を取り消して保存する。
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click("target-undo", cx);
-        w.render_frame(cx);
-        assert_eq!(w.find("target-toggle-extension:json").checked(), Some(true));
-        w.click("target-save", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    let after_undo = load().unwrap();
-    assert!(after_undo.selections[&id].enabled("data.json"));
-    after_undo.selections[&id]
-        .validate_for(&after_undo.packs[0].theme)
-        .unwrap();
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click("target-toggle-extension:json", cx);
-        w.render_frame(cx);
-        w.click("target-save", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    assert!(!load().unwrap().selections[&id].enabled("data.json"));
-    // 取り込み失敗でも、画面を離れる前の未保存指定を保持する。
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click("target-toggle-extension:json", cx);
-        w.render_frame(cx);
-        w.click("target-back", cx);
-    })
-    .unwrap();
-    std::fs::write(&theme_path, b"broken theme").unwrap();
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click("import", cx);
-    })
-    .unwrap();
-    cx.simulate_path_prompt_response(|_| Some(vec![fixture.clone()]));
-    cx.run_until_parked();
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click(("theme", 0usize), cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click(pack_button(&recovered_manager, cx, "targets", 0), cx);
-        w.render_frame(cx);
-        assert_eq!(w.find("target-toggle-extension:json").checked(), Some(true));
-        assert!(!load().unwrap().selections[&id].enabled("data.json"));
-        w.click("target-save", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    assert!(load().unwrap().selections[&id].enabled("data.json"));
-    // 削除前の未保存指定が、同じIDを再追加したときに復活しない。
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click("target-toggle-extension:json", cx);
-        w.render_frame(cx);
         w.click("target-back", cx);
         w.render_frame(cx);
-        w.click(pack_button(&recovered_manager, cx, "remove-pack", 0), cx);
         w.within("dialog").click("ok", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    assert!(load().unwrap().packs.is_empty());
-    std::fs::write(&theme_path, serde_json::to_vec(&original_theme).unwrap()).unwrap();
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click("import", cx);
-    })
-    .unwrap();
-    cx.simulate_path_prompt_response(|_| Some(vec![fixture.clone()]));
-    cx.run_until_parked();
-    cx.update_window(recovery_window, |_, w, cx| {
-        w.render_frame(cx);
-        w.click(("theme", 0usize), cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    cx.update_window(recovery_window, |_, w, cx| {
         w.render_frame(cx);
         w.click(pack_button(&recovered_manager, cx, "targets", 0), cx);
         w.render_frame(cx);
@@ -711,6 +613,20 @@ fn gui_contract_in_child(cx: &mut TestAppContext) {
     let saved = load().unwrap();
     assert!(saved.selections[&id].enabled("data.json"));
     assert!(!saved.selections[&id].enabled("Cargo.toml"));
+    cx.update_window(recovery_window, |_, w, cx| {
+        w.render_frame(cx);
+        assert_eq!(
+            w.find("target-status").label(),
+            Some("Target selection saved.")
+        );
+        w.click("target-back", cx);
+        w.render_frame(cx);
+        assert!(
+            w.try_find("status")
+                .is_none_or(|status| status.label().unwrap_or("").is_empty())
+        );
+    })
+    .unwrap();
 }
 
 #[test]
@@ -836,13 +752,12 @@ fn download_gui_in_child(cx: &mut TestAppContext) {
         manager.update(cx, |view, _| assert!(!view.operation.busy()));
         window.click("library", cx);
         window.render_frame(cx);
-        assert!(
-            window
-                .find(pack_button(&manager, cx, "warnings", 0))
-                .label()
-                .unwrap()
-                .contains("were skipped")
-        );
+        let provenance = manager.read(cx).settings.packs[0].provenance.clone();
+        let mut record: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&provenance).unwrap()).unwrap();
+        record["licenses"]["NOTICE"] =
+            serde_json::json!(format!("{}END OF LICENSE", "License line.\n".repeat(2500)));
+        std::fs::write(&provenance, serde_json::to_vec(&record).unwrap()).unwrap();
         window.click(pack_button(&manager, cx, "details", 0), cx);
     })
     .unwrap();
@@ -863,20 +778,22 @@ fn download_gui_in_child(cx: &mut TestAppContext) {
                 .to_owned();
             assert_ne!(left.split(" · ").last(), right.split(" · ").last());
         }
-        assert!(
-            window
-                .find("pack-rights")
-                .label()
-                .unwrap()
-                .contains("Copyright fixture author")
+        let rights = manager.read(cx).rights.as_ref().unwrap().clone();
+        assert!(rights.read(cx).value().contains("Copyright fixture author"));
+        assert!(rights.read(cx).value().contains("END OF LICENSE"));
+        window.render_frame(cx);
+        window.scroll(
+            "pack-rights",
+            gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-500.))),
+            cx,
         );
-        assert!(
-            window
-                .find("pack-rights")
-                .label()
-                .unwrap()
-                .contains("sha256")
-        );
+        window.render_frame(cx);
+        assert!(rights.read(cx).scroll_offset().y < px(0.));
+        let before = rights.read(cx).value();
+        window.click("pack-rights", cx);
+        window.press("ctrl-a", cx);
+        window.input("This license must remain unchanged", cx);
+        assert_eq!(rights.read(cx).value(), before);
         window.click("preview-name", cx);
         window.input("package.json", cx);
         assert!(
@@ -998,7 +915,7 @@ fn download_gui_in_child(cx: &mut TestAppContext) {
         window.render_frame(cx);
         manager.update(cx, |view, _| {
             assert!(view.selected.is_none());
-            assert!(view.rights.is_empty());
+            assert!(view.rights.is_none());
         });
     })
     .unwrap();

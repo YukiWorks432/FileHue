@@ -80,6 +80,7 @@ impl Manager {
                             .child(
                                 theme::button(("download", index), cx)
                                     .small()
+                                    .min_w(rems(13.5))
                                     .icon(if installed {
                                         IconName::Check
                                     } else {
@@ -122,11 +123,11 @@ impl Manager {
         section
     }
 
-    pub(super) fn select_details(&mut self, id: &str, cx: &mut Context<Self>) {
+    pub(super) fn select_details(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         // 同じ操作で閉じる。読込中でも閉じられ、後着の結果で再展開しない。
         if self.selected.as_deref() == Some(id) {
             self.selected = None;
-            self.rights.clear();
+            self.rights = None;
             self.show_rights = false;
             cx.notify();
             return;
@@ -140,32 +141,35 @@ impl Manager {
         let path = pack.provenance.clone();
         self.selected = Some(id.to_owned());
         self.show_rights = false;
-        self.rights.clear();
+        self.rights = None;
         self.operation.begin(Kind::Details, None);
         let guard = self._guard.clone();
         let task = cx.background_executor().spawn(async move {
             let _guard = guard;
             read_rights(&path)
         });
+        let window = window.window_handle();
+        let selected = id.to_owned();
         cx.spawn(async move |this, cx| {
             let result = task.await;
-            let _ = this.update(cx, |this, cx| {
-                match result {
-                    Ok(rights) => {
-                        if this.selected.is_some() {
-                            this.rights = rights;
+            let _ = cx.update_window(window, |_, window, cx| {
+                let _ = this.update(cx, |this, cx| {
+                    match result {
+                        Ok(rights) => {
+                            if this.selected.as_deref() == Some(&selected) {
+                                this.rights = Some(cx.new(|cx| {
+                                    gpui_kit::component::input::TextareaState::new(window, cx)
+                                        .default_value(rights)
+                                }));
+                            }
+                            this.operation.finish(Status::Idle);
                         }
-                        this.operation.finish(Status::Complete);
+                        Err(error) => this
+                            .operation
+                            .finish(Status::Error(Failure::ReadRights, format!("{error:#}"))),
                     }
-                    Err(error) => {
-                        if this.selected.is_some() {
-                            this.rights = format!("{error:#}");
-                        }
-                        this.operation
-                            .finish(Status::Error(Failure::ReadRights, format!("{error:#}")));
-                    }
-                }
-                cx.notify();
+                    cx.notify();
+                });
             });
         })
         .detach();
@@ -184,24 +188,7 @@ impl Manager {
             .flex_col()
             .gap_3()
             .child(format!("{} · {}", pack.label, pack.version));
-        if !pack.warnings.is_empty() {
-            details = details.child(self.text(
-                "警告: 次の規則はアイコンが未定義のため除外しました（先頭20件）。完全な記録は出典ファイルに保存しています。",
-                "Warning: these rules reference undefined icons and were skipped (first 20). The provenance file contains the complete record.",
-            ));
-            for warning in pack.warnings.iter().take(20) {
-                let kind = match warning.rule_type.as_str() {
-                    "fileNames" => self.text("ファイル名", "Filename"),
-                    "fileExtensions" => self.text("拡張子", "Extension"),
-                    _ => self.text("言語", "Language"),
-                };
-                details = details.child(
-                    div()
-                        .text_sm()
-                        .child(format!("{kind}: {} → {}", warning.rule, warning.icon_id)),
-                );
-            }
-        }
+        let mut examples = div().grid().grid_cols(3).gap_3();
         for (index, name) in [
             "Cargo.toml",
             "settings.toml",
@@ -213,9 +200,10 @@ impl Manager {
         .into_iter()
         .enumerate()
         {
-            details = details.child(self.preview_row(name, pack, format!("example-{index}"), cx));
+            examples = examples.child(self.preview_row(name, pack, format!("example-{index}"), cx));
         }
         details = details
+            .child(examples)
             .child(
                 div()
                     .text_sm()
@@ -249,38 +237,19 @@ impl Manager {
                     cx.notify();
                 })),
         );
-        if self.show_rights {
-            let rights: String = self.rights.chars().take(32_000).collect();
-            let license = div()
-                .id("pack-rights")
-                .role(Role::Status)
-                .aria_label(rights.clone())
-                .text_sm()
-                .whitespace_normal()
-                .child(rights);
+        if self.show_rights
+            && let Some(rights) = &self.rights
+        {
+            let area = div().id("pack-rights").h(rems(12.)).w_full().child(
+                gpui_kit::component::input::Textarea::new(rights)
+                    .aria_label(self.text("出典・利用条件の全文", "Full source and license text"))
+                    .readonly(true)
+                    .h(rems(12.))
+                    .w_full(),
+            );
             #[cfg(feature = "test-support")]
-            let license = license.test_support();
-            details = details
-                .child(
-                    div()
-                        .id("license-scroll")
-                        .h_48()
-                        .overflow_y_scroll()
-                        .p_3()
-                        .border_t_1()
-                        .border_color(colors.border)
-                        .child(license),
-                )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(colors.muted_foreground)
-                        .child(format!(
-                            "{}: {}",
-                            self.text("完全な記録", "Full provenance"),
-                            pack.provenance.display()
-                        )),
-                );
+            let area = area.test_support();
+            details = details.child(area);
         }
         Some(details)
     }
@@ -290,7 +259,7 @@ impl Manager {
         name: &str,
         pack: &file_icons_core::ImportedPack,
         id: String,
-        cx: &mut Context<Self>,
+        _cx: &mut Context<Self>,
     ) -> AnyElement {
         let empty = file_icons_core::selection::Selection::default();
         let selection = self.settings.selections.get(&pack.id).unwrap_or(&empty);
@@ -307,15 +276,17 @@ impl Manager {
         };
         let artwork = match icon {
             Some(path) => {
-                crate::icon_preview::preview(path.to_path_buf(), rems(2.)).into_any_element()
+                crate::icon_preview::preview(path.to_path_buf(), rems(1.5)).into_any_element()
             }
-            None => Icon::new(IconName::File).size_8().into_any_element(),
+            None => Icon::new(IconName::File).size_6().into_any_element(),
         };
         let mut description = div()
             .min_w_0()
             .flex()
             .flex_col()
             .gap_1()
+            .text_sm()
+            .truncate()
             .child(name.to_owned());
         if icon.is_none() {
             let message = self.text("Windowsの通常のアイコン", "Windows default icon");
@@ -329,8 +300,6 @@ impl Manager {
             let hint = hint.test_support();
             description = description.child(hint);
         }
-        let pack_id = pack.id.clone();
-        let filename = name.to_owned();
         let row = div()
             .id(SharedString::from(id.clone()))
             .role(Role::Status)
@@ -340,23 +309,14 @@ impl Manager {
             .flex_wrap()
             .gap_3()
             .child(artwork)
-            .child(description.flex_1())
-            .child(
-                theme::button(SharedString::from(format!("check-{id}")), cx)
-                    .small()
-                    .label(self.text("表示予定を確認", "Check planned icon"))
-                    .disabled_elevated(self.operation.busy() || !self.valid)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.open_preview_outcome(&pack_id, filename.clone(), window, cx);
-                    })),
-            );
+            .child(description.flex_1());
         #[cfg(feature = "test-support")]
         let row = row.test_support();
         row.into_any_element()
     }
 }
 
-/// 表示上限に達した後の本文は文字列へ組み立てない。
+/// 元の記録を保持し、画面内で利用条件の全文を確認できる形にする。
 fn read_rights(path: &std::path::Path) -> Result<String> {
     let mut bytes = Vec::new();
     std::fs::File::open(path)?
@@ -365,26 +325,11 @@ fn read_rights(path: &std::path::Path) -> Result<String> {
     anyhow::ensure!(bytes.len() <= 16 * 1024 * 1024, "provenance too large");
     let value: serde_json::Value = serde_json::from_slice(&bytes)?;
     let mut output = String::new();
-    let mut remaining = 32_000usize;
-    let mut append = |text: &str| {
-        for ch in text.chars().take(remaining) {
-            output.push(ch);
-            remaining -= 1;
-        }
-    };
+    let mut append = |text: &str| output.push_str(text);
     append(value["package"]["license"].as_str().unwrap_or(""));
-    for key in [
-        "url",
-        "sha256",
-        "repository",
-        "version",
-        "license_summary",
-        "conversion",
-    ] {
+    for key in ["repository", "url", "license_summary"] {
         if let Some(text) = value["download"][key].as_str() {
             append("\n");
-            append(key);
-            append(": ");
             append(text);
         }
     }
@@ -402,7 +347,7 @@ fn read_rights(path: &std::path::Path) -> Result<String> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn rights_view_caps_unicode_characters_and_keeps_the_complete_source() {
+    fn rights_view_includes_the_full_license_and_keeps_the_source() {
         let file = tempfile::NamedTempFile::new().unwrap();
         let text = "あ".repeat(40_000);
         std::fs::write(
@@ -415,7 +360,7 @@ mod tests {
         .unwrap();
         let before = std::fs::read(file.path()).unwrap();
         let rendered = super::read_rights(file.path()).unwrap();
-        assert_eq!(rendered.chars().count(), 32_000);
+        assert_eq!(rendered, format!("MIT\nNOTICE\n{}", "あ".repeat(40_000)));
         assert!(rendered.starts_with("MIT\nNOTICE\nあ"));
         assert_eq!(std::fs::read(file.path()).unwrap(), before);
     }

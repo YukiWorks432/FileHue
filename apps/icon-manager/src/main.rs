@@ -59,7 +59,7 @@ struct Manager {
     browsing: bool,
     conflict_attention: bool,
     selected: Option<String>,
-    rights: String,
+    rights: Option<Entity<gpui_kit::component::input::TextareaState>>,
     show_rights: bool,
     preview: Entity<gpui_kit::component::input::InputState>,
     _preview_subscription: Subscription,
@@ -108,8 +108,7 @@ impl Manager {
         let preview = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx));
         let preview_subscription = cx.subscribe(
             &preview,
-            |this, _, _: &gpui_kit::component::input::InputEvent, cx| {
-                this.inspect_target_preview(cx);
+            |_, _, _: &gpui_kit::component::input::InputEvent, cx| {
                 cx.notify();
             },
         );
@@ -132,7 +131,7 @@ impl Manager {
                     browsing: false,
                     conflict_attention: file_icons_windows::conflict::pending().unwrap_or(true),
                     selected: None,
-                    rights: String::new(),
+                    rights: None,
                     show_rights: false,
                     preview,
                     _preview_subscription: preview_subscription,
@@ -168,7 +167,7 @@ impl Manager {
                     browsing: false,
                     conflict_attention: file_icons_windows::conflict::pending().unwrap_or(true),
                     selected: None,
-                    rights: String::new(),
+                    rights: None,
                     show_rights: false,
                     preview,
                     _preview_subscription: preview_subscription,

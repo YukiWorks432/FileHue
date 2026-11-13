@@ -128,6 +128,15 @@ pub fn button(id: impl Into<gpui_kit::ElementId>, cx: &App) -> gpui_kit::compone
         .border_color(cx.theme().colors.border)
 }
 
+/// ラベルも含めた操作領域を、基準文字16pxで44px以上確保する。
+pub fn checkbox(id: impl Into<gpui_kit::ElementId>) -> gpui_kit::component::checkbox::Checkbox {
+    gpui_kit::component::checkbox::Checkbox::new(id)
+        .min_w(gpui_kit::rems(2.75))
+        .min_h(gpui_kit::rems(2.75))
+        .items_center()
+        .px_2()
+}
+
 /// 無効な操作はKitの無効表示に合わせて影も除く。
 pub trait ButtonElevation {
     fn disabled_elevated(self, disabled: bool) -> Self;

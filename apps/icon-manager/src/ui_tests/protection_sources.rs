@@ -800,6 +800,18 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             .contains_key("wfi-a")
     );
     assert!(load().unwrap().journal.is_empty() && load().unwrap().active.is_none());
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("protection-back", cx);
+        w.render_frame(cx);
+        assert!(
+            w.try_find("status")
+                .is_none_or(|status| status.label().unwrap_or("").is_empty())
+        );
+        w.click("protection-open", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
     // 素材と関連付けクラスが異なる同一パッケージアプリも一度に開閉する。
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);

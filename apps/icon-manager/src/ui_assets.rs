@@ -12,10 +12,13 @@ gpui_kit::assets::icon_assets!(
         Download,
         ExternalLink,
         File,
+        FileCode,
         FileImage,
+        FileText,
         FolderOpen,
         Info,
         Library,
+        ListFilter,
         Loader,
         Monitor,
         Moon,
@@ -23,6 +26,7 @@ gpui_kit::assets::icon_assets!(
         PackageOpen,
         Palette,
         PanelsTopLeft,
+        PanelLeft,
         RefreshCw,
         RotateCcw,
         Search,
@@ -37,6 +41,11 @@ gpui_kit::assets::icon_assets!(
 pub struct Assets;
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
+        if path == "file-preview-example.png" {
+            return Ok(Some(Cow::Borrowed(include_bytes!(
+                "../assets/thumbnail-example.png"
+            ))));
+        }
         match ExtraIcons.load(path)? {
             Some(bytes) => Ok(Some(bytes)),
             None => gpui_kit::assets::Assets.load(path),
@@ -61,6 +70,10 @@ mod tests {
             "icons/package.svg",
             "icons/monitor.svg",
             "icons/file-image.svg",
+            "icons/file-code.svg",
+            "icons/file-text.svg",
+            "icons/list-filter.svg",
+            "icons/panel-left.svg",
             "icons/trash.svg",
             "icons/brush-cleaning.svg",
             "icons/chevron-down.svg",

@@ -17,9 +17,16 @@ pub(super) struct Editor {
     pub completed: bool,
     focus: Option<FocusHandle>,
     previous_focus: Option<FocusHandle>,
+    inspection_revision: u64,
+    #[cfg(test)]
+    inspection_gate: Option<std::sync::mpsc::Receiver<()>>,
 }
 
 impl Editor {
+    #[cfg(test)]
+    pub(super) fn delay_inspection(&mut self, gate: std::sync::mpsc::Receiver<()>) {
+        self.inspection_gate = Some(gate);
+    }
     pub(super) fn backup_hint(&self) -> Option<PathBuf> {
         self.plan.as_ref().map(|plan| plan.backup.clone())
     }
@@ -82,6 +89,13 @@ impl Manager {
         if self.operation.busy() {
             return;
         }
+        if self.screen == Screen::Thumbnails && self.thumbnails.dirty() {
+            self.confirm_navigation(window, cx, move |this, window, cx| {
+                this.open_conflicts(strategy, window, cx)
+            });
+            return;
+        }
+        self.operation.clear_result();
         let Some(service) = self._guard.clone() else {
             return;
         };
@@ -99,8 +113,16 @@ impl Manager {
         self.recovery.needs_refresh = false;
         self.recovery.completed = false;
         self.recovery.page = 0;
+        self.recovery.inspection_revision = self.recovery.inspection_revision.wrapping_add(1);
+        let revision = self.recovery.inspection_revision;
         self.operation.begin(Kind::InspectConflicts, None);
+        #[cfg(test)]
+        let gate = self.recovery.inspection_gate.take();
         let task = cx.background_executor().spawn(async move {
+            #[cfg(test)]
+            if let Some(gate) = gate {
+                let _ = gate.recv();
+            }
             let preserve = service.conflicts(Strategy::PreserveExternal)?;
             let reapply = service.conflicts(Strategy::ReapplyTheme);
             Ok::<_, anyhow::Error>((preserve, reapply))
@@ -108,6 +130,10 @@ impl Manager {
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
+                if this.recovery.inspection_revision != revision || this.screen != Screen::Recovery
+                {
+                    return;
+                }
                 match result {
                     Ok((preserve, reapply)) => {
                         let (plan, alternative) = match reapply {
@@ -137,6 +163,11 @@ impl Manager {
     }
 
     pub(super) fn close_recovery(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.operation.running(Kind::InspectConflicts) {
+            self.recovery.inspection_revision = self.recovery.inspection_revision.wrapping_add(1);
+            self.operation.finish(Status::Idle);
+        }
+        self.operation.clear_result();
         if self.recovery.reviewed {
             self.recovery.reviewed = false;
             if let Some(focus) = &self.recovery.focus {
@@ -190,6 +221,8 @@ impl Manager {
                     self.text("表示が更新されない場合は、ファイル操作を終えてからExplorerを再起動してください。", "If icons have not refreshed, finish file operations and restart Explorer.")
                 } else if self.recovery.reviewed {
                     self.text("まだ変更していません。下の実行ボタンで確定します。", "Nothing has changed yet. Use the execution button below to commit.")
+                } else if self.operation.running(Kind::InspectConflicts) {
+                    self.text("現在の設定を確認しています。", "Checking the current settings.")
                 } else {
                     self.text("復元記録と現在の設定を照合しました。復旧方法を選び、変更内容を確認してください。", "Review the saved registration and current settings, then choose how to recover.")
                 })));
@@ -222,7 +255,9 @@ impl Manager {
             .child(scroll)
             .child(self.recovery_footer(cx))
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                if event.keystroke.key == "escape" && !this.operation.busy() {
+                if event.keystroke.key == "escape"
+                    && (!this.operation.busy() || this.operation.running(Kind::InspectConflicts))
+                {
                     this.close_recovery(window, cx);
                 }
             }))
@@ -463,6 +498,7 @@ impl Manager {
                 .child(
                     theme::button("recovery-filter", cx)
                         .small()
+                        .min_w(rems(9.))
                         .label(if self.recovery.all {
                             self.text("外部変更のみ", "External only")
                         } else {
@@ -657,9 +693,7 @@ impl Manager {
         let message = if busy {
             String::new()
         } else {
-            self.operation
-                .status()
-                .render(self.settings.language == "en")
+            self.operation.message(self.settings.language == "en")
         };
         let has_message = !message.is_empty();
         let status = div()
@@ -720,7 +754,7 @@ impl Manager {
                     } else {
                         self.text("キャンセル", "Cancel")
                     })
-                    .disabled_elevated(busy)
+                    .disabled_elevated(busy && !self.operation.running(Kind::InspectConflicts))
                     .on_click(cx.listener(|this, _, window, cx| this.close_recovery(window, cx))),
             );
         if busy {

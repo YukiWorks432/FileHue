@@ -126,10 +126,22 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         )
         .unwrap()
     });
+    let (release_inspection, inspection_gate) = std::sync::mpsc::channel();
+    manager.update(cx, |view, _| {
+        view.recovery.delay_inspection(inspection_gate)
+    });
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click(pack_button(&manager, cx, "targets", 0), cx);
         w.render_frame(cx);
+        // カテゴリ欄を閉じると一覧へ幅を渡し、再度開いて同じ作業を続けられる。
+        let initial_width = w.find("target-rows").bounds().size.width;
+        w.click("target-categories-close", cx);
+        w.render_frame(cx);
+        assert!(w.find("target-rows").bounds().size.width > initial_width);
+        w.click("target-categories-open", cx);
+        w.render_frame(cx);
+        assert!(w.find("target-all-categories").visible());
         // 初回・幅変更直後も、検索や絞り込みで再初期化せずページ末尾へ到達する。
         let last = manager.read(cx).settings.packs[0].theme.targets()[99]
             .id
@@ -166,6 +178,21 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         w.click("target-category-data", cx);
         w.render_frame(cx);
         assert!(w.find("target-toggle-extension:json").visible());
+        let hit = w.find("target-toggle-extension:json").bounds().size;
+        assert!(hit.height >= px(44.) && hit.width >= px(44.));
+        // ラベル側をクリックしても切り替わり、箱の16pxに操作を限定しない。
+        w.click_at(
+            "target-toggle-extension:json",
+            gpui_kit::point(hit.width - px(2.), hit.height / 2.),
+            cx,
+        );
+        w.render_frame(cx);
+        assert_eq!(
+            w.find("target-toggle-extension:json").checked(),
+            Some(false)
+        );
+        w.click("target-undo", cx);
+        w.render_frame(cx);
         assert!(w.try_find("target-toggle-extension:md").is_none());
         w.press("down", cx);
         w.render_frame(cx);
@@ -262,8 +289,25 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         let extension = w.find("target-toggle-extension:json").bounds();
         let filename = w.find("target-toggle-file:package.json").bounds();
         let long = w.find(format!("target-toggle-file:{long_name}")).bounds();
+        let reset = w.find("target-reset-extension:json").bounds();
+        let check_center = extension.top() + extension.size.height / 2.;
+        let reset_center = reset.top() + reset.size.height / 2.;
+        assert!(check_center <= reset_center + px(1.) && reset_center <= check_center + px(1.));
         assert_eq!(extension.left(), filename.left());
         assert_eq!(extension.left(), long.left());
+        w.click("conflicts-open", cx);
+        w.render_frame(cx);
+        assert!(w.find("recovery-progress").visible());
+        w.click("recovery-close", cx);
+        w.render_frame(cx);
+        assert!(w.find("target-search").visible());
+    })
+    .unwrap();
+    release_inspection.send(()).unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        assert!(w.find("target-search").visible());
         w.click("conflicts-open", cx);
     })
     .unwrap();
@@ -280,9 +324,8 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
             w.find("target-toggle-file:package.json").checked(),
             Some(true)
         );
-        w.click("target-details-open", cx);
-        w.render_frame(cx);
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
         w.input("package.json", cx);
     })
     .unwrap();
@@ -296,7 +339,9 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("パックのアイコン")
         );
-        w.click("target-auxiliary-back", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.input("json", cx);
         w.render_frame(cx);
         w.click("target-save", cx);
         w.render_frame(cx);
@@ -328,11 +373,17 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         assert_eq!(w.find("target-save").label(), Some("Save selection"));
         assert!(w.try_find("target-save-progress").is_none());
-        w.click(("target-filter", 2usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 2, cx);
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         assert!(w.try_find("target-toggle-file:package.json").is_none());
         assert!(w.find("target-toggle-extension:json").visible());
-        w.click(("target-filter", 0usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 0, cx);
+    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("target-toggle-file:package.json", cx);
         w.render_frame(cx);
@@ -431,9 +482,9 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
             cx,
         );
         w.render_frame(cx);
-        assert!(w.try_find("target-search").is_none());
-        w.click(pack_button(&manager, cx, "targets", 1), cx);
+        w.within("dialog").click("cancel", cx);
         w.render_frame(cx);
+        assert!(w.find("target-search").visible());
         w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.press("backspace", cx);
@@ -540,17 +591,30 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
     })
     .unwrap();
     cx.simulate_window_resize(window, size(px(640.), px(700.)));
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("target-categories-open", cx);
+        w.render_frame(cx);
+        assert!(w.find("target-categories-close").visible());
+    })
+    .unwrap();
+    cx.simulate_window_resize(window, size(px(1440.), px(700.)));
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("target-categories-close", cx);
+        w.render_frame(cx);
+        assert!(w.try_find("target-categories-close").is_none());
+        assert!(w.find("target-search").visible());
+        assert!(w.find("target-categories-open").visible());
+    })
+    .unwrap();
+    cx.simulate_window_resize(window, size(px(640.), px(700.)));
     for mode in [ThemeMode::Light, ThemeMode::Dark] {
         cx.update_window(window, |_, w, cx| {
             theme::apply(mode, cx);
             gpui_kit::component::theme::Theme::update(cx, |theme| theme.font_size = px(18.));
             w.render_frame(cx);
-            for control in [
-                "target-search",
-                "target-save",
-                "target-categories-open",
-                "target-details-open",
-            ] {
+            for control in ["target-search", "target-save", "target-categories-open"] {
                 let bounds = w.find(control).bounds();
                 assert!(w.find(control).visible(), "{control}");
                 assert!(
@@ -589,9 +653,7 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
             assert!(w.find("target-toggle-extension:json").visible());
             assert!(w.try_find("target-toggle-extension:md").is_none());
             assert_eq!(w.find("target-search").focused(), Some(true));
-            w.click("target-details-open", cx);
-            w.render_frame(cx);
-            w.click("target-preview", cx);
+            w.click("target-search", cx);
             w.press("ctrl-a", cx);
             w.input("package.json", cx);
             w.render_frame(cx);
@@ -599,11 +661,13 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
                 w.find("target-planned")
                     .label()
                     .unwrap()
-                    .contains("Original Windows icon")
+                    .contains("Appearance unavailable")
             );
-            w.press("escape", cx);
-            w.render_frame(cx);
             assert!(w.find("target-search").visible());
+            w.click("target-search", cx);
+            w.press("ctrl-a", cx);
+            w.press("backspace", cx);
+            w.render_frame(cx);
         })
         .unwrap();
     }
@@ -650,7 +714,10 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("zprobe", cx);
-        w.click(("target-filter", 1usize), cx);
+    })
+    .unwrap();
+    select_target_filter(window, 1, cx);
+    cx.update_window(window, |_, w, cx| {
         w.scroll(
             "target-rows",
             gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-100000.))),

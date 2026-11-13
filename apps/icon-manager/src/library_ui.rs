@@ -19,6 +19,7 @@ impl Manager {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.operation.clear_result();
         self.browsing = browsing;
         self.focus.focus(window, cx);
         cx.notify();
@@ -245,7 +246,7 @@ impl Manager {
                 self.text("拡張子", "extensions")
             );
             let full_title = pack.label.clone();
-            let mut title = div()
+            let title = div()
                 .flex_1()
                 .min_w_0()
                 .flex()
@@ -259,7 +260,10 @@ impl Manager {
                         .font_weight(FontWeight::SEMIBOLD)
                         .child(full_title.clone())
                         .tooltip(move |window, cx| {
-                            Tooltip::new(full_title.clone()).build(window, cx)
+                            Tooltip::new(full_title.clone())
+                                .max_w(rems(28.))
+                                .whitespace_normal()
+                                .build(window, cx)
                         }),
                 )
                 .child(
@@ -268,27 +272,6 @@ impl Manager {
                         .text_color(colors.muted_foreground)
                         .child(metadata),
                 );
-            if !pack.warnings.is_empty() {
-                let text = format!(
-                    "{}: {} · {}",
-                    self.text("警告", "Warnings"),
-                    pack.warnings.len(),
-                    self.text(
-                        "未定義のアイコンを参照する規則を除外しました。詳細を確認してください。",
-                        "Rules referencing undefined icons were skipped. Open the preview for details.",
-                    )
-                );
-                let warning = div()
-                    .id(pack_control("warnings", &pack.id))
-                    .role(Role::Status)
-                    .aria_label(text.clone())
-                    .text_sm()
-                    .whitespace_normal()
-                    .child(text);
-                #[cfg(feature = "test-support")]
-                let warning = warning.test_support();
-                title = title.child(warning);
-            }
             let mut identity = div()
                 .flex()
                 .flex_wrap()
@@ -344,6 +327,7 @@ impl Manager {
                     theme::button(pack_control("apply", &pack.id), cx)
                         .small()
                         .primary()
+                        .min_w(rems(7.))
                         .icon(if active {
                             IconName::Check
                         } else {
@@ -369,9 +353,9 @@ impl Manager {
                         .selected(expanded)
                         .toggled(expanded)
                         .disabled_elevated(self.operation.busy() && !expanded)
-                        .on_click(
-                            cx.listener(move |this, _, _, cx| this.select_details(&detail_id, cx)),
-                        ),
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.select_details(&detail_id, window, cx)
+                        })),
                 )
                 .child(
                     theme::button(pack_control("targets", &pack.id), cx)

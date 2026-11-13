@@ -161,6 +161,7 @@ impl Manager {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.targets.categories_visible = view != "collapsed";
         self.targets.auxiliary = (view == "categories").then_some(Auxiliary::Categories);
         if view == "focus" {
             self.targets.categories.update(cx, |state, cx| {
@@ -238,8 +239,35 @@ impl Manager {
                     .px_3()
                     .py_2()
                     .text_xs()
+                    .flex()
+                    .items_center()
+                    .gap_2()
                     .text_color(cx.theme().colors.muted_foreground)
-                    .child(self.text("カテゴリで絞り込み", "Browse categories")),
+                    .child(
+                        gpui_kit::component::Icon::new(gpui_kit::assets::IconName::ListFilter)
+                            .size_4(),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .child(self.text("カテゴリで絞り込み", "Browse categories")),
+                    )
+                    .child(
+                        theme::button("target-categories-close", cx)
+                            .small()
+                            .icon(gpui_kit::assets::IconName::PanelLeft)
+                            .accessibility_label(self.text("カテゴリを閉じる", "Close categories"))
+                            .tooltip(self.text("カテゴリを閉じる", "Close categories"))
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.targets.auxiliary = None;
+                                this.targets.categories_visible = false;
+                                this.targets.list.remeasure();
+                                if compact {
+                                    this.focus.focus(window, cx);
+                                }
+                                cx.notify();
+                            })),
+                    ),
             )
             .child(
                 div()

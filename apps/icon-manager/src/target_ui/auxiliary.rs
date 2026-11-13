@@ -8,130 +8,84 @@ impl Manager {
         value: &Selection,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let mut detail = theme::card(cx)
-            .id("target-details")
-            .flex_1()
-            .min_w_0()
-            .min_h_0()
-            .overflow_y_scroll()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .p_4()
-            .bg(cx.theme().colors.group_box)
-            .child(self.target_auxiliary_header("表示を確認", "Check icons", cx));
-        if let Some(target) = &self.targets.focused {
-            detail = detail.child(div().text_sm().child(format!(
-                "{}: {} · {}",
-                self.text("選択した対象", "Selected target"),
-                target.name,
-                if value.target_enabled(target) {
-                    self.text("対象に含む", "Included")
+        let mut detail = div().flex().flex_wrap().gap_2().px_3().py_2();
+        let typed = self.targets.search.read(cx).value().to_string();
+        for (key, label, selection) in [
+            ("target-current", self.text("保存済み", "Saved"), saved),
+            ("target-planned", self.text("予定", "Draft"), value),
+        ] {
+            let result = selection.resolve(&pack.theme, &typed);
+            let protection = self.target_preview_protected(&typed, key == "target-current");
+            let protected = protection == Some(true);
+            let inspected = !self.protection.inspection.loading
+                && self.protection.inspection.error.is_none()
+                && protection.is_some();
+            let use_pack = result.is_some() && !protected && inspected;
+            let reason = if file_icons_core::selection::protected_path(&typed) {
+                self.text(
+                    "Windowsが管理する保護対象",
+                    "Protected file type managed by Windows",
+                )
+            } else if !selection.enabled(&typed) {
+                self.text("利用者設定で無効", "Disabled by selection")
+            } else if !inspected {
+                self.text(
+                    "保護状態を確認できていません",
+                    "Protection has not been confirmed",
+                )
+            } else if protected {
+                self.text("既存アイコンを保護中", "Original icon protected")
+            } else {
+                result
+                    .map(|(_, reason)| match reason {
+                        "file_name" | "language_file_name" => {
+                            self.text("固有名の規則", "Filename rule")
+                        }
+                        "language_pattern" => self.text("パターンの規則", "Pattern rule"),
+                        _ => self.text("拡張子の規則", "Extension rule"),
+                    })
+                    .unwrap_or(self.text("未対応", "Unsupported"))
+            };
+            let text = format!(
+                "{label}: {typed} · {reason} · {}",
+                if !inspected {
+                    self.text("表示を確認できません", "Appearance unavailable")
+                } else if use_pack {
+                    self.text("パックのアイコン", "Pack icon")
                 } else {
-                    self.text(
-                        "対象外・Windowsの元の表示",
-                        "Excluded; original Windows icon",
-                    )
+                    self.text("Windowsの元の表示", "Original Windows icon")
                 }
-            )));
-        }
-        let typed = self.preview.read(cx).value().to_string();
-        detail = detail
-            .child(div().text_sm().child(self.text(
-                "ファイル名で変更前と予定を確認",
-                "Compare saved and draft results for a filename",
-            )))
-            .child(
-                Input::new(&self.preview)
-                    .id("target-preview")
-                    .aria_label(self.text("結果を比較するファイル名", "Filename to compare"))
-                    .w_full(),
             );
-        if !typed.is_empty() {
-            for (key, label, selection) in [
-                ("target-current", self.text("保存済み", "Saved"), saved),
-                ("target-planned", self.text("予定", "Draft"), value),
-            ] {
-                let result = selection.resolve(&pack.theme, &typed);
-                let protection = self.target_preview_protected(&typed, key == "target-current");
-                let protected = protection == Some(true);
-                let inspected = !self.protection.inspection.loading
-                    && self.protection.inspection.error.is_none()
-                    && protection.is_some();
-                let use_pack = result.is_some() && !protected && inspected;
-                let reason = if file_icons_core::selection::protected_path(&typed) {
-                    self.text(
-                        "Windowsが管理する保護対象",
-                        "Protected file type managed by Windows",
-                    )
-                } else if !selection.enabled(&typed) {
-                    self.text("利用者設定で無効", "Disabled by selection")
-                } else if !inspected {
-                    self.text(
-                        "保護状態を確認できていません",
-                        "Protection has not been confirmed",
-                    )
-                } else if protected {
-                    self.text("既存アイコンを保護中", "Original icon protected")
-                } else {
-                    result
-                        .map(|(_, reason)| match reason {
-                            "file_name" | "language_file_name" => {
-                                self.text("固有名の規則", "Filename rule")
-                            }
-                            "language_pattern" => self.text("パターンの規則", "Pattern rule"),
-                            _ => self.text("拡張子の規則", "Extension rule"),
-                        })
-                        .unwrap_or(self.text("未対応", "Unsupported"))
-                };
-                let text = format!(
-                    "{label}: {typed} · {reason} · {}",
-                    if use_pack {
-                        self.text("パックのアイコン", "Pack icon")
-                    } else {
-                        self.text("Windowsの元の表示", "Original Windows icon")
-                    }
-                );
-                let row = theme::inset(cx)
-                    .p_3()
-                    .id(key)
-                    .role(Role::Status)
-                    .aria_label(text.clone())
-                    .child(text);
-                let row =
-                    if let Some((icon, _)) = result.filter(|_| use_pack) {
-                        row.child(crate::icon_preview::preview(icon.to_path_buf(), rems(2.)))
-                    } else {
-                        row.children(
-                            self.target_source(&typed)
-                                .and_then(|source| {
-                                    self.protection.inspection.previews.as_ref().and_then(
-                                        |previews| {
-                                            previews.paths.get(&source.registration.extension)
-                                        },
-                                    )
+            let row = theme::inset(cx)
+                .p_3()
+                .id(key)
+                .role(Role::Status)
+                .aria_label(text.clone())
+                .child(text);
+            let row = if let Some((icon, _)) = result.filter(|_| use_pack) {
+                row.child(crate::icon_preview::preview(icon.to_path_buf(), rems(2.)))
+            } else {
+                row.children(
+                    self.target_source(&typed)
+                        .and_then(|source| {
+                            self.protection
+                                .inspection
+                                .previews
+                                .as_ref()
+                                .and_then(|previews| {
+                                    previews.paths.get(&source.registration.extension)
                                 })
-                                .map(|icon| crate::icon_preview::preview(icon.clone(), rems(2.))),
-                        )
-                    };
-                #[cfg(feature = "test-support")]
-                let row = row.test_support();
-                detail = detail.child(row);
-            }
+                        })
+                        .map(|icon| crate::icon_preview::preview(icon.clone(), rems(2.))),
+                )
+            };
+            #[cfg(feature = "test-support")]
+            let row = row.test_support();
+            detail = detail.child(row);
         }
-        #[cfg(feature = "test-support")]
-        let detail = detail.test_support();
-        div()
-            .relative()
-            .flex_1()
-            .min_h_0()
-            .min_w_0()
-            .flex()
-            .flex_col()
-            .child(detail.track_scroll(&self.targets.detail_scroll))
-            .vertical_scrollbar(&self.targets.detail_scroll)
-            .into_any_element()
+        detail.into_any_element()
     }
+
     fn target_auxiliary_header(
         &self,
         ja: &'static str,
@@ -148,6 +102,7 @@ impl Manager {
                     .small()
                     .label(self.text("対象一覧に戻る", "Back to targets"))
                     .on_click(cx.listener(|this, _, window, cx| {
+                        this.operation.clear_result();
                         this.targets.auxiliary = None;
                         window.focus(&this.focus, cx);
                         cx.notify();
