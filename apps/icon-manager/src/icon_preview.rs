@@ -1,12 +1,8 @@
 //! 表示寸法に合うICO画像を非同期で読み込み、GPUIの資産キャッシュで共有する。
-use gpui_kit::{App, Asset, ImageCacheError, Img, RenderImage, Window, img};
+use gpui_kit::{
+    AbsoluteLength, App, Asset, ImageCacheError, Img, RenderImage, Styled, Window, img,
+};
 use std::{path::PathBuf, sync::Arc};
-
-#[derive(Clone, Copy)]
-pub enum PreviewSize {
-    Rem(f32),
-    Pixels(f32),
-}
 
 #[derive(Clone, Hash)]
 struct Source {
@@ -35,18 +31,16 @@ impl Asset for PreviewAsset {
     }
 }
 
-pub fn preview(path: PathBuf, size: PreviewSize) -> Img {
+pub fn preview(path: PathBuf, size: impl Into<AbsoluteLength>) -> Img {
+    let size = size.into();
     if !path
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("ico"))
     {
-        return img(path);
+        return img(path).size(size);
     }
     img(move |window: &mut Window, cx: &mut App| {
-        let logical = match size {
-            PreviewSize::Rem(value) => f32::from(window.rem_size()) * value,
-            PreviewSize::Pixels(value) => value,
-        };
+        let logical = f32::from(size.to_pixels(window.rem_size()));
         let pixels = (logical * window.scale_factor()).ceil().clamp(1., 512.) as u32;
         window.use_asset::<PreviewAsset>(
             &Source {
@@ -56,6 +50,7 @@ pub fn preview(path: PathBuf, size: PreviewSize) -> Img {
             cx,
         )
     })
+    .size(size)
 }
 
 fn load_icon(path: &std::path::Path, pixels: u32) -> anyhow::Result<image::RgbaImage> {
@@ -76,12 +71,9 @@ fn load_icon(path: &std::path::Path, pixels: u32) -> anyhow::Result<image::RgbaI
         })
         .context("icon contains no images")?;
     let decoded = entry.decode()?;
-    let mut image = image::RgbaImage::from_raw(
-        decoded.width(),
-        decoded.height(),
-        decoded.rgba_data().to_vec(),
-    )
-    .context("invalid icon pixels")?;
+    let mut image =
+        image::RgbaImage::from_raw(decoded.width(), decoded.height(), decoded.into_rgba_data())
+            .context("invalid icon pixels")?;
     if image.width() != pixels || image.height() != pixels {
         // 補間時に透明画素の色が輪郭へ混ざらないよう、事前乗算してから戻す。
         for p in image.pixels_mut() {
@@ -120,12 +112,12 @@ mod tests {
     #[cfg(feature = "test-support")]
     #[test]
     fn requests_a_new_preview_after_display_scale_changes() {
-        use gpui_kit::{Context, IntoElement, Render, Styled, TestApp};
+        use gpui_kit::{Context, IntoElement, Render, TestApp};
 
         struct View(PathBuf);
         impl Render for View {
             fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-                preview(self.0.clone(), PreviewSize::Rem(1.5)).size_6()
+                preview(self.0.clone(), gpui_kit::rems(1.5))
             }
         }
 

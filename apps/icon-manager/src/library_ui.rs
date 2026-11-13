@@ -320,13 +320,7 @@ impl Manager {
                         .flex_col()
                         .items_center()
                         .gap_1()
-                        .child(
-                            crate::icon_preview::preview(
-                                path,
-                                crate::icon_preview::PreviewSize::Rem(1.5),
-                            )
-                            .size_6(),
-                        )
+                        .child(crate::icon_preview::preview(path, rems(1.5)))
                         .child(
                             div()
                                 .text_xs()

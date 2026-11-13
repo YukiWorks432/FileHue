@@ -306,12 +306,9 @@ impl Manager {
             ),
         };
         let artwork = match icon {
-            Some(path) => crate::icon_preview::preview(
-                path.to_path_buf(),
-                crate::icon_preview::PreviewSize::Rem(2.),
-            )
-            .size_8()
-            .into_any_element(),
+            Some(path) => {
+                crate::icon_preview::preview(path.to_path_buf(), rems(2.)).into_any_element()
+            }
             None => Icon::new(IconName::File).size_8().into_any_element(),
         };
         let mut description = div()
