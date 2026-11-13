@@ -591,6 +591,24 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
     })
     .unwrap();
     cx.simulate_window_resize(window, size(px(640.), px(700.)));
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("target-categories-open", cx);
+        w.render_frame(cx);
+        assert!(w.find("target-categories-close").visible());
+    })
+    .unwrap();
+    cx.simulate_window_resize(window, size(px(1440.), px(700.)));
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        w.click("target-categories-close", cx);
+        w.render_frame(cx);
+        assert!(w.try_find("target-categories-close").is_none());
+        assert!(w.find("target-search").visible());
+        assert!(w.find("target-categories-open").visible());
+    })
+    .unwrap();
+    cx.simulate_window_resize(window, size(px(640.), px(700.)));
     for mode in [ThemeMode::Light, ThemeMode::Dark] {
         cx.update_window(window, |_, w, cx| {
             theme::apply(mode, cx);

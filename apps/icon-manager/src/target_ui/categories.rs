@@ -259,12 +259,11 @@ impl Manager {
                             .accessibility_label(self.text("カテゴリを閉じる", "Close categories"))
                             .tooltip(self.text("カテゴリを閉じる", "Close categories"))
                             .on_click(cx.listener(move |this, _, window, cx| {
+                                this.targets.auxiliary = None;
+                                this.targets.categories_visible = false;
+                                this.targets.list.remeasure();
                                 if compact {
-                                    this.targets.auxiliary = None;
                                     this.focus.focus(window, cx);
-                                } else {
-                                    this.targets.categories_visible = false;
-                                    this.targets.list.remeasure();
                                 }
                                 cx.notify();
                             })),

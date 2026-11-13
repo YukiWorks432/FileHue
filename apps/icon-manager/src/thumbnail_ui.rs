@@ -464,20 +464,16 @@ impl Manager {
             );
         if let Some(plan) = &self.thumbnails.plan {
             let names = |items: &BTreeSet<String>| {
-                if items.is_empty() {
-                    self.text("なし", "None").to_string()
-                } else {
-                    items
-                        .iter()
-                        .map(|extension| {
-                            format!(
-                                "{} ({extension})",
-                                format_name(extension, self.settings.language == "en")
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                }
+                items
+                    .iter()
+                    .map(|extension| {
+                        format!(
+                            "{} ({extension})",
+                            format_name(extension, self.settings.language == "en")
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
             };
             let mut preview = theme::card(cx)
                 .flex()
