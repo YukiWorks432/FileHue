@@ -1503,6 +1503,9 @@ fn protection_visual_probe() {
                     manager.update(cx, |this, cx| { this.settings.language = lang.into(); cx.notify(); });
                     w.resize(size(px(width), px(height)));
                     w.render_frame(cx);
+                }).unwrap();
+                cx.background_executor().timer(std::time::Duration::from_millis(350)).await;
+                window.update(cx, |_, w, cx| {
                     w.hover("app-brand", cx);
                     w.render_frame(cx);
                     w.hover("protection-help", cx);
