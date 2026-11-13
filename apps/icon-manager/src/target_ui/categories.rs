@@ -247,7 +247,28 @@ impl Manager {
                         gpui_kit::component::Icon::new(gpui_kit::assets::IconName::ListFilter)
                             .size_4(),
                     )
-                    .child(self.text("カテゴリで絞り込み", "Browse categories")),
+                    .child(
+                        div()
+                            .flex_1()
+                            .child(self.text("カテゴリで絞り込み", "Browse categories")),
+                    )
+                    .child(
+                        theme::button("target-categories-close", cx)
+                            .small()
+                            .icon(gpui_kit::assets::IconName::PanelLeft)
+                            .accessibility_label(self.text("カテゴリを閉じる", "Close categories"))
+                            .tooltip(self.text("カテゴリを閉じる", "Close categories"))
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                if compact {
+                                    this.targets.auxiliary = None;
+                                    this.focus.focus(window, cx);
+                                } else {
+                                    this.targets.categories_visible = false;
+                                    this.targets.list.remeasure();
+                                }
+                                cx.notify();
+                            })),
+                    ),
             )
             .child(
                 div()

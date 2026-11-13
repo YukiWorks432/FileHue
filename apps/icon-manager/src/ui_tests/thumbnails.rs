@@ -66,6 +66,38 @@ fn selection_in_child(cx: &mut TestAppContext) {
         assert_eq!(w.find("app-brand").bounds().origin, brand_origin);
         w.click("thumbnail-apply", cx);
         manager.update(cx, |view, _| assert!(view.thumbnails.plan.is_none()));
+        let card = w.find("thumbnail-card-.ai").bounds();
+        w.click_at(
+            "thumbnail-card-.ai",
+            gpui_kit::point(px(8.), card.size.height - px(8.)),
+            cx,
+        );
+        w.render_frame(cx);
+        assert_eq!(w.find("thumbnail-.ai").checked(), Some(true));
+        let status_position = w.find("thumbnail-state-.ai").bounds().origin;
+        w.click_at("thumbnail-card-.ai", gpui_kit::point(px(8.), px(8.)), cx);
+        w.render_frame(cx);
+        assert_eq!(w.find("thumbnail-.ai").checked(), Some(false));
+        w.click_at(
+            "thumbnail-card-.ai",
+            gpui_kit::point(card.size.width / 2., card.size.height / 2.),
+            cx,
+        );
+        w.render_frame(cx);
+        assert_eq!(w.find("thumbnail-.ai").checked(), Some(true));
+        w.click("thumbnail-.ai", cx);
+        w.render_frame(cx);
+        assert_eq!(w.find("thumbnail-.ai").checked(), Some(false));
+        assert_eq!(
+            w.find("thumbnail-state-.ai").bounds().origin,
+            status_position
+        );
+        w.press("space", cx);
+        w.render_frame(cx);
+        assert_eq!(w.find("thumbnail-.ai").checked(), Some(true));
+        w.press("space", cx);
+        w.render_frame(cx);
+        assert_eq!(w.find("thumbnail-.ai").checked(), Some(false));
         w.click("thumbnail-.ai", cx);
         super::protection_sources::reveal_in(w, "thumbnail-.eps", "thumbnail-scroll", cx);
         w.click("thumbnail-.eps", cx);
@@ -172,6 +204,14 @@ fn selection_in_child(cx: &mut TestAppContext) {
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         assert!(w.find("thumbnail-plan").visible());
+        w.click("thumbnail-plan-details", cx);
+        w.render_frame(cx);
+        assert_eq!(
+            w.find("thumbnail-plan-details").label(),
+            Some("技術情報を閉じる")
+        );
+        w.click("thumbnail-plan-details", cx);
+        w.render_frame(cx);
         // 選択を変えたら、確認済みの変更予定は使い回さない。
         super::protection_sources::reveal_in(w, "thumbnail-.eps", "thumbnail-scroll", cx);
         w.click("thumbnail-.eps", cx);

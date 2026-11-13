@@ -297,7 +297,11 @@ impl Manager {
                             } else {
                                 cx.theme().colors.muted_foreground
                             })
-                            .child(format!("{state} · {label}"));
+                            .child(if outcome == protection::Outcome::Checking {
+                                state.clone()
+                            } else {
+                                format!("{state} · {label}")
+                            });
                         #[cfg(feature = "test-support")]
                         let status = status.test_support();
                         status
@@ -306,6 +310,7 @@ impl Manager {
             .child(
                 theme::checkbox(SharedString::from(format!("target-toggle-{}", target.id)))
                     .small()
+                    .items_center()
                     .checked(enabled)
                     .label(self.text("対象", "Include"))
                     .accessibility_label(format!(

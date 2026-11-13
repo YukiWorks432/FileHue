@@ -113,7 +113,7 @@ impl Manager {
             }))
     }
     fn navigate_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.operation.busy() {
+        if self.operation.busy() && !self.operation.running(Kind::InspectConflicts) {
             return;
         }
         if self.screen == Screen::Thumbnails && self.thumbnails.dirty() {
@@ -532,11 +532,18 @@ impl Manager {
             .max_h_24()
             .overflow_y_scroll()
             .flex_1()
+            .flex()
+            .items_center()
+            .gap_2()
             .text_color(if self.operation.failed() {
                 colors.danger
             } else {
                 colors.muted_foreground
             })
+            .when(
+                self.operation.busy() && self.operation.progress().is_none(),
+                |row| row.child(gpui_kit::component::spinner::Spinner::new().small()),
+            )
             .child(message);
         #[cfg(feature = "test-support")]
         let status = status.test_support();

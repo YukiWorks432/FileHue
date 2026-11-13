@@ -41,7 +41,6 @@ struct ListMetrics {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Auxiliary {
     Categories,
-    Details,
     Copy,
 }
 pub(super) struct Editor {
@@ -163,6 +162,7 @@ impl Editor {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("json, package.json…"));
         let subscription = cx.subscribe(&search, |this, _, _: &InputEvent, cx| {
             this.targets.reset_page();
+            this.inspect_target_preview(cx);
             cx.notify();
         });
         Self {
@@ -216,6 +216,13 @@ fn matching_categories(query: &str) -> Vec<&'static str> {
 fn matches_query(target: &Target, query: &str, search: &TargetQuery, categories: &[&str]) -> bool {
     search.matches(target) || target.kind.contains(query) || categories.contains(&target.category)
 }
+fn is_preview_filename(name: &str, targets: &[Target]) -> bool {
+    !name.is_empty()
+        && ((name.contains('.') && !name.starts_with('.'))
+            || targets
+                .iter()
+                .any(|target| target.kind == "file" && target.name.eq_ignore_ascii_case(name)))
+}
 impl Manager {
     pub(super) fn target_changes_pending(&self) -> bool {
         self.targets.has_changes(&self.settings) || self.protection.draft.dirty(&self.settings)
@@ -254,13 +261,20 @@ impl Manager {
         self.protection.draft.rules = self.settings.icon_protection_rules.clone();
         self.targets.copy_changes = (page == "update").then(|| self.settings.packs[1].id.clone());
         if page == "planned" {
-            self.targets.auxiliary = Some(Auxiliary::Details);
+            self.targets.auxiliary = None;
         }
         if !matches!(page, "samples" | "update" | "planned") {
             self.targets.pack = None;
             self.screen = Screen::Packs;
             self.selected = None;
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn prepare_guidance_query(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.targets.search.update(cx, |input, cx| {
+            input.set_value("sample.mts", window, cx);
+        });
     }
 
     pub(super) fn back_from_targets(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -421,10 +435,7 @@ impl Manager {
             body = body.child(self.target_categories(all, compact, window, cx));
         }
         if self.targets.auxiliary.is_none() {
-            body = body.child(self.target_results(pack, all, &rows, cx));
-        }
-        if self.targets.auxiliary == Some(Auxiliary::Details) {
-            body = body.child(self.target_details(pack, saved, value, cx));
+            body = body.child(self.target_results(pack, all, &rows, compact, cx));
         }
         if self.targets.auxiliary == Some(Auxiliary::Copy) {
             body = body.child(self.target_copy(pack, cx));
@@ -511,63 +522,22 @@ impl Manager {
                         })),
                 );
         }
-        for (id, ja, en, section) in [
-            (
-                "target-categories-open",
-                "カテゴリ",
-                "Categories",
-                Auxiliary::Categories,
-            ),
-            (
-                "target-details-open",
-                "表示を確認…",
-                "Check icons…",
-                Auxiliary::Details,
-            ),
-            (
-                "target-copy-open",
-                "設定をコピー…",
-                "Copy settings…",
-                Auxiliary::Copy,
-            ),
-        ] {
-            tools = tools.child(
-                theme::button(id, cx)
-                    .small()
-                    .label(self.text(ja, en))
-                    .when(section == Auxiliary::Categories, |button| {
-                        button.icon(IconName::PanelLeft)
-                    })
-                    .selected(if section == Auxiliary::Categories && !compact {
-                        self.targets.categories_visible
+        tools = tools.child(
+            theme::button("target-copy-open", cx)
+                .small()
+                .label(self.text("設定をコピー…", "Copy settings…"))
+                .selected(self.targets.auxiliary == Some(Auxiliary::Copy))
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.operation.clear_result();
+                    this.targets.auxiliary = if this.targets.auxiliary == Some(Auxiliary::Copy) {
+                        None
                     } else {
-                        self.targets.auxiliary == Some(section)
-                    })
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.operation.clear_result();
-                        if section == Auxiliary::Categories && !compact {
-                            this.targets.categories_visible = !this.targets.categories_visible;
-                            this.targets.list.remeasure();
-                            cx.notify();
-                            return;
-                        }
-                        this.targets.auxiliary = if this.targets.auxiliary == Some(section) {
-                            None
-                        } else {
-                            Some(section)
-                        };
-                        if this.targets.auxiliary == Some(Auxiliary::Categories) {
-                            this.targets.categories.focus_handle(cx).focus(window, cx);
-                        } else {
-                            this.focus.focus(window, cx);
-                        }
-                        if section == Auxiliary::Details {
-                            this.inspect_target_preview(cx);
-                        }
-                        cx.notify();
-                    })),
-            );
-        }
+                        Some(Auxiliary::Copy)
+                    };
+                    this.focus.focus(window, cx);
+                    cx.notify();
+                })),
+        );
         div()
             .flex_shrink_0()
             .flex()
@@ -585,6 +555,7 @@ impl Manager {
         pack: &file_icons_core::ImportedPack,
         all: &[Target],
         rows: &[&Target],
+        compact: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let mut panel = theme::card(cx)
@@ -594,18 +565,20 @@ impl Manager {
             .min_h_0()
             .flex()
             .flex_col();
-        panel = panel.child(self.target_tools(rows, cx));
-        if self.protection.inspection.loading {
-            panel = panel.child(
-                div()
-                    .p_3()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(Spinner::new().small())
-                    .child(self.text("保護状態を確認中…", "Checking icon protection…")),
-            );
-        } else if let Some(error) = &self.protection.inspection.error {
+        panel = panel.child(self.target_tools(rows, compact, cx));
+        let query = self.targets.search.read(cx).value();
+        if is_preview_filename(&query, all) {
+            let id = self.targets.pack.as_ref().unwrap();
+            let empty = Selection::default();
+            let saved = self.settings.selections.get(id).unwrap_or(&empty);
+            if let Some(draft) = self.targets.drafts.get(id) {
+                panel = panel.child(self.target_details(pack, saved, &draft.value, cx));
+            }
+        }
+
+        if !self.protection.inspection.loading
+            && let Some(error) = &self.protection.inspection.error
+        {
             panel = panel.child(
                 div()
                     .p_3()
@@ -698,7 +671,7 @@ impl Manager {
         let panel = panel.test_support();
         panel.into_any_element()
     }
-    fn target_tools(&self, rows: &[&Target], cx: &mut Context<Self>) -> AnyElement {
+    fn target_tools(&self, rows: &[&Target], compact: bool, cx: &mut Context<Self>) -> AnyElement {
         let blocked = self.operation.busy() || !self.valid;
         #[cfg(test)]
         let _tools = crate::performance::section("target_tools");
@@ -715,6 +688,31 @@ impl Manager {
                 .font_weight(FontWeight::SEMIBOLD)
                 .child(category_name),
         );
+        if compact || !self.targets.categories_visible {
+            heading = div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap_3()
+                .child(
+                    theme::button("target-categories-open", cx)
+                        .small()
+                        .icon(IconName::PanelLeft)
+                        .accessibility_label(self.text("カテゴリを開く", "Open categories"))
+                        .tooltip(self.text("カテゴリを開く", "Open categories"))
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            if compact {
+                                this.targets.auxiliary = Some(Auxiliary::Categories);
+                                this.targets.categories.focus_handle(cx).focus(window, cx);
+                            } else {
+                                this.targets.categories_visible = true;
+                                this.targets.list.remeasure();
+                            }
+                            cx.notify();
+                        })),
+                )
+                .child(heading.flex_1());
+        }
         if let Some(category) = self.targets.category {
             let (enabled, total) = self
                 .targets
@@ -752,6 +750,9 @@ impl Manager {
                 })),
             );
         }
+        heading = heading.child(theme::button("target-restart-help", cx).small().icon(IconName::Info)
+            .accessibility_label(self.text("Explorerの表示更新について", "About refreshing Explorer icons"))
+            .tooltip(self.text("チェックを外した対象はWindowsの元の表示になります。\n反映されない場合は、ファイル操作を終えてから\nExplorerを再起動してください。", "Unchecked targets use the original Windows icons.\nIf icons do not update, finish file operations\nand restart Explorer.")));
         let filters = [
             self.text("すべて", "All"),
             self.text("対象に含む", "Included"),
@@ -764,6 +765,7 @@ impl Manager {
         let owner = cx.entity().downgrade();
         let filter = theme::button("target-filter-open", cx)
             .small()
+            .min_w(rems(10.))
             .icon(IconName::ListFilter)
             .label(if selected == 0 {
                 self.text("絞り込み", "Filter")
@@ -1031,14 +1033,12 @@ impl Manager {
                 .child(self.back_button("target-back", cx))
                 .child(div().text_sm().child(if dirty == 0 {
                     self.text("保存済み", "Saved").to_string()
-                } else { format!("{}: {dirty}", self.text("未保存の変更", "Unsaved changes")) }))
-                .child(theme::button("target-restart-help", cx).small().icon(IconName::Info)
-                    .accessibility_label(self.text("Explorerの表示更新について", "About refreshing Explorer icons"))
-                    .tooltip(self.text("チェックを外した対象はWindowsの元の表示になります。\n反映されない場合は、ファイル操作を終えてから\nExplorerを再起動してください。", "Unchecked targets use the original Windows icons.\nIf icons do not update, finish file operations\nand restart Explorer.")))
+                } else {
+                    format!("{}: {dirty}", self.text("未保存の変更", "Unsaved changes"))
+                }))
                 .child(
                     theme::button("target-undo", cx)
                         .small()
-
                         .icon(IconName::RotateCcw)
                         .label(self.text("取り消す", "Undo"))
                         .disabled_elevated(blocked || undo_disabled)
@@ -1053,7 +1053,6 @@ impl Manager {
                 .child(
                     theme::button("target-discard", cx)
                         .small()
-
                         .label(self.text("保存済みに戻す", "Revert to saved"))
                         .disabled_elevated(blocked || dirty == 0)
                         .on_click(cx.listener(move |this, _, _, cx| {

@@ -8,45 +8,8 @@ impl Manager {
         value: &Selection,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let mut detail = theme::card(cx)
-            .id("target-details")
-            .flex_1()
-            .min_w_0()
-            .min_h_0()
-            .overflow_y_scroll()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .p_4()
-            .bg(cx.theme().colors.group_box)
-            .child(self.target_auxiliary_header("表示を確認", "Check icons", cx));
-        if let Some(target) = &self.targets.focused {
-            detail = detail.child(div().text_sm().child(format!(
-                "{}: {} · {}",
-                self.text("選択した対象", "Selected target"),
-                target.name,
-                if value.target_enabled(target) {
-                    self.text("対象に含む", "Included")
-                } else {
-                    self.text(
-                        "対象外・Windowsの元の表示",
-                        "Excluded; original Windows icon",
-                    )
-                }
-            )));
-        }
-        let typed = self.preview.read(cx).value().to_string();
-        detail = detail
-            .child(div().text_sm().child(self.text(
-                "ファイル名で変更前と予定を確認",
-                "Compare saved and draft results for a filename",
-            )))
-            .child(
-                Input::new(&self.preview)
-                    .id("target-preview")
-                    .aria_label(self.text("結果を比較するファイル名", "Filename to compare"))
-                    .w_full(),
-            );
+        let mut detail = div().flex().flex_wrap().gap_2().px_3().py_2();
+        let typed = self.targets.search.read(cx).value().to_string();
         if !typed.is_empty() {
             for (key, label, selection) in [
                 ("target-current", self.text("保存済み", "Saved"), saved),
@@ -86,7 +49,9 @@ impl Manager {
                 };
                 let text = format!(
                     "{label}: {typed} · {reason} · {}",
-                    if use_pack {
+                    if !inspected {
+                        self.text("表示を確認できません", "Appearance unavailable")
+                    } else if use_pack {
                         self.text("パックのアイコン", "Pack icon")
                     } else {
                         self.text("Windowsの元の表示", "Original Windows icon")
@@ -119,19 +84,9 @@ impl Manager {
                 detail = detail.child(row);
             }
         }
-        #[cfg(feature = "test-support")]
-        let detail = detail.test_support();
-        div()
-            .relative()
-            .flex_1()
-            .min_h_0()
-            .min_w_0()
-            .flex()
-            .flex_col()
-            .child(detail.track_scroll(&self.targets.detail_scroll))
-            .vertical_scrollbar(&self.targets.detail_scroll)
-            .into_any_element()
+        detail.into_any_element()
     }
+
     fn target_auxiliary_header(
         &self,
         ja: &'static str,

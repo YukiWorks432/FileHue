@@ -283,9 +283,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("保護中")
         );
-        w.click("target-details-open", cx);
-        w.render_frame(cx);
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.mts", cx);
         w.render_frame(cx);
@@ -301,8 +299,6 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("Windowsの元の表示")
         );
-        w.press("escape", cx);
-        w.render_frame(cx);
         w.press("alt-left", cx);
         w.render_frame(cx);
         w.within("dialog").click("cancel", cx);
@@ -413,9 +409,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
 
     // 拡張子として未登録でも、名前パターンが一致すればUnknownの保護を引き継ぐ。
     cx.update_window(window, |_, w, cx| {
-        w.click("target-details-open", cx);
-        w.render_frame(cx);
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.wfi-test", cx);
     })
@@ -431,7 +425,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                     .contains("Original icon protected")
             );
         }
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.wfi-unprotected", cx);
     })
@@ -470,7 +464,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
         for id in ["target-current", "target-planned"] {
             assert!(w.find(id).label().unwrap().contains("Pack icon"));
         }
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.wfi-test", cx);
     })
@@ -486,7 +480,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
                     .contains("Original icon protected")
             );
         }
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
         w.press("ctrl-a", cx);
         w.input("sample.wfi-unprotected", cx);
         w.press("ctrl-a", cx);
@@ -499,7 +493,9 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
         for id in ["target-current", "target-planned"] {
             assert!(w.find(id).label().unwrap().contains("Pack icon"));
         }
-        w.click("target-auxiliary-back", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.press("backspace", cx);
     })
     .unwrap();
     manager.update(cx, |this, cx| {

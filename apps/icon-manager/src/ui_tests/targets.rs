@@ -126,13 +126,17 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         )
         .unwrap()
     });
+    let (release_inspection, inspection_gate) = std::sync::mpsc::channel();
+    manager.update(cx, |view, _| {
+        view.recovery.delay_inspection(inspection_gate)
+    });
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click(pack_button(&manager, cx, "targets", 0), cx);
         w.render_frame(cx);
         // カテゴリ欄を閉じると一覧へ幅を渡し、再度開いて同じ作業を続けられる。
         let initial_width = w.find("target-rows").bounds().size.width;
-        w.click("target-categories-open", cx);
+        w.click("target-categories-close", cx);
         w.render_frame(cx);
         assert!(w.find("target-rows").bounds().size.width > initial_width);
         w.click("target-categories-open", cx);
@@ -175,7 +179,7 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         assert!(w.find("target-toggle-extension:json").visible());
         let hit = w.find("target-toggle-extension:json").bounds().size;
-        assert!(hit.height >= px(32.));
+        assert!(hit.height >= px(44.) && hit.width >= px(44.));
         // ラベル側をクリックしても切り替わり、箱の16pxに操作を限定しない。
         w.click_at(
             "target-toggle-extension:json",
@@ -285,8 +289,25 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
         let extension = w.find("target-toggle-extension:json").bounds();
         let filename = w.find("target-toggle-file:package.json").bounds();
         let long = w.find(format!("target-toggle-file:{long_name}")).bounds();
+        let reset = w.find("target-reset-extension:json").bounds();
+        let check_center = extension.top() + extension.size.height / 2.;
+        let reset_center = reset.top() + reset.size.height / 2.;
+        assert!(check_center <= reset_center + px(1.) && reset_center <= check_center + px(1.));
         assert_eq!(extension.left(), filename.left());
         assert_eq!(extension.left(), long.left());
+        w.click("conflicts-open", cx);
+        w.render_frame(cx);
+        assert!(w.find("recovery-progress").visible());
+        w.click("recovery-close", cx);
+        w.render_frame(cx);
+        assert!(w.find("target-search").visible());
+    })
+    .unwrap();
+    release_inspection.send(()).unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        assert!(w.find("target-search").visible());
         w.click("conflicts-open", cx);
     })
     .unwrap();
@@ -303,9 +324,8 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
             w.find("target-toggle-file:package.json").checked(),
             Some(true)
         );
-        w.click("target-details-open", cx);
-        w.render_frame(cx);
-        w.click("target-preview", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
         w.input("package.json", cx);
     })
     .unwrap();
@@ -319,7 +339,9 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("パックのアイコン")
         );
-        w.click("target-auxiliary-back", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.input("json", cx);
         w.render_frame(cx);
         w.click("target-save", cx);
         w.render_frame(cx);
@@ -574,12 +596,7 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
             theme::apply(mode, cx);
             gpui_kit::component::theme::Theme::update(cx, |theme| theme.font_size = px(18.));
             w.render_frame(cx);
-            for control in [
-                "target-search",
-                "target-save",
-                "target-categories-open",
-                "target-details-open",
-            ] {
+            for control in ["target-search", "target-save", "target-categories-open"] {
                 let bounds = w.find(control).bounds();
                 assert!(w.find(control).visible(), "{control}");
                 assert!(
@@ -618,9 +635,7 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
             assert!(w.find("target-toggle-extension:json").visible());
             assert!(w.try_find("target-toggle-extension:md").is_none());
             assert_eq!(w.find("target-search").focused(), Some(true));
-            w.click("target-details-open", cx);
-            w.render_frame(cx);
-            w.click("target-preview", cx);
+            w.click("target-search", cx);
             w.press("ctrl-a", cx);
             w.input("package.json", cx);
             w.render_frame(cx);
@@ -628,11 +643,13 @@ fn target_editor_in_child(cx: &mut TestAppContext) {
                 w.find("target-planned")
                     .label()
                     .unwrap()
-                    .contains("Original Windows icon")
+                    .contains("Appearance unavailable")
             );
-            w.press("escape", cx);
-            w.render_frame(cx);
             assert!(w.find("target-search").visible());
+            w.click("target-search", cx);
+            w.press("ctrl-a", cx);
+            w.press("backspace", cx);
+            w.render_frame(cx);
         })
         .unwrap();
     }

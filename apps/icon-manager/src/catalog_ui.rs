@@ -80,6 +80,7 @@ impl Manager {
                             .child(
                                 theme::button(("download", index), cx)
                                     .small()
+                                    .min_w(rems(13.5))
                                     .icon(if installed {
                                         IconName::Check
                                     } else {

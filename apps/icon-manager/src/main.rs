@@ -108,8 +108,7 @@ impl Manager {
         let preview = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx));
         let preview_subscription = cx.subscribe(
             &preview,
-            |this, _, _: &gpui_kit::component::input::InputEvent, cx| {
-                this.inspect_target_preview(cx);
+            |_, _, _: &gpui_kit::component::input::InputEvent, cx| {
                 cx.notify();
             },
         );

@@ -201,7 +201,9 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        w.click("target-details-open", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.input("sample.mts", cx);
         w.render_frame(cx);
         assert!(
             w.find("target-planned")
@@ -215,13 +217,17 @@ fn pack_guidance_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("sample.mts")
         );
-        w.press("escape", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.input(".mts", cx);
         w.render_frame(cx);
         w.click("target-protection-extension:mts", cx);
         w.render_frame(cx);
         w.click("pack-icon-mts", cx);
         w.render_frame(cx);
-        w.click("target-details-open", cx);
+        w.click("target-search", cx);
+        w.press("ctrl-a", cx);
+        w.input("sample.mts", cx);
         w.render_frame(cx);
         assert!(
             w.find("target-planned")
@@ -322,6 +328,9 @@ fn pack_guidance_visual_probe() {
                                     this.operation = crate::Operation::default();
                                     this.settings.language = language.into();
                                     this.prepare_guidance_visual(page);
+                                    if page == "planned" {
+                                        this.prepare_guidance_query(w, cx);
+                                    }
                                     this.preview.update(cx, |input, cx| {
                                         input.set_value("sample.mts", w, cx)
                                     });

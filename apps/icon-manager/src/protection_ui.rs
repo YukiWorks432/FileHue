@@ -787,8 +787,8 @@ impl Manager {
                     cx.notify();
                 }
             }));
-        let mut settings = theme::card(cx).mx_4().mt_3().mb_2().px_3().py_2()
-            .flex_shrink_0().flex().flex_col().gap_2()
+        let mut settings = theme::card(cx).mx_4().mt_3().mb_2().px_3().py_1()
+            .flex_shrink_0().flex().flex_col().gap_1()
             .child(div().flex().items_center().gap_2()
                 .child(theme::checkbox("protection-toggle")
                     .checked(self.protection.draft.enabled).disabled(blocked)
@@ -863,17 +863,6 @@ impl Manager {
             "おすすめ設定は全体保護をオンにし、VS Code・開発用の個別指定をパック優先にします。",
             "Recommended settings enable default protection and prefer pack icons for VS Code and development types, replacing their overrides.",
         ));
-        if self.protection.inspection.previews_loading {
-            settings = settings.child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .text_xs()
-                    .child(Spinner::new().small())
-                    .child(self.text("アイコンの見本を読み込み中…", "Loading icon previews…")),
-            );
-        }
         let mut filters = ButtonGroup::new("protection-view")
             .small()
             .disabled(self.operation.busy());
@@ -1174,6 +1163,12 @@ impl Manager {
                         .flex_1()
                         .min_w_0()
                         .text_sm()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .when(self.operation.busy(), |status| {
+                            status.child(Spinner::new().small())
+                        })
                         .text_color(if self.operation.failed() {
                             colors.danger
                         } else {
