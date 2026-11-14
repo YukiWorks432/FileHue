@@ -16,27 +16,46 @@ pub(super) struct Previews {
 }
 
 pub(super) fn generate(rows: &[ExistingIcon]) -> Result<Previews> {
-    let directory = tempfile::tempdir()?;
-    let mut unique = BTreeMap::new();
-    let mut keys = BTreeMap::new();
-    // ソフトの見出しを優先し、種類別の画像と同じ資源は一度だけ抽出する。
-    for (key, location) in rows
+    let entries = rows
         .iter()
         .map(|row| {
             (
                 format!("p:{}", row.group_id()),
-                row.provider_location.as_ref(),
+                row.provider_location.clone(),
             )
         })
         .chain(rows.iter().map(|row| {
             (
                 format!("f:{}", row.registration.extension),
-                row.location.as_ref(),
+                row.location.clone(),
             )
-        }))
-    {
+        }));
+    generate_entries(entries)
+}
+
+pub(super) fn generate_thumbnail_examples() -> Result<Previews> {
+    let entries = file_icons_windows::thumbnails::Format::ALL
+        .iter()
+        .map(|format| {
+            let extension = format.extension();
+            (
+                format!("f:{extension}"),
+                file_icons_windows::association_icon_location(extension),
+            )
+        });
+    generate_entries(entries)
+}
+
+fn generate_entries(
+    entries: impl Iterator<Item = (String, Option<IconLocation>)>,
+) -> Result<Previews> {
+    let directory = tempfile::tempdir()?;
+    let mut unique = BTreeMap::new();
+    let mut keys = BTreeMap::new();
+    // ソフトの見出しを優先し、種類別の画像と同じ資源は一度だけ抽出する。
+    for (key, location) in entries {
         if let Some(location) = location {
-            let resource = serde_json::to_string(location)?;
+            let resource = serde_json::to_string(&location)?;
             if unique.len() < 128 || unique.contains_key(&resource) {
                 let next = unique.len();
                 let index = *unique.entry(resource).or_insert(next);

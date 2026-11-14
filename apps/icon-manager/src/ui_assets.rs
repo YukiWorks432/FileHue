@@ -41,10 +41,29 @@ gpui_kit::assets::icon_assets!(
 pub struct Assets;
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
-        if path == "file-preview-example.png" {
-            return Ok(Some(Cow::Borrowed(include_bytes!(
-                "../assets/thumbnail-example.png"
-            ))));
+        let example: Option<&'static [u8]> = match path {
+            "thumbnail-example-ai.png" => {
+                Some(include_bytes!("../assets/thumbnail-example-ai.png"))
+            }
+            "thumbnail-example-eps.png" => {
+                Some(include_bytes!("../assets/thumbnail-example-eps.png"))
+            }
+            "thumbnail-example-svg.png" => {
+                Some(include_bytes!("../assets/thumbnail-example-svg.png"))
+            }
+            "thumbnail-example-psd.png" => {
+                Some(include_bytes!("../assets/thumbnail-example-psd.png"))
+            }
+            "thumbnail-example-psb.png" => {
+                Some(include_bytes!("../assets/thumbnail-example-psb.png"))
+            }
+            "thumbnail-example-pdf.png" => {
+                Some(include_bytes!("../assets/thumbnail-example-pdf.png"))
+            }
+            _ => None,
+        };
+        if let Some(example) = example {
+            return Ok(Some(Cow::Borrowed(example)));
         }
         match ExtraIcons.load(path)? {
             Some(bytes) => Ok(Some(bytes)),

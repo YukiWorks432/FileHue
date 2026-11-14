@@ -41,7 +41,9 @@ mod icon_policy;
 pub mod native_preview;
 mod package_icons;
 mod protection;
-pub use icon_policy::{ExistingIcon, IconProtectionRules, ProtectionRule};
+pub use icon_policy::{
+    ExistingIcon, IconProtectionRules, ProtectionRule, association_icon_location,
+};
 pub use protection::{inspect_existing_icons, inspect_pack_icons, inspect_retained_icons};
 mod recovery;
 mod registration_scope;

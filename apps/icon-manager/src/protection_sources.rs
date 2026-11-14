@@ -700,10 +700,12 @@ impl Manager {
                     self.text("継承結果の見本を取得できません。", "Inherited preview unavailable.")), cx))
         );
         if source.needs_review {
-            area = area.child(div().text_sm().text_color(colors.warning).child(self.text(
-                "登録が変わりました。再指定するまで保護します。",
-                "Registration changed. Protected until reviewed.",
-            )));
+            area = area.child(div().text_sm().text_color(colors.warning_foreground).child(
+                self.text(
+                    "登録が変わりました。再指定するまで保護します。",
+                    "Registration changed. Protected until reviewed.",
+                ),
+            ));
         }
         area
     }
