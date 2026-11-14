@@ -1,6 +1,6 @@
 //! 内容のサムネイルを拡張子ごとに選ぶ画面。
 use super::*;
-use file_icons_manager_service::{ThumbnailSelectionPlan, ThumbnailStatus};
+use file_icons_manager_service::ThumbnailStatus;
 use file_icons_windows::thumbnails::Format;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
@@ -32,8 +32,6 @@ pub(super) struct Editor {
     pub(super) draft: BTreeSet<String>,
     initialized: bool,
     pub(super) status: Option<ThumbnailStatus>,
-    pub(super) plan: Option<ThumbnailSelectionPlan>,
-    plan_details: bool,
     error_details: bool,
     card_focus: BTreeMap<&'static str, FocusHandle>,
     example_icons: Option<super::original_icons::Previews>,
@@ -55,7 +53,6 @@ impl Editor {
     }
     pub(super) fn discard(&mut self) {
         self.draft = self.applied();
-        self.plan = None;
     }
 }
 
@@ -72,7 +69,6 @@ impl Manager {
                 .or_insert_with(|| cx.focus_handle());
         }
         self.screen = Screen::Thumbnails;
-        self.thumbnails.plan = None;
         self.thumbnails.error_details = false;
         if self.thumbnails.example_icons.is_none() && !self.thumbnails.example_icons_loading {
             self.thumbnails.example_icons_loading = true;
@@ -90,41 +86,6 @@ impl Manager {
             .detach();
         }
         self.thumbnail_operation(|_| Ok(()), !self.thumbnails.initialized, false, cx);
-    }
-
-    fn preview_thumbnails(&mut self, cx: &mut Context<Self>) {
-        if self.operation.busy() {
-            return;
-        }
-        let Some(manager) = self._guard.clone() else {
-            return;
-        };
-        self.thumbnails.plan = None;
-        self.thumbnails.plan_details = false;
-        let selected = self.thumbnails.draft.clone();
-        self.operation.begin(Kind::Thumbnails, None);
-        let task = cx
-            .background_executor()
-            .spawn(async move { manager.preview_thumbnail_selection(selected) });
-        cx.spawn(async move |this, cx| {
-            let result = task.await;
-            let _ = this.update(cx, |this, cx| {
-                match result {
-                    Ok(plan) if plan.selected == this.thumbnails.draft => {
-                        this.thumbnails.plan = Some(plan);
-                        this.thumbnails.scroll.set_offset(point(px(0.), px(0.)));
-                        this.operation.finish(Status::Idle);
-                    }
-                    Ok(_) => this.operation.finish(Status::Idle),
-                    Err(error) => this
-                        .operation
-                        .finish(Status::Error(Failure::Operation, format!("{error:#}"))),
-                }
-                cx.notify();
-            });
-        })
-        .detach();
-        cx.notify();
     }
 
     fn thumbnail_operation(
@@ -150,9 +111,6 @@ impl Manager {
             let (result, status) = task.await;
             let _ = this.update(cx, |this, cx| {
                 let success = result.is_ok();
-                if report_success {
-                    this.thumbnails.plan = None;
-                }
                 this.operation.finish(match result {
                     Ok(()) if report_success => Status::Complete,
                     Ok(()) => Status::Idle,
@@ -294,7 +252,6 @@ impl Manager {
                 .on_click(cx.listener(move |this, checked, _, cx| {
                     cx.stop_propagation();
                     this.operation.clear_result();
-                    this.thumbnails.plan = None;
                     if *checked {
                         this.thumbnails.draft.insert(extension.into());
                     } else {
@@ -404,7 +361,6 @@ impl Manager {
                     card.hover(|style| style.bg(colors.muted))
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.operation.clear_result();
-                            this.thumbnails.plan = None;
                             if chosen {
                                 this.thumbnails.draft.remove(extension);
                             } else {
@@ -468,7 +424,6 @@ impl Manager {
                         } else {
                             BTreeSet::new()
                         };
-                        this.thumbnails.plan = None;
                         cx.notify();
                     })),
             );
@@ -590,8 +545,7 @@ impl Manager {
                             .label(self.text("再確認", "Check again"))
                             .disabled_elevated(busy || self._guard.is_none())
                             .on_click(cx.listener(|this, _, _, cx| {
-                                this.thumbnails.plan = None;
-                                this.thumbnail_operation(
+                                            this.thumbnail_operation(
                                     |_| Ok(()),
                                     !this.thumbnails.initialized,
                                     false,
@@ -600,125 +554,6 @@ impl Manager {
                             })),
                     ),
             );
-        }
-        if let Some(plan) = &self.thumbnails.plan {
-            let names = |items: &BTreeSet<String>| {
-                items
-                    .iter()
-                    .map(|extension| {
-                        format!(
-                            "{} ({extension})",
-                            format_name(extension, self.settings.language == "en")
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            };
-            let mut preview = theme::card(cx)
-                .flex()
-                .flex_col()
-                .gap_2()
-                .p_3()
-                .child(
-                    div()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(self.text("適用前の確認", "Review changes")),
-                )
-                .when(!plan.additions.is_empty(), |preview| {
-                    preview.child(div().text_sm().child(format!(
-                        "{}: {}",
-                        self.text("有効にする", "Enable"),
-                        names(&plan.additions)
-                    )))
-                })
-                .when(!plan.removals.is_empty(), |preview| {
-                    preview.child(div().text_sm().child(format!(
-                        "{}: {}",
-                        self.text("元に戻す", "Restore"),
-                        names(&plan.removals)
-                    )))
-                });
-            let groups = plan
-                .existing_groups
-                .iter()
-                .chain(plan.new_groups.iter())
-                .flat_map(|record| &record.groups)
-                .filter(|group| {
-                    group.members.iter().any(|extension| {
-                        plan.additions.contains(extension) || plan.removals.contains(extension)
-                    })
-                });
-            let mut paths = BTreeSet::new();
-            for group in groups {
-                paths.extend(group.changes.iter().map(|change| change.key.clone()));
-                let unaffected = group
-                    .members
-                    .iter()
-                    .filter(|extension| {
-                        !plan.additions.contains(*extension) && !plan.removals.contains(*extension)
-                    })
-                    .collect::<Vec<_>>();
-                if group.class.is_some() && !unaffected.is_empty() {
-                    preview = preview.child(
-                        div()
-                            .text_sm()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(self.text("関連するファイル形式", "Related file types")),
-                    );
-                    for extension in unaffected {
-                        let outcome = if plan.selected.contains(extension) {
-                            self.text("内容を表示", "Content preview")
-                        } else {
-                            self.text("従来の表示", "Previous display")
-                        };
-                        let name = format_name(extension, self.settings.language == "en");
-                        let label = if name.is_empty() {
-                            extension.clone()
-                        } else {
-                            format!("{name} ({extension})")
-                        };
-                        preview =
-                            preview.child(div().text_sm().child(format!("{label}: {outcome}")));
-                    }
-                }
-            }
-            preview = preview.child(div().text_sm().text_color(colors.muted_foreground).child(
-                self.text(
-                    "アイコンと既定のアプリは変更しません。",
-                    "Icons and default apps are unchanged.",
-                ),
-            ));
-            if !paths.is_empty() {
-                preview = preview.child(
-                    div().flex().child(
-                        theme::button("thumbnail-plan-details", cx)
-                            .small()
-                            .min_w(rems(11.))
-                            .label(if self.thumbnails.plan_details {
-                                self.text("技術情報を閉じる", "Hide technical details")
-                            } else {
-                                self.text("技術情報", "Technical details")
-                            })
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.thumbnails.plan_details = !this.thumbnails.plan_details;
-                                cx.notify();
-                            })),
-                    ),
-                );
-                if self.thumbnails.plan_details {
-                    for path in paths {
-                        preview = preview.child(
-                            div()
-                                .text_sm()
-                                .text_color(colors.muted_foreground)
-                                .child(format!("HKCU\\{path}")),
-                        );
-                    }
-                }
-            }
-            #[cfg(feature = "test-support")]
-            let preview = preview.id("thumbnail-plan").test_support();
-            panel = panel.child(preview);
         }
         if failed && self.thumbnails.error_details {
             panel = panel.child(div().text_color(colors.danger).child(self.text(
@@ -802,38 +637,12 @@ impl Manager {
                     theme::button("thumbnail-apply", cx)
                         .primary()
                         .min_w(rems(12.))
-                        .label(if self.thumbnails.plan.is_some() {
-                            self.text("変更を適用", "Apply changes")
-                        } else {
-                            self.text("変更内容を確認", "Review changes")
-                        })
+                        .label(self.text("変更を適用", "Apply changes"))
                         .disabled_elevated(unavailable || !dirty)
                         .on_click(cx.listener(|this, _, _, cx| {
-                            if !this
-                                .thumbnails
-                                .plan
-                                .as_ref()
-                                .is_some_and(|plan| plan.selected == this.thumbnails.draft)
-                            {
-                                this.preview_thumbnails(cx);
-                                return;
-                            }
-                            let reviewed = this
-                                .thumbnails
-                                .plan
-                                .take()
-                                .expect("reviewed thumbnail plan");
-                            let changed = this.text(
-                            "確認後に登録が変更されました。変更内容をもう一度確認してください。",
-                            "The registration changed after review. Review the changes again.",
-                        );
+                            let selected = this.thumbnails.draft.clone();
                             this.thumbnail_operation(
-                                move |manager| {
-                                    let actual = manager
-                                        .preview_thumbnail_selection(reviewed.selected.clone())?;
-                                    anyhow::ensure!(actual == reviewed, "{changed}");
-                                    manager.apply_reviewed_thumbnail_selection(reviewed)
-                                },
+                                move |manager| manager.set_thumbnail_selection(selected),
                                 true,
                                 true,
                                 cx,

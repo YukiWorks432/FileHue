@@ -2,7 +2,7 @@
 
 [日本語](thumbnails.ja.md) | English
 
-Choose `.ai`, `.eps`, `.svg`, `.psd`, `.psb` and `.pdf` independently in **File previews**. The examples compare the file icon with a sample content thumbnail. Each card shows the checked registration separately from any unapplied selection. Select **Review changes** to inspect the extensions being enabled or restored, then choose **Apply changes**. Technical registration details can be expanded when needed. When an association is shared, the review includes the resulting display for unselected extensions. If the selection or registration changes after review, review it again. Leaving with unapplied changes asks for confirmation; **Discard changes** restores the current registration as the selection. Icon registration, default applications and file contents are not changed.
+Choose `.ai`, `.eps`, `.svg`, `.psd`, `.psb` and `.pdf` independently in **File previews**. The examples compare the file icon with a sample content thumbnail. Each card shows the checked registration separately from any unapplied selection. Choose **Apply changes** to apply the selection. The app checks registrations during application and stops rather than overwriting conflicts. Leaving with unapplied changes asks for confirmation; **Discard changes** restores the current registration as the selection. Icon registration, default applications and file contents are not changed.
 
 | Extension | Preview source |
 | --- | --- |
