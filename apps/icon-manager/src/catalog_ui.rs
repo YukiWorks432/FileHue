@@ -1,5 +1,6 @@
 use super::*;
 use file_icons_catalog::{CATALOG, Progress};
+use gpui_kit::base::Link;
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{
     assets::IconName,
@@ -58,12 +59,23 @@ impl Manager {
                 entry.license
             };
             let url = entry.source_url();
-            let source = theme::button(("source", index), cx)
-                .small()
-                .icon(IconName::ExternalLink)
-                .label(self.text("出典・利用条件", "Source and licenses"))
-                .tooltip(self.text("公式配布元を開きます。", "Open the official source."))
-                .on_click(move |_, _, cx| cx.open_url(&url));
+            let source_label = self.text("出典・利用条件", "Source and licenses");
+            let source = Link::new(("source", index))
+                .href(url)
+                .open_with(|url, _, _, cx| cx.open_url(url))
+                .accessibility_label(source_label)
+                .text_color(colors.muted_foreground)
+                .text_decoration_1()
+                .cursor_pointer()
+                .focus_visible(|style| style.border_1().border_color(colors.ring))
+                .flex()
+                .items_center()
+                .gap_1()
+                .child(source_label)
+                .child(Icon::new(IconName::ExternalLink).size_4());
+            let source = div().id(("source-hit", index)).child(source);
+            #[cfg(feature = "test-support")]
+            let source = source.test_support();
             let label = if downloading {
                 self.text("取得中", "Downloading")
             } else if failed {

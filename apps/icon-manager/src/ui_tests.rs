@@ -678,6 +678,22 @@ fn download_gui_in_child(cx: &mut TestAppContext) {
         });
         window.render_frame(cx);
         window.click("browse", cx);
+        window.render_frame(cx);
+        window.click(("source-hit", 0usize), cx);
+    })
+    .unwrap();
+    assert_eq!(
+        cx.opened_url().as_deref(),
+        Some(file_icons_catalog::CATALOG[0].source_url().as_str())
+    );
+    cx.update(|cx| cx.open_url("https://example.invalid/other"));
+    cx.update_window(window, |_, window, cx| window.press("enter", cx))
+        .unwrap();
+    assert_eq!(
+        cx.opened_url().as_deref(),
+        Some(file_icons_catalog::CATALOG[0].source_url().as_str())
+    );
+    cx.update_window(window, |_, window, cx| {
         window.click(("download", 0usize), cx);
         window.click("import", cx);
         window.click("cancel-download", cx);
