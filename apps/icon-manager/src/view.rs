@@ -713,7 +713,7 @@ impl Render for Manager {
             return self.screen_root(cx).child(panel);
         }
         let body = div().p_4().child(if self.browsing {
-            self.catalog(cx)
+            self.catalog(window, cx)
         } else {
             self.library(cx)
         });

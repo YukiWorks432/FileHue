@@ -5,6 +5,92 @@ use file_icons_core::selection::Selection;
 use gpui_kit::SharedString;
 use std::{fs, sync::Arc};
 
+#[test]
+#[ignore = "専用プロファイルで取得候補の各状態を実描画する"]
+fn catalog_visual_probe() {
+    use gpui_kit::application;
+    assert_eq!(std::env::var("WFI_GUI_PROBE").as_deref(), Ok("1"));
+    let output = std::path::PathBuf::from(std::env::var("WFI_VISUAL_OUTPUT").unwrap());
+    assert!(output.is_absolute() && home().unwrap().starts_with(output.parent().unwrap()));
+    fs::create_dir_all(&output).unwrap();
+    let registry = fixture();
+    let settings = load().unwrap();
+    drop(registry);
+    application()
+        .with_assets(crate::ui_assets::Assets)
+        .run(move |cx| {
+            gpui_kit::init(cx);
+            let (window, manager) =
+                gpui_kit::open_window(WindowOptions::default(), cx, Manager::open).unwrap();
+            cx.spawn(async move |cx| {
+                for (language, mode, width, height, font) in [
+                    ("ja", ThemeMode::Dark, 1120., 780., 16.),
+                    ("en", ThemeMode::Light, 1120., 780., 16.),
+                    ("ja", ThemeMode::Dark, 640., 640., 18.),
+                    ("en", ThemeMode::Light, 640., 640., 18.),
+                ] {
+                    for state in ["new", "downloaded", "update", "downloading", "error"] {
+                        window
+                            .update(cx, |_, w, cx| {
+                                theme::apply(mode, cx);
+                                gpui_kit::component::theme::Theme::update(cx, |theme| {
+                                    theme.font_size = px(font)
+                                });
+                                manager.update(cx, |view, cx| {
+                                    view.operation = crate::Operation::default();
+                                    view.settings = settings.clone();
+                                    view.settings.language = language.into();
+                                    view.settings.packs.clear();
+                                    view.browsing = true;
+                                    let entry = &file_icons_catalog::CATALOG[0];
+                                    if state == "downloaded" || state == "update" {
+                                        let mut pack = settings.packs[0].clone();
+                                        pack.id = entry.pack_id(entry.themes[0]);
+                                        pack.version = entry.version.into();
+                                        if state == "update" {
+                                            pack.id = pack.id.replace(entry.version, "0.0.1");
+                                            pack.version = "0.0.1".into();
+                                        }
+                                        view.settings.packs.push(pack);
+                                    }
+                                    if state == "downloading" || state == "error" {
+                                        view.operation.begin(
+                                            Kind::Download(entry.id),
+                                            Some(Arc::new(file_icons_catalog::Progress::default())),
+                                        );
+                                        if state == "error" {
+                                            view.operation.finish(Status::Error(
+                                                crate::status::Failure::Download,
+                                                "接続失敗".into(),
+                                            ));
+                                        }
+                                    }
+                                    cx.notify();
+                                });
+                                w.resize(size(px(width), px(height)));
+                                w.render_frame(cx);
+                            })
+                            .unwrap();
+                        cx.background_executor()
+                            .timer(std::time::Duration::from_millis(250))
+                            .await;
+                        window
+                            .update(cx, |_, w, cx| {
+                                w.render_frame(cx);
+                                w.render_to_image()
+                                    .unwrap()
+                                    .save(output.join(format!("{state}-{language}-{width}.png")))
+                                    .unwrap();
+                            })
+                            .unwrap();
+                    }
+                }
+                cx.update(|cx| cx.quit());
+            })
+            .detach();
+        });
+}
+
 pub(super) fn fixture() -> super::IsolatedRegistryProfile {
     let registry = super::target_protection::fixture();
     let mut settings = load().unwrap();

@@ -1,8 +1,9 @@
 use super::*;
 use file_icons_catalog::{CATALOG, Progress};
+use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::{
     assets::IconName,
-    component::{Icon, Sizable, input::Input},
+    component::{Icon, Sizable, button::ButtonVariants, input::Input, tag::Tag},
 };
 use std::{io::Read as _, sync::Arc};
 
@@ -33,17 +34,10 @@ impl Manager {
         );
     }
 
-    pub(super) fn catalog(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn catalog(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let colors = cx.theme().colors;
-        let mut section = div().flex().flex_col().gap_3().child(
-            div()
-                .text_sm()
-                .text_color(colors.muted_foreground)
-                .child(self.text(
-                    "公式配布元の確認済みバージョンです。取得後に適用できます。",
-                    "Reviewed versions from official releases. Download, then apply.",
-                )),
-        );
+        let compact = window.viewport_size().width < window.rem_size() * 48.;
+        let mut list = theme::card(cx).flex().flex_col();
         for (index, entry) in CATALOG.iter().enumerate() {
             let installed = entry.themes.iter().all(|theme| {
                 self.settings
@@ -56,71 +50,141 @@ impl Manager {
                     .starts_with(&format!("{}.{}", entry.publisher, entry.package))
                     && pack.version != entry.version
             });
+            let downloading = self.operation.running(Kind::Download(entry.id));
+            let failed = self.operation.retry_download(entry.id);
             let license = if entry.id == "vscode-icons" && self.settings.language != "en" {
                 "コード: MIT ／ アイコン: CC BY-SA 4.0 ／ ブランドのアイコン: 各権利者の条件"
             } else {
                 entry.license
             };
             let url = entry.source_url();
-            section = section.child(
-                theme::card(cx)
-                    .p_4()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .child(format!(
-                        "{} · {} · {}",
-                        entry.name, entry.version, entry.author
-                    ))
-                    .child(div().text_sm().child(license))
+            let source = theme::button(("source", index), cx)
+                .small()
+                .icon(IconName::ExternalLink)
+                .label(self.text("出典・利用条件", "Source and licenses"))
+                .tooltip(self.text("公式配布元を開きます。", "Open the official source."))
+                .on_click(move |_, _, cx| cx.open_url(&url));
+            let label = if downloading {
+                self.text("取得中", "Downloading")
+            } else if failed {
+                self.text("再試行", "Retry download")
+            } else if installed {
+                self.text("取得済み", "Downloaded")
+            } else if older {
+                self.text("更新を取得", "Download update")
+            } else {
+                self.text("ダウンロード", "Download")
+            };
+            let mut controls = div().flex().items_center().justify_center().w(rems(11.));
+            if downloading {
+                let status = div()
+                    .id(("catalog-state", index))
+                    .role(Role::Status)
+                    .aria_label(label)
                     .child(
-                        div()
-                            .flex()
-                            .gap_2()
-                            .child(
-                                theme::button(("download", index), cx)
-                                    .small()
-                                    .min_w(rems(13.5))
-                                    .icon(if installed {
-                                        IconName::Check
-                                    } else {
-                                        IconName::Download
-                                    })
-                                    .label(if installed {
-                                        self.text("取得済み", "Downloaded")
-                                    } else if older {
-                                        self.text("更新をダウンロード", "Download update")
-                                    } else if self.operation.retry_download(entry.id) {
-                                        self.text("ダウンロードを再試行", "Retry download")
-                                    } else {
-                                        self.text("ダウンロード", "Download")
-                                    })
-                                    .disabled_elevated(
-                                        self.operation.busy() || !self.valid || installed,
-                                    )
-                                    .on_click(cx.listener(move |this, _, _, cx| {
-                                        this.download_pack(index, cx)
-                                    })),
-                            )
-                            .child(
-                                theme::button(("source", index), cx)
-                                    .small()
-                                    .icon(IconName::ExternalLink)
-                                    .accessibility_label(self.text(
-                                        "出典・利用条件を開く",
-                                        "Open source and license information",
-                                    ))
-                                    .tooltip(format!(
-                                        "{} · {}",
-                                        self.text("出典・利用条件", "Source and licenses"),
-                                        entry.repository
-                                    ))
-                                    .on_click(move |_, _, cx| cx.open_url(&url)),
-                            ),
-                    ),
-            );
+                        Tag::info().small().child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_1()
+                                .child(gpui_kit::component::spinner::Spinner::new().small())
+                                .child(label),
+                        ),
+                    );
+                #[cfg(feature = "test-support")]
+                let status = status.test_support();
+                controls = controls.child(status);
+            } else if installed && !failed {
+                let status = div()
+                    .id(("catalog-state", index))
+                    .role(Role::Status)
+                    .aria_label(label)
+                    .child(Tag::success().small().child(format!("✓ {label}")));
+                #[cfg(feature = "test-support")]
+                let status = status.test_support();
+                controls = controls.child(status);
+            } else {
+                controls = controls.child(
+                    theme::button(("download", index), cx)
+                        .small()
+                        .primary()
+                        .min_w(rems(10.))
+                        .icon(IconName::Download)
+                        .label(label)
+                        .disabled_elevated(self.operation.busy() || !self.valid)
+                        .on_click(cx.listener(move |this, _, _, cx| this.download_pack(index, cx))),
+                );
+            }
+            let info = div()
+                .min_w_0()
+                .flex_1()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(
+                    div()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(format!("{} · {}", entry.name, entry.version)),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(colors.muted_foreground)
+                        .child(entry.author),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .gap_2()
+                        .text_sm()
+                        .child(
+                            div()
+                                .min_w_0()
+                                .flex_shrink(1.)
+                                .when(compact, |text| text.w_full())
+                                .child(license),
+                        )
+                        .child(source),
+                )
+                .when(failed, |info| {
+                    info.child(div().text_sm().text_color(colors.warning_foreground).child(
+                        self.text(
+                            "取得に失敗しました。詳細を確認して再試行してください。",
+                            "Download failed. Check the details and try again.",
+                        ),
+                    ))
+                });
+            let row = div()
+                .px_3()
+                .py_1()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .when(compact, |row| row.flex_col().items_start())
+                .gap_3()
+                .when(index + 1 < CATALOG.len(), |row| {
+                    row.border_b_1().border_color(colors.border)
+                })
+                .child(info)
+                .child(controls);
+            list = list.child(row);
         }
-        section
+        div()
+            .flex()
+            .flex_col()
+            .gap_3()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(colors.muted_foreground)
+                    .child(self.text(
+                        "取得したパックは「取得済み」から確認・適用できます。",
+                        "View and apply downloaded packs from Downloaded packs.",
+                    )),
+            )
+            .child(list)
     }
 
     pub(super) fn select_details(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
