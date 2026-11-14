@@ -173,6 +173,15 @@ fn association_text(extension: &str, kind: ASSOCSTR) -> Option<String> {
     String::from_utf16(&buffer[..end]).ok()
 }
 
+/// 現在の関連付けが指定する静的アイコン資源を読み取る。
+pub fn association_icon_location(extension: &str) -> Option<IconLocation> {
+    let value = association_text(extension.trim_start_matches('.'), ASSOCSTR_DEFAULTICON)?;
+    if value.is_empty() || value == "%1" {
+        return None;
+    }
+    crate::location_from_value(&value).ok()
+}
+
 #[derive(Clone)]
 struct Module {
     identity: String,

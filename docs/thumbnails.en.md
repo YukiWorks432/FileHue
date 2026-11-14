@@ -2,7 +2,7 @@
 
 [日本語](thumbnails.ja.md) | English
 
-Choose `.ai`, `.eps`, `.svg`, `.psd`, `.psb` and `.pdf` independently in **File previews**. Select **Review changes** to inspect the extensions being enabled or restored and the affected registration locations, then choose **Apply selection**. When an association is shared, the review includes the resulting display for unselected extensions. If the selection or registration changes after review, review it again. Returning to the previous screen keeps the draft; **Discard changes** restores the current registration as the selection. Each row's applied state reflects the checked Windows registration. Icon registration, default applications and file contents are not changed.
+Choose `.ai`, `.eps`, `.svg`, `.psd`, `.psb` and `.pdf` independently in **File previews**. The examples compare the file icon with a sample content thumbnail. Each card shows the checked registration separately from any unapplied selection. Choose **Apply changes** to apply the selection. The app checks registrations during application and stops rather than overwriting conflicts. Leaving with unapplied changes asks for confirmation; **Discard changes** restores the current registration as the selection. Icon registration, default applications and file contents are not changed.
 
 | Extension | Preview source |
 | --- | --- |
@@ -12,9 +12,9 @@ Choose `.ai`, `.eps`, `.svg`, `.psd`, `.psb` and `.pdf` independently in **File 
 | `.psd`, `.psb` | A supported embedded thumbnail. |
 | `.pdf` | The first page, rendered by Windows. |
 
-No content image is returned when the required data is absent or the file exceeds format or size limits. To disable registration, deselect an extension and apply the selection, or choose **Restore all**. Thumbnail restoration is independent of icon restoration.
+No content image is returned when the required data is absent or the file exceeds format or size limits. To disable registration, deselect an extension and apply the selection, or choose **Restore previous settings** and confirm. Thumbnail restoration is independent of icon restoration.
 
-For shared associations, the app records the observed members and previous thumbnail registrations so unselected extensions can retain their previous providers. If a default application, shared association or registration changes externally, the app preserves the recovery record instead of overwriting the change. The app stops when a machine-level shared registration cannot be safely suppressed for the user. If an operation fails, inspect the details and retry **Restore all**. Conflicting groups are retained while other groups that can be restored are restored first.
+For shared associations, the app records the observed members and previous thumbnail registrations so unselected extensions can retain their previous providers. If a default application, shared association or registration changes externally, the app preserves the recovery record instead of overwriting the change. The app stops when a machine-level shared registration cannot be safely suppressed for the user. If an operation fails, inspect the details and retry **Restore previous settings**. Conflicting groups are retained while other groups that can be restored are restored first.
 
 An extension without a default application is recorded in that state before only its thumbnail is registered. If a default application is subsequently set, the change is detected and the old state is not restored automatically.
 

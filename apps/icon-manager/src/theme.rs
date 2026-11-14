@@ -95,6 +95,37 @@ pub fn apply(mode: ThemeMode, cx: &mut App) {
         } else {
             color(357., 100., 45.)
         };
+        // 状態表示の文字と背景を組にし、明暗どちらでも読めるようにする。
+        colors.success = if dark {
+            color(149., 44., 14.7)
+        } else {
+            color(143., 50., 92.9)
+        };
+        colors.success_foreground = if dark {
+            color(138., 79., 81.2)
+        } else {
+            color(149., 60., 21.4)
+        };
+        colors.warning = if dark {
+            color(39., 50., 15.7)
+        } else {
+            color(42.5, 100., 90.6)
+        };
+        colors.warning_foreground = if dark {
+            color(40.4, 100., 80.8)
+        } else {
+            color(35.9, 83.6, 23.9)
+        };
+        colors.info = if dark {
+            color(212.3, 53., 19.2)
+        } else {
+            color(215., 100., 95.3)
+        };
+        colors.info_foreground = if dark {
+            color(208.8, 100., 85.3)
+        } else {
+            color(212.7, 60., 32.4)
+        };
         // 製品指定の単色を明示し、登録テーマの同色グラデーションを引き継がない。
         theme.tokens.button = theme.colors.button.into();
         theme.tokens.button_hover = theme.colors.button_hover.into();
@@ -102,6 +133,7 @@ pub fn apply(mode: ThemeMode, cx: &mut App) {
         theme.tokens.button_primary = theme.colors.button_primary.into();
         theme.tokens.button_primary_hover = theme.colors.button_primary_hover.into();
         theme.tokens.button_primary_active = theme.colors.button_primary_active.into();
+        theme.tokens.switch_thumb = color(0., 0., 98.).into();
         theme.shadow = true;
         theme.font_family = "Yu Gothic UI".into();
     });

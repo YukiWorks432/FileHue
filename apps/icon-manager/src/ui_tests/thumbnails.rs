@@ -64,8 +64,13 @@ fn selection_in_child(cx: &mut TestAppContext) {
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         assert_eq!(w.find("app-brand").bounds().origin, brand_origin);
-        w.click("thumbnail-apply", cx);
-        manager.update(cx, |view, _| assert!(view.thumbnails.plan.is_none()));
+        assert!(w.try_find("thumbnail-apply").is_none());
+        w.click("thumbnail-restore", cx);
+        w.render_frame(cx);
+        assert!(w.find("dialog").visible());
+        w.within("dialog").click("cancel", cx);
+        w.render_frame(cx);
+        manager.update(cx, |view, _| assert!(!view.operation.busy()));
         let card = w.find("thumbnail-card-.ai").bounds();
         w.click_at(
             "thumbnail-card-.ai",
@@ -191,40 +196,12 @@ fn selection_in_child(cx: &mut TestAppContext) {
     })
     .unwrap();
     cx.run_until_parked();
+    let orphaned = br#"{"format_version":1,"selected":[".svg"]}"#;
+    std::fs::write(&settings, orphaned).unwrap();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         manager.update(cx, |view, _| assert!(view.thumbnails.draft.is_empty()));
         w.click("thumbnail-.ai", cx);
-        w.click("thumbnail-apply", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    assert!(!settings.exists(), "変更内容の確認では保存しない");
-    assert!(!home().unwrap().join("thumbnail-recovery.json").exists());
-    cx.update_window(window, |_, w, cx| {
-        w.render_frame(cx);
-        assert!(w.find("thumbnail-plan").visible());
-        w.click("thumbnail-plan-details", cx);
-        w.render_frame(cx);
-        assert_eq!(
-            w.find("thumbnail-plan-details").label(),
-            Some("技術情報を閉じる")
-        );
-        w.click("thumbnail-plan-details", cx);
-        w.render_frame(cx);
-        // 選択を変えたら、確認済みの変更予定は使い回さない。
-        super::protection_sources::reveal_in(w, "thumbnail-.eps", "thumbnail-scroll", cx);
-        w.click("thumbnail-.eps", cx);
-        w.render_frame(cx);
-        assert!(w.try_find("thumbnail-plan").is_none());
-        w.click("thumbnail-apply", cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-    assert!(!settings.exists());
-    let orphaned = br#"{"format_version":1,"selected":[".svg"]}"#;
-    std::fs::write(&settings, orphaned).unwrap();
-    cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("thumbnail-apply", cx);
     })
@@ -233,7 +210,7 @@ fn selection_in_child(cx: &mut TestAppContext) {
     assert_eq!(
         std::fs::read(&settings).unwrap(),
         orphaned,
-        "確認後の外部変更を上書きしない"
+        "適用時に外部変更を検出し、保存済み設定を上書きしない"
     );
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
@@ -249,15 +226,10 @@ fn selection_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        w.scroll(
-            "thumbnail-scroll",
-            gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-900.))),
-            cx,
-        );
+        w.click("thumbnail-error-details", cx);
         w.render_frame(cx);
         assert!(w.find("thumbnail-missing-recovery").visible());
-        w.click("thumbnail-apply", cx);
-        manager.update(cx, |view, _| assert!(view.thumbnails.plan.is_none()));
+        assert!(w.try_find("thumbnail-apply").is_none());
         w.click("thumbnail-restore", cx);
         manager.update(cx, |view, _| assert!(!view.operation.busy()));
     })
@@ -269,6 +241,7 @@ fn selection_in_child(cx: &mut TestAppContext) {
 #[ignore = "隔離した保存先でサムネイル画面を実描画する"]
 fn thumbnail_visual_probe() {
     assert_eq!(std::env::var("WFI_THUMBNAIL_GUI_PROBE").as_deref(), Ok("1"));
+    let _registry = IsolatedRegistryProfile::new();
     let output = std::path::PathBuf::from(std::env::var("WFI_VISUAL_OUTPUT").unwrap());
     assert!(output.is_absolute());
     std::fs::create_dir_all(&output).unwrap();
@@ -283,6 +256,82 @@ fn thumbnail_visual_probe() {
                 cx.background_executor()
                     .timer(std::time::Duration::from_millis(350))
                     .await;
+                for (name, mode, scenario) in [
+                    ("enabled-dark", ThemeMode::Dark, "enabled"),
+                    ("disabled-dark", ThemeMode::Dark, "disabled"),
+                    ("changed-dark", ThemeMode::Dark, "changed"),
+                    ("attention-dark", ThemeMode::Dark, "attention"),
+                    ("enabled-light", ThemeMode::Light, "enabled"),
+                    ("disabled-light", ThemeMode::Light, "disabled"),
+                    ("changed-light", ThemeMode::Light, "changed"),
+                    ("attention-light", ThemeMode::Light, "attention"),
+                ] {
+                    let selected: Vec<_> = match scenario {
+                        "enabled" => file_icons_windows::thumbnails::Format::ALL.to_vec(),
+                        "changed" => vec![file_icons_windows::thumbnails::Format::Ai],
+                        _ => Vec::new(),
+                    };
+                    let groups = selected
+                        .iter()
+                        .map(|format| {
+                            file_icons_windows::thumbnails::plan_extension_group(
+                                &file_icons_windows::UserRegistry,
+                                *format,
+                            )
+                            .unwrap()
+                        })
+                        .collect::<Vec<_>>();
+                    window
+                        .update(cx, |_, w, cx| {
+                            theme::apply(mode, cx);
+                            gpui_kit::component::theme::Theme::update(cx, |theme| {
+                                theme.font_size = px(16.)
+                            });
+                            manager.update(cx, |view, cx| {
+                                let recovery = (!groups.is_empty()).then_some(
+                                    file_icons_windows::thumbnails::Recovery {
+                                        format_version: 1,
+                                        groups,
+                                        transition: None,
+                                    },
+                                );
+                                let current = recovery
+                                    .as_ref()
+                                    .map(|r| r.selected_extensions().unwrap())
+                                    .unwrap_or_default();
+                                view.settings.language = "ja".into();
+                                view.thumbnails.status =
+                                    Some(file_icons_manager_service::ThumbnailStatus {
+                                        settings: file_icons_windows::thumbnails::Settings::default(
+                                        ),
+                                        recovery,
+                                        missing_recovery: scenario == "attention",
+                                        group_errors: Vec::new(),
+                                    });
+                                view.thumbnails.draft = if scenario == "changed" {
+                                    [".eps".into()].into_iter().collect()
+                                } else {
+                                    current
+                                };
+                                cx.notify();
+                            });
+                            w.resize(size(px(1120.), px(780.)));
+                            w.render_frame(cx);
+                        })
+                        .unwrap();
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(350))
+                        .await;
+                    window
+                        .update(cx, |_, w, cx| {
+                            w.render_frame(cx);
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join(format!("{name}.png")))
+                                .unwrap();
+                        })
+                        .unwrap();
+                }
                 for (name, lang, mode, width, height, font) in [
                     ("ja-dark", "ja", ThemeMode::Dark, 1120., 780., 16.),
                     ("en-light", "en", ThemeMode::Light, 1120., 780., 16.),
@@ -299,6 +348,14 @@ fn thumbnail_visual_probe() {
                             });
                             manager.update(cx, |view, cx| {
                                 view.settings.language = lang.into();
+                                view.thumbnails.status =
+                                    Some(file_icons_manager_service::ThumbnailStatus {
+                                        settings: file_icons_windows::thumbnails::Settings::default(
+                                        ),
+                                        recovery: None,
+                                        missing_recovery: false,
+                                        group_errors: Vec::new(),
+                                    });
                                 view.thumbnails.draft =
                                     [".ai".into(), ".eps".into()].into_iter().collect();
                                 cx.notify();
@@ -320,81 +377,11 @@ fn thumbnail_visual_probe() {
                         })
                         .unwrap();
                 }
-                for (name, lang, mode, width, height, font) in [
-                    ("ja-shared-review", "ja", ThemeMode::Dark, 1120., 780., 16.),
-                    ("en-shared-review", "en", ThemeMode::Light, 640., 640., 18.),
-                ] {
-                    window
-                        .update(cx, |_, w, cx| {
-                            theme::apply(mode, cx);
-                            gpui_kit::component::theme::Theme::update(cx, |theme| {
-                                theme.font_size = px(font)
-                            });
-                            manager.update(cx, |view, cx| {
-                                use file_icons_core::registry::{Change, Value};
-                                use file_icons_windows::thumbnails::{Group, Recovery};
-                                let selected: std::collections::BTreeSet<String> =
-                                    [".ai".into(), ".eps".into()].into_iter().collect();
-                                let group = Group {
-                                    class: Some("Adobe.Illustrator.30".into()),
-                                    members: [".ai".into(), ".ait".into(), ".eps".into()].into_iter().collect(),
-                                    dependencies: None,
-                                    previous_providers: None,
-                                    changes: [".ai", ".ait", ".eps", "Adobe.Illustrator.30"]
-                                        .into_iter()
-                                        .map(|name| Change {
-                                            key: format!("Software\\Classes\\{name}\\shellex\\{{e357fccd-a995-4576-b01f-234630154e96}}"),
-                                            name: String::new(), before: None,
-                                            after: Value { kind: 1, bytes: vec![] },
-                                        })
-                                        .collect(),
-                                    created_keys: Vec::new(),
-                                    keys_captured: false,
-                                };
-                                view.settings.language = lang.into();
-                                view.thumbnails.plan = Some(file_icons_manager_service::ThumbnailSelectionPlan {
-                                    selected: selected.clone(), current: Default::default(),
-                                    additions: selected, removals: Default::default(), existing_groups: None,
-                                    new_groups: Some(Recovery { format_version: 1, groups: vec![group], transition: None }),
-                                    recheck_on_execution: true,
-                                });
-                                cx.notify();
-                            });
-                            w.resize(size(px(width), px(height)));
-                            w.render_frame(cx);
-                        })
-                        .unwrap();
-                    cx.background_executor()
-                        .timer(std::time::Duration::from_millis(350))
-                        .await;
-                    window
-                        .update(cx, |_, w, cx| {
-                            w.render_frame(cx);
-                            w.render_to_image()
-                                .unwrap()
-                                .save(output.join(format!("{name}.png")))
-                                .unwrap();
-                            if name == "en-shared-review" {
-                                w.scroll(
-                                    "thumbnail-scroll",
-                                    gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-300.))),
-                                    cx,
-                                );
-                                w.render_frame(cx);
-                                w.render_to_image()
-                                    .unwrap()
-                                    .save(output.join("en-shared-review-scrolled.png"))
-                                    .unwrap();
-                            }
-                        })
-                        .unwrap();
-                }
                 window
                     .update(cx, |_, w, cx| {
                         theme::apply(ThemeMode::Dark, cx);
                         manager.update(cx, |view, cx| {
                             view.settings.language = "ja".into();
-                            view.thumbnails.plan = None;
                             view.thumbnails.status =
                                 Some(file_icons_manager_service::ThumbnailStatus {
                                     settings: file_icons_windows::thumbnails::Settings {
