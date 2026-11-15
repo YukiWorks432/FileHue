@@ -101,10 +101,15 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
     });
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        w.click("protection-collapse-all", cx);
+        super::protection_menu(w, "protection-more", 1, cx);
         w.render_frame(cx);
         assert!(w.try_find("protection-extensionless-scope").is_none());
-        w.click("protection-expand-all", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 0, cx);
         w.render_frame(cx);
         assert!(w.find("protection-extensionless-scope").visible());
         assert!(
@@ -132,13 +137,14 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
                 .contains("元の表示")
         );
         let inspection = manager.read(cx).protection.inspection.revision;
+        super::protection_sources::reveal(w, "pack-icon-", cx);
         w.click("pack-icon-", cx);
         w.render_frame(cx);
         assert!(
             w.find("pack-icon-")
                 .label()
                 .unwrap()
-                .starts_with("パックのアイコンを許可")
+                .starts_with("パックを許可")
         );
         assert!(
             w.find("protection-result-after-")
@@ -164,6 +170,7 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
         assert_eq!(manager.read(cx).protection.inspection.revision, inspection);
         assert!(load().unwrap().icon_protection_rules.extensions.is_empty());
         // 独立した拡張子なしの項目を閉じても、変更一覧から編集に戻ると展開される。
+        super::protection_sources::reveal(w, "provider-toggle-extensionless", cx);
         w.click("provider-toggle-extensionless", cx);
         w.render_frame(cx);
         w.click("protection-view-changes", cx);
@@ -183,7 +190,9 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
         w.click("protection-change-edit-", cx);
         w.render_frame(cx);
         assert!(w.find("protection-extensionless-scope").visible());
+        super::protection_sources::reveal(w, "pack-icon-", cx);
         assert_eq!(w.find("pack-icon-").checked(), Some(true));
+        super::protection_sources::reveal(w, "provider-toggle-extensionless", cx);
         w.click("provider-toggle-extensionless", cx);
         w.render_frame(cx);
         manager.update(cx, |this, _| {
@@ -224,6 +233,7 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
         super::protection_sources::reveal(w, "provider-toggle-extensionless", cx);
         w.click("provider-toggle-extensionless", cx);
         w.render_frame(cx);
+        super::protection_sources::reveal(w, "pack-icon-", cx);
         assert_eq!(w.find("pack-icon-").checked(), Some(true));
         w.click("protection-save", cx);
     })
@@ -273,11 +283,14 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("Extensionless files")
         );
+        w.click("provider-toggle-extensionless", cx);
+        w.render_frame(cx);
+        super::protection_sources::reveal(w, "pack-icon-", cx);
         assert!(
             w.find("pack-icon-")
                 .label()
                 .unwrap()
-                .starts_with("Allow pack icons")
+                .starts_with("Allow pack")
         );
         w.click("default-icon-", cx);
         w.render_frame(cx);
@@ -348,7 +361,7 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
             this.refresh_protection_policy(cx);
         });
         w.render_frame(cx);
-        w.click("protection-collapse-all", cx);
+        super::protection_menu(w, "protection-more", 1, cx);
         w.render_frame(cx);
         w.press("home", cx);
         w.render_frame(cx);
@@ -358,7 +371,12 @@ fn extensionless_controls_in_child(cx: &mut TestAppContext) {
                     .bounds()
                     .top()
         );
-        w.click("protection-expand-all", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 0, cx);
         w.render_frame(cx);
         assert!(
             w.find("provider-toggle-extensionless").bounds().top()

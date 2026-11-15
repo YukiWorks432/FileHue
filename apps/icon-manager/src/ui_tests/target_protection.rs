@@ -191,7 +191,7 @@ fn target_protection_in_child(cx: &mut TestAppContext) {
             w.find("default-icon-mts")
                 .label()
                 .unwrap()
-                .contains("結果は元のアイコン")
+                .contains("個別設定を解除")
         );
         // m2tsを保護したまま、mtsだけをパックへ切り替える。保存や再調査は起こさない。
         assert!(

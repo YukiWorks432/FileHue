@@ -313,13 +313,7 @@ impl Manager {
             return div();
         }
         if compact && self.screen == Screen::Protection {
-            return div()
-                .flex_shrink_0()
-                .bg(cx.theme().colors.sidebar)
-                .px_4()
-                .py_1()
-                .text_sm()
-                .child(self.text("既存アイコンの保護", "Existing icon protection"));
+            return div();
         }
         if compact && self.screen == Screen::Recovery {
             return div()
@@ -404,10 +398,11 @@ impl Manager {
                     .label(self.text("アイコンの保護", "Icon protection"))
                     .selected(self.screen == Screen::Protection)
                     .when(self.screen == Screen::Protection, |b| b.primary())
-                    .disabled_elevated(
-                        self.operation.busy() || !self.valid || self.screen == Screen::Protection,
-                    )
+                    .disabled_elevated(self.operation.busy() || !self.valid)
                     .on_click(cx.listener(|this, _, window, cx| {
+                        if this.screen == Screen::Protection {
+                            return;
+                        }
                         this.confirm_navigation(window, cx, |this, window, cx| {
                             this.open_protection(window, cx)
                         });

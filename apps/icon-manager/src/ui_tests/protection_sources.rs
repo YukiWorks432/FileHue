@@ -192,6 +192,18 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 0, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 2, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
         reveal(w, format!("provider-icon-{provider}"), cx);
         assert!(w.find(format!("provider-icon-{provider}")).visible());
         reveal(w, "original-icon-wfi-a", cx);
@@ -263,8 +275,17 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             w.find("default-icon-wfi-a")
                 .label()
                 .unwrap()
-                .contains("結果はパック"),
-            "再調査待ちを挟まず方針を表示すること"
+                .contains("個別設定を解除"),
+            "基本設定へ戻す操作を説明すること"
+        );
+        assert!(
+            !manager
+                .read(cx)
+                .protection
+                .inspection
+                .source("wfi-a")
+                .unwrap()
+                .protect
         );
         w.click("protection-toggle", cx);
         w.render_frame(cx);
@@ -277,31 +298,60 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             w.find("default-icon-wfi-b")
                 .label()
                 .unwrap()
-                .contains("結果は元のアイコン")
+                .contains("個別設定を解除")
+        );
+        assert!(
+            manager
+                .read(cx)
+                .protection
+                .inspection
+                .source("wfi-b")
+                .unwrap()
+                .protect
         );
         // 別ソフトの指定を残し、後の一括初期化が対象範囲を越えないことを検証する。
         w.click("pack-icon-wfi-b", cx);
         assert!(load().unwrap().icon_protection_rules.extensions.is_empty());
-        // 表示と詳細の切替は下書きや保存値を変更しない。
-        let draft = serde_json::to_value(&manager.read(cx).protection.draft.rules).unwrap();
-        w.click("protection-current", cx);
+    })
+    .unwrap();
+    // 表示と詳細の切替は下書きや保存値を変更しない。
+    let draft =
+        cx.read(|cx| serde_json::to_value(&manager.read(cx).protection.draft.rules).unwrap());
+    cx.update_window(window, |_, w, cx| {
+        super::protection_filter(w, 4, cx);
         w.render_frame(cx);
         assert!(w.try_find("original-icon-wfi-a").is_none());
         assert!(w.find("protection-show-all").visible());
-        w.click("protection-current", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        super::protection_filter(w, 4, cx);
         w.render_frame(cx);
         assert!(w.try_find("original-icon-wfi-a").is_none());
-        w.click("protection-planned", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        super::protection_filter(w, 0, cx);
         w.render_frame(cx);
         reveal(w, "original-icon-wfi-a", cx);
         assert!(w.find("original-icon-wfi-a").visible());
-        w.click("protection-details", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        super::protection_menu(w, "protection-more", 2, cx);
+        w.render_frame(cx);
+        assert!(w.try_find("protection-copy-wfi-a").is_none());
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        super::protection_menu(w, "protection-more", 2, cx);
         w.render_frame(cx);
         reveal(w, "protection-copy-wfi-a", cx);
         assert!(w.find("protection-copy-wfi-a").visible());
-        w.click("protection-details", cx);
-        w.render_frame(cx);
-        assert!(w.try_find("protection-copy-wfi-a").is_none());
         w.scroll(
             "protection-rows",
             gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(10000.))),
@@ -407,7 +457,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             w.find("default-icon-wfi-a")
                 .label()
                 .unwrap()
-                .contains("結果はパック")
+                .contains("個別設定を解除")
         );
     })
     .unwrap();
@@ -533,7 +583,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        w.click("protection-review", cx);
+        super::protection_filter(w, 3, cx);
         w.render_frame(cx);
         reveal(w, "protection-saved-wfi-b", cx);
         let label = w.find("protection-saved-wfi-b").label().unwrap().to_owned();
@@ -558,7 +608,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             .unwrap();
     }
     cx.update_window(window, |_, w, cx| {
-        w.click("protection-planned", cx);
+        super::protection_filter(w, 0, cx);
         w.click("protection-refresh", cx);
     })
     .unwrap();
@@ -585,7 +635,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             w.find("default-icon-wfi-a")
                 .label()
                 .unwrap()
-                .contains("結果は元のアイコン")
+                .contains("個別設定を解除")
         );
         w.click(format!("provider-pack-{provider}"), cx);
     })
@@ -622,7 +672,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
                         w.find("default-icon-wfi-a")
                             .label()
                             .unwrap()
-                            .contains("結果は元のアイコン")
+                            .contains("個別設定を解除")
                     );
                 }
                 before
@@ -765,6 +815,12 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
     .unwrap();
     cx.run_until_parked();
     assert!(load().unwrap().icon_protection_rules.extensions["wfi-a"].protect);
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 0, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
     let mut focused = false;
     for _ in 0..60 {
         focused = cx
@@ -815,6 +871,12 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
     // 素材と関連付けクラスが異なる同一パッケージアプリも一度に開閉する。
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 0, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
         for _ in 0..20 {
             let id = "provider-toggle-package:example.app_8wekyb3d8bbwe!Editor";
             if w.try_find(id).is_some_and(|node| {
@@ -849,7 +911,7 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
     let saved_before_collapse = serde_json::to_value(load().unwrap()).unwrap();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        w.click("protection-collapse-all", cx);
+        super::protection_menu(w, "protection-more", 1, cx);
         w.render_frame(cx);
         for extension in ["wfi-a", "wfi-aa", "wfi-b", "wfi-pkg-a", "wfi-pkg-b"] {
             assert!(w.try_find(format!("original-icon-{extension}")).is_none());
@@ -859,14 +921,23 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
         w.click(format!("provider-pack-{provider}"), cx);
         w.render_frame(cx);
         assert!(!manager.read(cx).protection.draft.rules.providers[&provider]["wfi-aa"].protect);
-        let draft_before = serde_json::to_value(&manager.read(cx).protection.draft.rules).unwrap();
-        w.click("protection-collapse-all", cx);
+    })
+    .unwrap();
+    let draft_before =
+        cx.read(|cx| serde_json::to_value(&manager.read(cx).protection.draft.rules).unwrap());
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        super::protection_menu(w, "protection-more", 1, cx);
         w.render_frame(cx);
         assert!(w.try_find(format!("provider-pack-{provider}")).is_none());
         w.click(format!("provider-toggle-{provider}"), cx);
         w.render_frame(cx);
         assert!(w.find(format!("provider-pack-{provider}")).visible());
-        w.click("protection-expand-all", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        super::protection_menu(w, "protection-more", 0, cx);
         w.render_frame(cx);
         reveal(w, "original-icon-wfi-a", cx);
         assert!(w.find("original-icon-wfi-a").visible());
@@ -894,8 +965,8 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
         for id in [
             "protection-back",
             "protection-save",
-            "protection-collapse-all",
-            "protection-expand-all",
+            "protection-more",
+            "protection-filter",
         ] {
             let b = w.find(id).bounds();
             assert!(b.bottom() <= px(640.) && b.right() <= px(640.));
@@ -938,6 +1009,18 @@ fn source_rules_gui_in_child(cx: &mut TestAppContext) {
             this.selected = None;
             this.open_protection(w, cx);
         });
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 0, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 2, cx);
     })
     .unwrap();
     cx.run_until_parked();
@@ -1095,6 +1178,18 @@ fn pattern_preview_in_child(cx: &mut TestAppContext) {
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
         w.click("protection-open", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 0, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 2, cx);
     })
     .unwrap();
     cx.run_until_parked();
