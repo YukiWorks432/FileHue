@@ -1,10 +1,10 @@
 # 配布物の作成と検証
 
-FileHueのWindows x64向け配布物を作る。検証用と公開候補を明示的に分け、作成成功を実Explorerの受け入れや公開許可と混同しない。公開先は `https://github.com/YukiWorks432/FileHue` とする。[0.1.0](https://github.com/YukiWorks432/FileHue/releases/tag/v0.1.0)は公開済みで、GUI・CLI・Shell DLLを未署名で配布している。自己署名・仮署名も付けない。
+FileHueのWindows x64向け配布物を作る。検証用と公開候補を明示的に分け、作成成功を実Explorerの受け入れや公開許可と混同しない。公開先は `https://github.com/YukiWorks432/FileHue` とする。[0.2.0](https://github.com/YukiWorks432/FileHue/releases/tag/v0.2.0)は公開済みで、GUI・CLI・アイコン用とサムネイル用のShell DLLを未署名で配布している。自己署名・仮署名も付けない。
 
 ## 作成と確認
 
-現在のソースは0.2.0の公開準備版である。[日本語の変更案内](releases/0.2.0.ja.md)と[英語の変更案内](releases/0.2.0.en.md)をZIPへ同梱する。公開済みの0.1.0は保持し、0.2.0の候補生成を公開完了として扱わない。
+現在のソースの共有版は0.2.0である。[日本語の変更案内](releases/0.2.0.ja.md)と[英語の変更案内](releases/0.2.0.en.md)をZIPへ同梱する。公開済みのタグと添付物は差し替えず、公開後の文書更新は次回の配布物へ反映する。
 
 配布候補を作る前に、[依存の更新と監査](dependency-security.ja.md)に従って`just audit`を実行する。監査の成功と権利表示の最終確認は別々に判断する。
 
