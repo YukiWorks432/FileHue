@@ -10,6 +10,8 @@ A Rust application that brings VS Code file icon themes to Windows 11 x64 File E
 
 Illustration with fictional files using vscode-icons 13.0.0. Results depend on the icon pack, associations, and protection settings. See the [image credits and terms](docs/assets/explorer/NOTICE.md).
 
+The current source is being prepared for 0.2.0. See the [0.2.0 release notes](docs/releases/0.2.0.en.md). Creating and verifying a candidate does not publish the release.
+
 ## Features
 
 - Download reviewed icon packs, preview the results and licenses, then apply a pack from the GUI.

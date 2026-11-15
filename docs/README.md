@@ -7,6 +7,7 @@
 | 起動、取得、適用、復元、削除 | [使い方](usage.ja.md) / [English](usage.en.md) |
 | コマンドとJSON出力 | [CLI](cli.ja.md) / [English](cli.en.md) |
 | 初回版の機能と制限 | [0.1.0](releases/0.1.0.ja.md) / [English](releases/0.1.0.en.md) |
+| 0.2.0の変更と更新方法（公開準備中） | [0.2.0](releases/0.2.0.ja.md) / [English](releases/0.2.0.en.md) |
 | 公開後の変更 | [変更履歴](../CHANGELOG.md) |
 | 要求と受け入れ基準 | [要求仕様](requirements.ja.md) |
 | 動作の全体像 | [現行仕様](current-specification.ja.md) |
