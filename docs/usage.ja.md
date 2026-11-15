@@ -8,7 +8,7 @@ Windows 11 x64向けのGUIと補助CLIを提供します。この文書は0.2.0�
 
 「アプリ情報」では製品の版と本体・第三者のライセンスを確認できます。「配布ページを開く」でGitHub Releasesへ移動し、公開済みの版と配布物を確認できます。各アイコンパックの利用条件は、パックの詳細で確認してください。
 
-公開済みの[v0.1.0のリリースページ](https://github.com/YukiWorks432/FileHue/releases/tag/v0.1.0)から、Windows x64向けZIPと`SHA256SUMS.txt`を取得できます。
+公開済みのWindows x64向けZIPと`SHA256SUMS.txt`は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)から取得します。0.2.0は現在公開準備中です。
 
 ## 起動前の準備
 

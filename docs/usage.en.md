@@ -6,7 +6,7 @@ The GUI and auxiliary CLI target Windows 11 x64. This guide covers the upcoming 
 
 Select “About” to see the application version and open the application and third-party licenses. Choose “Open distribution page” to view published versions and downloads on GitHub Releases. Individual icon-pack terms are available in each pack's details.
 
-Download the Windows x64 ZIP and `SHA256SUMS.txt` from the published [v0.1.0 release page](https://github.com/YukiWorks432/FileHue/releases/tag/v0.1.0).
+Download published Windows x64 ZIPs and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/YukiWorks432/FileHue/releases). Version 0.2.0 is currently being prepared for publication.
 
 ## Before launching
 
