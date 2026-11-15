@@ -1763,7 +1763,7 @@ dependencies = [
 name = "file-icons-thumbnail-core"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "image",
  "resvg 0.48.1",
 ]
@@ -1772,7 +1772,7 @@ dependencies = [
 name = "file-icons-thumbnail-shell"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "file-icons-thumbnail-core",
  "image",
  "tempfile",
