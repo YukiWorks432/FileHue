@@ -238,6 +238,19 @@ fn document_links_must_stay_within_the_payload_and_target_files() {
 }
 
 #[test]
+fn payload_collects_future_notes_and_keeps_historical_notes() {
+    let temp = tempfile::tempdir().unwrap();
+    let notes = temp.path().join("docs/releases");
+    fs::create_dir_all(&notes).unwrap();
+    for name in ["1.0.0.ja.md", "1.0.0.en.md", "9.8.7.ja.md", "9.8.7.en.md"] {
+        fs::write(notes.join(name), "変更内容").unwrap();
+    }
+    let payload = package::payload_documents(temp.path()).unwrap();
+    for name in ["1.0.0.ja.md", "1.0.0.en.md", "9.8.7.ja.md", "9.8.7.en.md"] {
+        assert!(payload.contains(&Path::new("docs/releases").join(name)));
+    }
+}
+#[test]
 fn bundled_guides_link_to_documents_in_the_actual_payload() {
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let output = tempfile::tempdir().unwrap();

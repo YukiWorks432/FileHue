@@ -32,7 +32,6 @@ PowerShell 7.4以降、RustのMSVC環境、justを用意する。リポジトリ
 | `just verify` | 整形確認、Clippy、ビルド・Rust試験、xtaskの契約試験、GUI起動確認 |
 | `just package` | 変更のないソースから検証用ZIPを作成 |
 | `just licenses [--output <新しいフォルダー>]` | cargo-aboutの選択結果・権利表示の原文・閲覧用HTMLを生成 |
-| `just release-notes <版> <新しい出力ファイル> [文書のルート]` | 日英の版別ノートからGitHub Releasesの本文を生成。文書のルートは既定でリポジトリ直下 |
 | `just check-binaries --folder <フォルダー>` | 配布EXE・DLLのビルド元パスを検査 |
 | `just perf-gui <未作成のJSON>` / `just perf-icons <未作成のJSON>` | GUI・関連付け調査／ICO変換の時間とメモリーを手動計測 |
 
