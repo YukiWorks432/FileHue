@@ -18,7 +18,7 @@ use std::{
 
 const MAX_JSON: u64 = 16 * 1024 * 1024;
 const MAX_ASSET: u64 = 32 * 1024 * 1024;
-const CONVERSION_REVISION: u32 = 3;
+const CONVERSION_REVISION: u32 = 4;
 const SIZES: [u32; 7] = [16, 20, 24, 32, 48, 128, 256];
 
 /// パスを調べ直さず、既存の名前・直近の親だけを両判定で共有する。

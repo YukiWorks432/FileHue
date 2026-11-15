@@ -1,4 +1,4 @@
-use file_icons_core::{discover, import};
+use file_icons_core::{discover, import, import_controlled};
 use std::fs;
 
 fn fixture() -> tempfile::TempDir {
@@ -42,6 +42,57 @@ fn imports_clipped_filter_as_icon() {
     );
     assert_eq!(&pixels[(8 * 16 + 5) * 4..(8 * 16 + 6) * 4], &[0, 0, 0, 0]);
     assert_eq!(&pixels[(8 * 16 + 13) * 4..(8 * 16 + 14) * 4], &[0, 0, 0, 0]);
+}
+
+#[test]
+fn reimport_keeps_the_legacy_svg_cache_after_rendering_changes() {
+    let root = tempfile::tempdir().unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("package.json"), r#"{"name":"legacy-fixture","publisher":"tests","version":"1.0.0","contributes":{"iconThemes":[{"id":"test","label":"Test","path":"theme.json"}]}}"#).unwrap();
+    fs::write(root.path().join("LICENSE"), "Test fixture artwork: MIT").unwrap();
+    fs::write(root.path().join("theme.json"), r#"{"iconDefinitions":{"generic":{"iconPath":"generic.svg"}},"fileExtensions":{"rs":"generic"}}"#).unwrap();
+    fs::write(root.path().join("generic.svg"), r##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 8 8" transform="translate(4 0)"><rect x="0" y="0" width="2" height="4" fill="#ff0000"/></svg>"##).unwrap();
+
+    // resvg 0.48.1と変換方式3で、同じ素材と出典から生成した保存先と内容。
+    let legacy = cache
+        .path()
+        .join("5008128be08149dbdbb602da989e273209e13e6f983a874bf82809ede808e4a4");
+    fs::create_dir(&legacy).unwrap();
+    let old_icon =
+        legacy.join("e08bff60b00ffd49c5401cf757e26d793b4e527b18b275dcb00d03661d1ff27a.ico");
+    let old_record = legacy.join("provenance.json");
+    let old_icon_bytes = include_bytes!("../../../test-support/fixtures/legacy-resvg-048.ico");
+    let old_record_bytes = include_bytes!("../../../test-support/fixtures/legacy-resvg-048.json");
+    fs::write(&old_icon, old_icon_bytes).unwrap();
+    fs::write(&old_record, old_record_bytes).unwrap();
+
+    let origin = serde_json::json!({"url":"https://example.invalid/legacy-fixture"});
+    let pack =
+        import_controlled(root.path(), "test", cache.path(), Some(&origin), || Ok(())).unwrap();
+    assert_ne!(pack.provenance.parent().unwrap(), legacy);
+    assert_eq!(fs::read(&old_icon).unwrap(), old_icon_bytes);
+    assert_eq!(fs::read(&old_record).unwrap(), old_record_bytes);
+    assert_ne!(
+        fs::read(pack.theme.resolve("code.rs").unwrap()).unwrap(),
+        old_icon_bytes
+    );
+    let image = ico::IconDir::read(fs::File::open(pack.theme.resolve("code.rs").unwrap()).unwrap())
+        .unwrap()
+        .entries()
+        .iter()
+        .find(|entry| entry.width() == 16)
+        .unwrap()
+        .decode()
+        .unwrap();
+    let pixels = image.rgba_data();
+    assert_eq!(
+        &pixels[(2 * 16 + 6) * 4..(2 * 16 + 7) * 4],
+        &[255, 0, 0, 255]
+    );
+    assert_eq!(&pixels[(2 * 16 + 10) * 4..(2 * 16 + 11) * 4], &[0, 0, 0, 0]);
+    let again =
+        import_controlled(root.path(), "test", cache.path(), Some(&origin), || Ok(())).unwrap();
+    assert_eq!(again.provenance, pack.provenance);
 }
 
 #[test]

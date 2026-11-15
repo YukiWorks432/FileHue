@@ -1,0 +1,28 @@
+{
+  "assets": {
+    "generic": "e08bff60b00ffd49c5401cf757e26d793b4e527b18b275dcb00d03661d1ff27a"
+  },
+  "conversion_revision": 3,
+  "download": {
+    "url": "https://example.invalid/legacy-fixture"
+  },
+  "licenses": {
+    "LICENSE": "Test fixture artwork: MIT"
+  },
+  "package": {
+    "contributes": {
+      "iconThemes": [
+        {
+          "id": "test",
+          "label": "Test",
+          "path": "theme.json"
+        }
+      ]
+    },
+    "name": "legacy-fixture",
+    "publisher": "tests",
+    "version": "1.0.0"
+  },
+  "source": "https://example.invalid/legacy-fixture",
+  "theme_id": "test"
+}
