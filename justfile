@@ -106,6 +106,10 @@ verify-release *args:
 check-docs:
     cargo xtask check-docs
 
+# 日英ノートからGitHub Releases向けの本文を新しいファイルへ生成する
+release-notes version output root=".":
+    & ./scripts/create-release-notes.ps1 -Version $args[1] -OutputPath $args[2] -Root $args[3]
+
 # 専用プロファイルでGUI・関連付けの時間と割り当て量を計測する（出力は上書きしない）
 perf-gui output:
     cargo build -p file-icons-cli --release --locked; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $env:WFI_PERF_CLI = [IO.Path]::GetFullPath('target/release/file-icons.exe'); $env:WFI_PERF_STARTUP = '1'; $env:WFI_PERF_OUTPUT = [IO.Path]::GetFullPath($args[1]); $env:WFI_PERF_REVISION = git rev-parse HEAD; cargo test -p file-icons-manager --release --features test-support --locked ui_tests::performance::gui_performance -- --ignored --exact --nocapture; exit $LASTEXITCODE

@@ -241,8 +241,8 @@ fn document_links_must_stay_within_the_payload_and_target_files() {
 fn bundled_guides_link_to_documents_in_the_actual_payload() {
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let output = tempfile::tempdir().unwrap();
-    for name in package::PAYLOAD {
-        let destination = output.path().join(name);
+    for name in package::payload_documents(source).unwrap() {
+        let destination = output.path().join(&name);
         fs::create_dir_all(destination.parent().unwrap()).unwrap();
         fs::copy(source.join(name), destination).unwrap();
     }

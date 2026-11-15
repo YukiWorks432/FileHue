@@ -68,6 +68,21 @@ fn public_payload_requires_complete_clean_unsigned_files_and_no_unresolved_right
 }
 
 #[test]
+fn manifest_cannot_silently_omit_a_language_of_its_own_release_notes() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("payload");
+    let mut manifest = support::payload(&root, Purpose::Validation);
+    package::verify(&root, temp.path(), Purpose::Validation).unwrap();
+    fs::remove_file(root.join("docs/releases/0.1.0.en.md")).unwrap();
+    manifest["files"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["path"] != "docs/releases/0.1.0.en.md");
+    fs::write(temp.path().join("manifest.json"), manifest.to_string()).unwrap();
+    assert!(package::verify(&root, temp.path(), Purpose::Validation).is_err());
+}
+
+#[test]
 fn unsigned_policy_checks_the_pe_even_when_the_manifest_hash_was_updated() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("payload");

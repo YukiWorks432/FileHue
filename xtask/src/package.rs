@@ -88,10 +88,6 @@ pub const PAYLOAD: &[&str] = &[
     "THIRD_PARTY_NOTICES.en.md",
     "docs/usage.ja.md",
     "docs/usage.en.md",
-    "docs/releases/0.1.0.ja.md",
-    "docs/releases/0.1.0.en.md",
-    "docs/releases/0.2.0.ja.md",
-    "docs/releases/0.2.0.en.md",
     "docs/cli.ja.md",
     "docs/cli.en.md",
     "docs/thumbnails.ja.md",
@@ -106,6 +102,18 @@ pub const BINARIES: &[&str] = &[
     "file_icons_shell.dll",
     "file_icons_thumbnail_shell.dll",
 ];
+
+/// 版ごとのノートを列挙し、版を追加しても同梱指定の追記を不要にする。
+pub fn payload_documents(root: &Path) -> Result<Vec<PathBuf>> {
+    let mut documents: Vec<_> = PAYLOAD.iter().map(PathBuf::from).collect();
+    documents.extend(
+        files(&root.join("docs/releases"))?
+            .into_iter()
+            .filter(|path| path.extension().is_some_and(|extension| extension == "md"))
+            .map(|path| PathBuf::from("docs/releases").join(path)),
+    );
+    Ok(documents)
+}
 
 pub fn digest(path: &Path) -> Result<String> {
     let mut hash = Sha256::new();
@@ -569,6 +577,13 @@ pub fn verify(folder: &Path, metadata: &Path, purpose: Purpose) -> Result<Manife
             "必要な配布ファイルがありません: {name}"
         );
     }
+    for language in ["ja", "en"] {
+        let name = format!("docs/releases/{}.{language}.md", manifest.version);
+        ensure!(
+            expected.contains(&PathBuf::from(&name)),
+            "対象版のリリースノートがありません: {name}"
+        );
+    }
     let notice_links = crate::notices::verify_html(&root.join("licenses"))?;
     ensure!(
         notice_links.contains("VSCODE-LICENSE.txt")
@@ -750,14 +765,14 @@ pub fn package(
         copy(&source, &payload.join(binary))?;
     }
     crate::privacy::verify(&payload, root, Path::new(&sysroot))?;
-    for path in PAYLOAD {
+    for path in payload_documents(root)? {
         if matches!(
-            *path,
-            "THIRD_PARTY_NOTICES.md" | "THIRD_PARTY_NOTICES.en.md"
+            path.to_str(),
+            Some("THIRD_PARTY_NOTICES.md" | "THIRD_PARTY_NOTICES.en.md")
         ) {
-            copy_distribution_notice(&root.join(path), &payload.join(path))?;
+            copy_distribution_notice(&root.join(&path), &payload.join(&path))?;
         } else {
-            copy(&root.join(path), &payload.join(path))?;
+            copy(&root.join(&path), &payload.join(&path))?;
         }
     }
     let records = crate::notices::generate(root, &metadata, &payload.join("licenses"))?;

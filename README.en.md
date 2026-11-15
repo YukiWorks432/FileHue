@@ -4,7 +4,7 @@ English | [日本語](README.md)
 
 A Rust application that brings VS Code file icon themes to Windows 11 x64 File Explorer. Icons are selected by filename and extension while preserving file contents and default applications.
 
-[v0.2.0 is available](https://github.com/YukiWorks432/FileHue/releases/tag/v0.2.0). Download the unsigned Windows x64 ZIP and `SHA256SUMS.txt` from the release page. Start with the [usage guide](docs/usage.en.md), or read the [0.2.0 release notes](docs/releases/0.2.0.en.md) for changes, update instructions, and supported scope. Find other versions on [GitHub Releases](https://github.com/YukiWorks432/FileHue/releases). Developers preparing distributions should follow the Japanese [distribution guide](docs/distribution.ja.md).
+Download the Windows x64 ZIP and `SHA256SUMS.txt` from the [latest release](https://github.com/YukiWorks432/FileHue/releases/latest). Start with the [usage guide](docs/usage.en.md), or see the [changelog](CHANGELOG.md) for changes and update instructions for each version. Find older distributions on [GitHub Releases](https://github.com/YukiWorks432/FileHue/releases). Developers preparing distributions should follow the Japanese [distribution guide](docs/distribution.ja.md).
 
 ![File Explorer before and after applying FileHue. AGENTS.md, Cargo.toml, package.json, and tsconfig.json receive filename-specific icons.](docs/assets/explorer/comparison.en.png)
 

@@ -12,6 +12,10 @@ pub fn payload(root: &Path, purpose: Purpose) -> Value {
     pe[88..90].copy_from_slice(&0x20bu16.to_le_bytes());
     pe[196..200].copy_from_slice(&16u32.to_le_bytes());
     for name in package::BINARIES.iter().chain(package::PAYLOAD).chain(&[
+        "docs/releases/0.1.0.ja.md",
+        "docs/releases/0.1.0.en.md",
+        "docs/releases/0.2.0.ja.md",
+        "docs/releases/0.2.0.en.md",
         "licenses/THIRD_PARTY_LICENSES.html",
         "licenses/rust/COPYRIGHT-library.html",
         "licenses/VSCODE-LICENSE.txt",

@@ -4,7 +4,7 @@
 
 Windows 11 x64の標準エクスプローラーで、VS Codeのファイルアイコンテーマを使うRust製アプリです。ファイルの内容や既定のアプリを変更せず、ファイル名と拡張子からアイコンを選びます。
 
-[v0.2.0を公開しました](https://github.com/YukiWorks432/FileHue/releases/tag/v0.2.0)。リリースページから、未署名のWindows x64向けZIPと`SHA256SUMS.txt`を取得できます。導入は[使い方](docs/usage.ja.md)、変更・更新方法・対応範囲は[0.2.0の案内](docs/releases/0.2.0.ja.md)を参照してください。ほかの版は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)、配布物を作る開発者は[配布手順](docs/distribution.ja.md)を確認します。
+[最新版のダウンロード](https://github.com/YukiWorks432/FileHue/releases/latest)から、Windows x64向けZIPと`SHA256SUMS.txt`を取得できます。導入は[使い方](docs/usage.ja.md)、版ごとの変更と更新方法は[変更履歴](CHANGELOG.md)を参照してください。過去の配布物は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)、配布物を作る開発者は[配布手順](docs/distribution.ja.md)を確認します。
 
 ![FileHueの適用前後のエクスプローラー比較。AGENTS.md、Cargo.toml、package.json、tsconfig.jsonにはファイル名に対応するアイコンを表示します。](docs/assets/explorer/comparison.ja.png)
 

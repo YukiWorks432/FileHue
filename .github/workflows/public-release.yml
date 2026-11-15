@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 作成済みの版タグ（例 v0.1.0）
+        description: 作成済みの版タグ（例 v1.2.3）
         required: true
         type: string
 
@@ -109,11 +109,14 @@ jobs:
           $zip = Join-Path $folder ($folders[0].Name + '.zip')
           just verify-release --skip-shell --public-candidate --archive $zip --report work/public-candidate-verification.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $version = (Get-Content (Join-Path $folder 'manifest.json') -Raw | ConvertFrom-Json).version
+          just release-notes $version (Join-Path $folder 'release-notes.md') (Join-Path $folder 'payload')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "CANDIDATE_DIR=$folder" >> $env:GITHUB_ENV
           "CANDIDATE_ZIP=$zip" >> $env:GITHUB_ENV
 
       - name: 完成ZIPのビルド来歴を証明する
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ${{ env.CANDIDATE_ZIP }}
 
@@ -176,5 +179,5 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $remote.sha -cne $env:GITHUB_SHA) { throw '公開先のタグが変更されています' }
           $assets = @($zip, "$folder/SHA256SUMS.txt", "$folder/manifest.json", $reportFile[0].FullName)
           $assets += @($sources | ForEach-Object { Join-Path $folder $_.source_archive.path })
-          gh release create $env:RELEASE_TAG @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title $env:RELEASE_TAG --notes 'FileHue Windows x64: unsigned candidate. Windows 11 Shell and Explorer validation is required before publication.'
+          gh release create $env:RELEASE_TAG @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title $env:RELEASE_TAG --notes-file (Join-Path $folder 'release-notes.md')
           exit $LASTEXITCODE
