@@ -22,16 +22,16 @@
   },
   {
     "package": "gpui-kit",
-    "version": "0.7.3",
-    "file": "gpui-kit-0.7.3.txt",
-    "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/67265a36e260ffe03c5aaebdcd8d654dbf892eab/LICENSE-APACHE",
+    "version": "0.9.0",
+    "file": "gpui-kit-0.9.0.txt",
+    "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/7591a35eced761e3613c01e71ff04c10129dae1a/LICENSE-APACHE",
     "sha256": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811"
   },
   {
     "package": "gpui-kit-assets",
-    "version": "0.7.3",
-    "file": "gpui-kit-assets-0.7.3.txt",
-    "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/67265a36e260ffe03c5aaebdcd8d654dbf892eab/LICENSE-APACHE",
+    "version": "0.9.0",
+    "file": "gpui-kit-assets-0.9.0.txt",
+    "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/7591a35eced761e3613c01e71ff04c10129dae1a/LICENSE-APACHE",
     "sha256": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811"
   },
   {
@@ -113,9 +113,9 @@
   },
   {
     "package": "taffy",
-    "version": "0.13.0",
-    "file": "taffy-0.13.0.txt",
-    "url": "https://raw.githubusercontent.com/DioxusLabs/taffy/45a56299d366ddb383e593a1f0372158d00e8530/LICENSE",
+    "version": "0.15.0",
+    "file": "taffy-0.15.0.txt",
+    "url": "https://raw.githubusercontent.com/DioxusLabs/taffy/eb6450694f33e2b7413e40677f230ff63f0fc194/LICENSE",
     "sha256": "f97daf1a0124413dccf399a4e6626b4b74acd05282f80b6d64ac82225650b77a"
   },
   {
