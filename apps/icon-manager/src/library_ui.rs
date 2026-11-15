@@ -21,6 +21,9 @@ impl Manager {
     ) {
         self.operation.clear_result();
         self.browsing = browsing;
+        if !browsing {
+            self.refresh_dll_update(cx);
+        }
         self.focus.focus(window, cx);
         cx.notify();
     }
@@ -192,6 +195,7 @@ impl Manager {
                     && pack_family(source) == pack_family(pack)
             });
             let active = self.settings.active.as_ref() == Some(&pack.id);
+            let review = active && self.dll_update.requires_recovery();
             let expanded = self.selected.as_ref() == Some(&pack.id);
             let default_selection = file_icons_core::selection::Selection::default();
             let selection = self
@@ -285,12 +289,11 @@ impl Manager {
                 )
                 .child(title)
                 .when(active, |row| {
-                    row.child(
-                        div()
-                            .text_sm()
-                            .flex_shrink_0()
-                            .child(self.text("適用中", "Applied")),
-                    )
+                    row.child(div().text_sm().flex_shrink_0().child(if review {
+                        self.text("要確認", "Needs review")
+                    } else {
+                        self.text("適用中", "Applied")
+                    }))
                 });
             if has_samples {
                 let mut preview = div().flex().flex_wrap().items_center().gap_2();
@@ -328,12 +331,16 @@ impl Manager {
                         .small()
                         .primary()
                         .min_w(rems(7.))
-                        .icon(if active {
+                        .icon(if review {
+                            IconName::TriangleAlert
+                        } else if active {
                             IconName::Check
                         } else {
                             IconName::Monitor
                         })
-                        .label(if active {
+                        .label(if review {
+                            self.text("要確認", "Needs review")
+                        } else if active {
                             self.text("適用中", "Applied")
                         } else {
                             self.text("適用する", "Apply")

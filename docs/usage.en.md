@@ -55,11 +55,11 @@ If icons do not update after applying or restoring, finish file operations such 
 
 To back up the data, close the GUI and CLI, then copy `%LOCALAPPDATA%\WindowsFileIconsDev` to a separate safe location. While recovery records remain, do not move or delete the folder or overwrite current settings with a backup.
 
-1. In the old version, choose **Restore Windows defaults**, confirm that restoration completed, and close the application. If a conflict or failure is reported, retain the recovery records and resolve it before continuing; see [Recover from registration conflicts](#recover-from-registration-conflicts).
+1. Close the old GUI and CLI. Restoring Windows defaults before updating is not required.
 2. Verify the source and SHA-256 of the new ZIP and extract it to a different folder. Keep the GUI, CLI, and `file_icons_shell.dll` together. Do not overwrite files in use.
-3. Start the new version and review downloaded packs, target selections, and protection settings. Choose **Apply** to apply the desired pack again. Launching the new version alone does not update the Shell DLL in use.
+3. Start the new version. If an update notice appears in **Downloaded packs**, choose **Update**. The active pack and saved target and protection choices are retained. Starting the application or opening the screen does not change registration. No notice appears if the same DLL contents are already registered or no pack is applied.
 
-Reapplying after restoration checks existing icon registrations again. If another application's update or another change has altered an icon reference, a saved choice to use the pack is marked **review needed**, and the original icon is protected until you confirm it again. Open **Icon protection** to review the registration and preview, then select and save only the types you want to change.
+Updating checks existing icon registrations again. If another application's update or another change has altered an icon reference, a saved choice to use the pack is marked **review needed**, and the original icon is protected until you confirm it again. Open **Icon protection** to review the registration and preview, then select and save only the types you want to change.
 
 If an operation fails, retain its details and recovery records. Keep the old version and backups until application or restoration is confirmed complete. If a DLL cannot be cleaned up because it is in use, close applications using it or sign in to Windows again, then retry. FileHue does not forcibly close Explorer.
 

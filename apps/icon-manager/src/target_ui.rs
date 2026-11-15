@@ -294,6 +294,9 @@ impl Manager {
             self.targets.all.clear();
             self.targets.preview_class = None;
             self.close_target_protection();
+            if !self.browsing {
+                self.refresh_dll_update(cx);
+            }
         }
         self.focus.focus(window, cx);
         cx.notify();

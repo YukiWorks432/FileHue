@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, fs};
 use winreg::{RegKey, RegValue, enums::*};
 
 type Snapshot = BTreeMap<String, BTreeMap<String, (u32, Vec<u8>)>>;
-fn snapshot(key: &RegKey) -> Snapshot {
+pub(super) fn snapshot(key: &RegKey) -> Snapshot {
     fn visit(key: &RegKey, prefix: &str, result: &mut Snapshot) {
         let values = key
             .enum_values()
