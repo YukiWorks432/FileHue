@@ -101,63 +101,6 @@ pub(super) fn compare(
 }
 
 impl Manager {
-    pub(super) fn protection_view_select(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        if self.protection.presentation.view_picker.is_none() {
-            let items = Filter::ALL
-                .into_iter()
-                .map(|filter| ProtectionOption {
-                    id: filter.id().into(),
-                    label: filter.label(self).into(),
-                    disabled: false,
-                })
-                .collect::<Vec<_>>();
-            let ix = Filter::ALL
-                .iter()
-                .position(|filter| *filter == self.protection.presentation.filter)
-                .unwrap();
-            let picker = cx.new(|cx| {
-                SelectState::new(
-                    items,
-                    Some(gpui_kit::component::IndexPath::default().row(ix)),
-                    window,
-                    cx,
-                )
-            });
-            self.protection.presentation.view_subscription =
-                Some(cx.subscribe(&picker, |this, _, event, cx| {
-                    if let SelectEvent::Confirm(Some(id)) = event {
-                        let Some(filter) = Filter::ALL.into_iter().find(|filter| filter.id() == id)
-                        else {
-                            return;
-                        };
-                        this.protection.presentation.filter = filter;
-                        this.protection.presentation.pinned.clear();
-                        this.reset_protection_list();
-                        cx.notify();
-                    }
-                }));
-            self.protection.presentation.view_picker = Some(picker);
-        }
-        div()
-            .flex()
-            .items_center()
-            .gap_2()
-            .child(div().text_sm().child(self.text("表示", "View")))
-            .child(
-                Select::new(self.protection.presentation.view_picker.as_ref().unwrap())
-                    .id("protection-view-select")
-                    .small()
-                    .w_48()
-                    .accessibility_label(self.text("表示", "View"))
-                    .disabled(self.operation.busy()),
-            )
-            .into_any_element()
-    }
-
     pub(super) fn protection_changes_panel(
         &mut self,
         compact: bool,
@@ -931,7 +874,11 @@ impl Manager {
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.protection.presentation.filter = Filter::All;
-                    this.protection.presentation.view_picker = None;
+                    this.protection.presentation.last_filter = Filter::All;
+                    this.protection.presentation.query.clear();
+                    if let Some(search) = &this.protection.presentation.search {
+                        search.update(cx, |input, cx| input.set_value("", window, cx));
+                    }
                     this.protection.presentation.pinned.clear();
                     if let Some(source) = this.protection.inspection.source(&target) {
                         let group = display_group(source);

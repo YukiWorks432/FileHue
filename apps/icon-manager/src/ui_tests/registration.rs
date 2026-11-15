@@ -164,13 +164,20 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         manager.update(cx, |this, cx| {
-            this.protection.visual_rows(
+            let template = this.protection.inspection.sources.first().unwrap().clone();
+            this.protection.visual_sources(
                 (0..160)
-                    .map(|ix| file_icons_windows::IconExclusion {
-                        extension: format!("scroll-{ix:03}"),
-                        class: format!("Scrolling.Type{ix}"),
-                        source: format!("Scrolling.Type{ix}\\DefaultIcon"),
-                        reason: file_icons_windows::ProtectionReason::DefaultIcon,
+                    .map(|ix| {
+                        let mut source = template.clone();
+                        source.provider_id = Some("visual:scroll".into());
+                        source.provider_name = Some("Scrolling fixture".into());
+                        source.registration = file_icons_windows::IconExclusion {
+                            extension: format!("scroll-{ix:03}"),
+                            class: format!("Scrolling.Type{ix}"),
+                            source: format!("Scrolling.Type{ix}\\DefaultIcon"),
+                            reason: file_icons_windows::ProtectionReason::DefaultIcon,
+                        };
+                        source
                     })
                     .collect(),
             );
@@ -178,7 +185,7 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
         });
         w.render_frame(cx);
         let save = w.find("protection-save").bounds();
-        for _ in 0..30 {
+        for _ in 0..100 {
             w.scroll(
                 "protection-rows",
                 gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-1000.))),
@@ -192,9 +199,9 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
             "ホイールで160件目まで到達できること"
         );
         assert_eq!(w.find("protection-save").bounds(), save);
-        w.click("protection-details", cx);
+        super::protection_menu(w, "protection-more", 2, cx);
         w.render_frame(cx);
-        for _ in 0..40 {
+        for _ in 0..100 {
             w.scroll(
                 "protection-rows",
                 gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(-1000.))),
@@ -202,6 +209,7 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
             );
             w.render_frame(cx);
         }
+        super::protection_sources::reveal(w, "protection-copy-scroll-159", cx);
         w.click("protection-copy-scroll-159", cx);
         let copied = cx.read_from_clipboard().unwrap().text().unwrap();
         assert!(copied.contains("Scrolling.Type159\\DefaultIcon"));
@@ -242,11 +250,18 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
         cx.run_until_parked();
         cx.update_window(window, |_, w, cx| {
             w.render_frame(cx);
+            super::protection_menu(w, "protection-more", 0, cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+        cx.update_window(window, |_, w, cx| {
+            w.render_frame(cx);
             for id in [
                 "protection-toggle",
-                "protection-view-select",
+                "protection-edit",
                 "protection-pack",
-                "protection-details",
+                "protection-filter",
+                "protection-more",
                 "protection-save",
                 "protection-back",
             ] {
@@ -259,7 +274,7 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
             let rows = w.find("protection-rows").bounds();
             assert!(rows.size.height > px(48.));
             assert!(rows.bottom() <= w.find("protection-save").bounds().top());
-            w.click("protection-details", cx);
+            super::protection_menu(w, "protection-more", 2, cx);
             w.render_frame(cx);
             w.press("end", cx);
             w.render_frame(cx);
@@ -430,6 +445,12 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
+        super::protection_menu(w, "protection-more", 0, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        w.render_frame(cx);
         assert!(w.find("protection-row-wfi-gui-a").visible());
         assert!(
             w.find("protection-result-current-wfi-gui-a")
@@ -437,7 +458,7 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("パックのアイコン")
         );
-        w.click("protection-allowed", cx);
+        super::protection_filter(w, 2, cx);
         w.render_frame(cx);
         assert!(w.find("protection-row-wfi-gui-a").visible());
         w.click("protection-toggle", cx);
@@ -483,7 +504,7 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
                 .unwrap()
                 .contains("元の表示")
         );
-        w.click("protection-current", cx);
+        super::protection_filter(w, 4, cx);
         w.render_frame(cx);
         assert!(
             w.find("protection-row-wfi-gui-a")
@@ -522,7 +543,7 @@ fn registration_gui_in_child(cx: &mut TestAppContext) {
         w.render_frame(cx);
         assert_eq!(
             w.find("protection-toggle").label(),
-            Some("Protect existing icons by default")
+            Some("Keep original icons by default")
         );
         assert!(
             w.find("protection-row-wfi-gui-a")

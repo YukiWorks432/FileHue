@@ -199,16 +199,18 @@ impl Manager {
             ),
         };
         let prefix = if after_save && self.settings.active.is_none() {
-            self.text("保存後（パック未適用）", "After saving (no active pack)")
+            self.text("保存後\nパック未適用", "After saving\nNo active pack")
         } else if after_save
             && self.protection.inspection.pack.as_ref() != self.settings.active.as_ref()
         {
-            self.text("保存後（適用中パック）", "After saving (active pack)")
+            self.text("保存後\n適用中パック", "After saving\nActive pack")
         } else if after_save {
             self.text("保存後の見込み", "After saving")
         } else {
             self.text("現在の見本", "Current preview")
         };
+        let two_line_prefix = self.settings.active.is_none()
+            || self.protection.inspection.pack.as_ref() != self.settings.active.as_ref();
         let sample = self.settings.active.as_ref().and_then(|active| {
             self.settings
                 .packs
@@ -216,6 +218,13 @@ impl Manager {
                 .find(|pack| &pack.id == active)
                 .and_then(|pack| sample_name(pack, extension))
         });
+        let visible_name = if extension.is_empty() {
+            sample
+                .as_ref()
+                .map_or_else(|| name.to_owned(), |sample| format!("{sample}\n{name}"))
+        } else {
+            name.to_owned()
+        };
         let label = if large {
             if let Some(sample) = sample {
                 format!("{sample}: {name}")
@@ -230,10 +239,10 @@ impl Manager {
         let has_preview = path.is_some();
         let icon = if let Some(path) = path {
             div()
-                .size(if large { px(48.) } else { px(20.) })
+                .size(if large { px(48.) } else { px(32.) })
                 .child(crate::icon_preview::preview(
                     path,
-                    if large { px(48.) } else { px(20.) },
+                    if large { px(48.) } else { px(32.) },
                 ))
                 .into_any_element()
         } else {
@@ -242,10 +251,10 @@ impl Manager {
                     "protection-preview-fallback-{}-{extension}",
                     if after_save { "after" } else { "current" }
                 )))
-                .size(if large { px(48.) } else { px(20.) })
+                .size(if large { px(48.) } else { px(32.) })
                 .child(
                     Icon::new(IconName::TriangleAlert)
-                        .size(if large { px(48.) } else { px(20.) })
+                        .size(if large { px(48.) } else { px(32.) })
                         .text_color(colors.muted_foreground),
                 )
                 .tooltip(move |window, cx| {
@@ -256,11 +265,19 @@ impl Manager {
                 })
                 .into_any_element()
         };
-        let label = if large && !has_preview {
+        let label = if !has_preview {
             format!("{label}\n{missing_tip}")
         } else {
             label
         };
+        let icon = div()
+            .id(SharedString::from(format!(
+                "protection-preview-image-{}-{extension}",
+                if after_save { "after" } else { "current" }
+            )))
+            .child(icon);
+        #[cfg(feature = "test-support")]
+        let icon = icon.test_support();
         let result = div()
             .id(SharedString::from(format!(
                 "protection-result-{}-{extension}",
@@ -269,13 +286,28 @@ impl Manager {
             .role(Role::Status)
             .aria_label(label.clone())
             .flex()
-            .when(large, |p| p.flex_col().items_start())
-            .when(!large, |p| p.items_center())
-            .gap_2()
+            .flex_col()
+            .when(large, |p| p.items_start())
+            .when(!large, |p| p.items_center().w(rems(7.)))
+            .gap_1()
             .min_w_0()
             .text_sm()
+            .when(!large, |p| {
+                p.child(
+                    div()
+                        .text_xs()
+                        .text_color(colors.muted_foreground)
+                        .when(two_line_prefix, |heading| heading.h(rems(2.5)))
+                        .child(prefix),
+                )
+            })
             .child(icon)
-            .child(div().min_w_0().child(label));
+            .child(
+                div()
+                    .min_w_0()
+                    .when(!large, |p| p.text_xs())
+                    .child(if large { label } else { visible_name }),
+            );
         #[cfg(feature = "test-support")]
         let result = result.test_support();
         result.into_any_element()
@@ -343,6 +375,55 @@ impl Manager {
                     .clone()
                     .unwrap_or_else(|| self.text("提供元不明", "Unknown provider").into())
             };
+            let provider_setting = source
+                .provider_id
+                .as_ref()
+                .and_then(|provider| self.protection.draft.rules.providers.get(provider));
+            let default_label = match provider_setting {
+                Some(rules)
+                    if group.into_iter().flatten().any(|index| {
+                        let row = &self.protection.inspection.sources[*index];
+                        rules
+                            .get(&row.registration.extension)
+                            .is_some_and(|rule| rule.fingerprint != row.fingerprint)
+                    }) =>
+                {
+                    self.text("要確認", "Needs review")
+                }
+                Some(rules) if rules.values().all(|rule| rule.protect) => {
+                    self.text("元のアイコン", "Original icon")
+                }
+                Some(rules) if rules.values().all(|rule| !rule.protect) => {
+                    self.text("パックを許可", "Allow pack")
+                }
+                Some(_) => self.text("個別指定", "Overrides"),
+                None => self.text("全体に従う", "Global"),
+            };
+            let overrides = source.provider_id.as_ref().map_or(0, |provider| {
+                self.protection.provider_override_count(provider)
+            });
+            let mut setting_summary = div()
+                .flex()
+                .gap_1()
+                .text_xs()
+                .text_color(colors.muted_foreground)
+                .child(format!(
+                    "{}: {default_label}",
+                    self.text("基本設定", "Default")
+                ));
+            if overrides > 0
+                && let Some(provider) = &source.provider_id
+            {
+                let label = format!("{}: {overrides}", self.text("個別設定", "Overrides"));
+                let notice = div()
+                    .id(SharedString::from(format!("provider-overrides-{provider}")))
+                    .role(Role::Status)
+                    .aria_label(label.clone())
+                    .child(format!("· {label}"));
+                #[cfg(feature = "test-support")]
+                let notice = notice.test_support();
+                setting_summary = setting_summary.child(notice);
+            }
             use gpui_kit::{assets::IconName, component::Icon};
             heading = heading
                 .child(
@@ -359,7 +440,8 @@ impl Manager {
                         .min_w_0()
                         .text_left()
                         .when(!extensionless, |name| name.truncate())
-                        .child(name.clone()),
+                        .child(name.clone())
+                        .when(!extensionless, |name| name.child(setting_summary)),
                 );
             let count_label = div()
                 .id(SharedString::from(format!("provider-count-{group_id}")))
@@ -447,66 +529,33 @@ impl Manager {
                 && !source.registration.extension.is_empty()
                 && expanded
             {
-                let original = self
-                    .protection
-                    .inspection
-                    .previews
-                    .as_ref()
-                    .and_then(|p| p.provider_paths.get(&source.group_id()))
-                    .cloned();
-                let pack = self
-                    .settings
-                    .packs
-                    .iter()
-                    .find(|p| Some(&p.id) == self.protection.inspection.pack.as_ref())
-                    .and_then(|p| {
-                        let sample = sample_name(p, &source.registration.extension)?;
-                        p.theme.resolve(&sample).map(|p| p.to_path_buf())
-                    });
-                let inherited = if self.protection.draft.enabled {
-                    original.clone()
-                } else {
-                    pack.clone().or_else(|| original.clone())
-                };
-                let actions = div().bg(colors.muted).p_3().flex().flex_col().gap_2()
-                    .child(div().text_sm().font_weight(FontWeight::SEMIBOLD)
-                        .child(self.text("このソフトの基本設定", "Software defaults")))
-                    .child(div().flex().flex_wrap().gap_2()
-                    .child(self.protection_preview(source, "provider-original", original,
+                let actions = div().bg(colors.muted).p_3().flex().flex_wrap().items_center().gap_2()
+                    .child(div().min_w_40().flex_1().flex().flex_col().gap_1()
+                        .child(div().text_sm().font_weight(FontWeight::SEMIBOLD)
+                            .child(self.text("このソフトの基本設定", "Software defaults")))
+                        .child(div().text_xs().text_color(colors.muted_foreground)
+                            .child(self.text("個別指定した種類は、その指定を優先します。", "File type overrides take priority."))))
+                    .child(div().flex().flex_wrap().gap_1()
+                    .child(self.protection_choice(source, "provider-original",
                         (self.text("元のアイコン", "Original icon"),
-                        self.text("このソフトのアイコンをまとめて保護します。種類ごとの個別指定は優先されます。", "Protect this software's icons. File type overrides take priority."),
-                        self.text("ソフトの代表アイコンを取得できません。", "Software preview unavailable.")), cx))
-                    .child(self.protection_preview(source, "provider-pack", pack,
-                        (self.text("パックのアイコンを許可", "Allow pack icons"),
-                        self.text("このソフトにパックのアイコンをまとめて許可します。種類ごとの個別指定と常時保護は優先されます。", "Allow pack icons for this software. File type overrides and mandatory protection take priority."),
-                        self.text("代表画像です。各種類にはそれぞれ対応するパックのアイコンを使用します。", "Each file type uses its own corresponding pack icon.")), cx))
-                    .child(self.protection_preview(source, "provider-default", inherited,
-                        (self.text("全体設定に従う", "Use global setting"),
-                        self.text("基本設定を共通の保護設定へ戻します。個別指定は保持します。画像は代表例です。", "Use the global protection setting. File type overrides are kept. The image is representative."),
-                        self.text("継承結果の代表画像を取得できません。", "Inherited representative preview unavailable.")), cx)));
+                        self.text("このソフトのアイコンをまとめて保護します。種類ごとの個別指定は優先されます。", "Protect this software's icons. File type overrides take priority.")), cx))
+                    .child(self.protection_choice(source, "provider-pack",
+                        (self.text("パックを許可", "Allow pack"),
+                        self.text("このソフトにパックのアイコンをまとめて許可します。種類ごとの個別指定と常時保護は優先されます。", "Allow pack icons for this software. File type overrides and mandatory protection take priority.")), cx))
+                    .child(self.protection_choice(source, "provider-default",
+                        (self.text("全体に従う", "Global default"),
+                        self.text("基本設定を共通の保護設定へ戻します。個別指定は保持します。", "Use the global protection setting. File type overrides are kept.")), cx)));
                 let overrides = self.protection.provider_override_count(provider);
                 let mut tools = div().flex().flex_wrap().items_center().gap_3();
-                if overrides > 0 {
-                    let label = format!(
-                        "{}: {overrides}",
-                        self.text("個別設定", "File type overrides")
-                    );
-                    let notice = div()
-                        .id(SharedString::from(format!("provider-overrides-{provider}")))
-                        .role(Role::Status)
-                        .aria_label(label.clone())
-                        .text_sm()
-                        .child(label);
-                    #[cfg(feature = "test-support")]
-                    let notice = notice.test_support();
-                    tools = tools.child(notice);
-                }
                 let reset_source = source.clone();
                 tools = tools.child(
                     theme::button(SharedString::from(format!("provider-reset-{provider}")), cx)
                         .small()
-                        .self_start()
-                        .label(self.text("このソフトの設定を初期化…", "Reset software settings…"))
+                        .icon(gpui_kit::assets::IconName::RotateCcw)
+                        .accessibility_label(
+                            self.text("このソフトの設定を初期化", "Reset software settings"),
+                        )
+                        .tooltip(self.text("このソフトの設定を初期化…", "Reset software settings…"))
                         .disabled_elevated(
                             blocked
                                 || (overrides == 0
@@ -536,38 +585,9 @@ impl Manager {
         source: &ExistingIcon,
         cx: &mut Context<Self>,
     ) -> Div {
+        use gpui_kit::component::tag::Tag;
         let colors = cx.theme().colors;
         let extension = source.registration.extension.clone();
-        let original = self
-            .protection
-            .inspection
-            .previews
-            .as_ref()
-            .and_then(|p| p.paths.get(&extension))
-            .cloned();
-        let pack = self
-            .settings
-            .packs
-            .iter()
-            .find(|p| Some(&p.id) == self.protection.inspection.pack.as_ref())
-            .and_then(|p| {
-                let sample = sample_name(p, &extension)?;
-                p.theme.resolve(&sample).map(|p| p.to_path_buf())
-            });
-        let inherited = if extension.is_empty() {
-            source.always_protected || self.protection.draft.enabled
-        } else {
-            self.protection
-                .draft
-                .rules
-                .inherited_protection(source, self.protection.draft.enabled)
-        };
-        let inherited_path = if inherited {
-            original.clone()
-        } else {
-            pack.clone().or_else(|| original.clone())
-        };
-        let inherits_original = inherited || pack.is_none();
         let saved_rule = self
             .settings
             .icon_protection_rules
@@ -637,21 +657,20 @@ impl Manager {
             .child(saved_label);
         #[cfg(feature = "test-support")]
         let saved = saved.test_support();
+        let changed = saved_source.protect != source.protect
+            || saved_rule != self.protection.draft.rules.extensions.get(&extension);
         let results = div()
             .flex()
-            .flex_wrap()
             .items_center()
-            .gap_3()
-            .child(saved)
+            .gap_1()
             .child(self.protection_result(source, false, false, cx))
+            .child(
+                gpui_kit::component::Icon::new(gpui_kit::assets::IconName::ArrowRight)
+                    .size_4()
+                    .text_color(colors.muted_foreground),
+            )
             .child(self.protection_result(source, true, false, cx));
-        let mut area = div()
-            .mt_2()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .min_w_0()
-            .child(results);
+        let mut area = div().flex().flex_col().gap_2().min_w_0();
         if !self
             .protection
             .inspection
@@ -683,22 +702,102 @@ impl Manager {
             let notice = notice.test_support();
             area = area.child(notice);
         }
+        let choices = div()
+            .flex()
+            .flex_wrap()
+            .gap_1()
+            .child(self.protection_choice(
+                source,
+                "original",
+                (
+                    self.text("元のアイコン", "Original icon"),
+                    self.text(
+                        "元のアイコンを維持します（保護）",
+                        "Keep the original icon (protected)",
+                    ),
+                ),
+                cx,
+            ))
+            .child(self.protection_choice(
+                source,
+                "pack",
+                (
+                    self.text("パックを許可", "Allow pack"),
+                    self.text(
+                        "パックのアイコンへの変更を許可します",
+                        "Allow the icon pack to replace this icon",
+                    ),
+                ),
+                cx,
+            ))
+            .child(self.protection_choice(
+                source,
+                "default",
+                (
+                    if extension.is_empty() {
+                        self.text("全体に従う", "Global default")
+                    } else {
+                        self.text("基本に従う", "App default")
+                    },
+                    self.text(
+                        "個別設定を解除して基本設定に従います。",
+                        "Remove the file type override and follow the default.",
+                    ),
+                ),
+                cx,
+            ));
+        let extension_label = if extension.is_empty() {
+            self.text("拡張子なし", "No extension").to_owned()
+        } else {
+            format!(".{extension}")
+        };
         area = area.child(
-            div().flex().flex_wrap().gap_2()
-                .child(self.protection_preview(source, "original", original,
-                    (self.text("元のアイコン", "Original icon"),
-                    self.text("元のアイコンを維持します（保護）", "Keep the original icon (protected)"),
-                    self.text("元アイコンの見本を取得できません。専用の処理やファイル固有の画像は表示できない場合があります。", "Original preview unavailable. Dynamic handlers and per-file images may not provide a preview.")), cx))
-                .child(self.protection_preview(source, "pack", pack,
-                    (self.text("パックのアイコンを許可", "Allow pack icons"),
-                    self.text("パックのアイコンへの変更を許可します", "Allow the icon pack to replace this icon"),
-                    self.text("この種類に対応するパックの見本がありません。未対応のファイルには元の表示を使用します。", "No representative pack icon is available. Unsupported files keep their original appearance.")), cx))
-                .child(self.protection_preview(source, "default", inherited_path,
-                    (if extension.is_empty() { self.text("全体設定に従う", "Use global setting") } else { self.text("基本設定に従う", "Use software setting") },
-                    if inherits_original { self.text("個別設定を解除して基本設定に従います。結果は元のアイコンです。", "Remove the file type override. The inherited result keeps the original icon.") }
-                    else { self.text("個別設定を解除して基本設定に従います。結果はパックのアイコンです。", "Remove the file type override. The inherited result uses the pack icon.") },
-                    self.text("継承結果の見本を取得できません。", "Inherited preview unavailable.")), cx))
+            div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap_3()
+                .when(self.screen == Screen::Protection, |area| {
+                    area.child(
+                        div()
+                            .min_w_32()
+                            .flex_1()
+                            .flex()
+                            .items_center()
+                            .flex_wrap()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(extension_label),
+                            )
+                            .when(source.needs_review, |row| {
+                                row.child(
+                                    Tag::warning()
+                                        .small()
+                                        .child(self.text("要確認", "Needs review")),
+                                )
+                            })
+                            .when(source.always_protected, |row| {
+                                row.child(
+                                    Tag::secondary()
+                                        .small()
+                                        .child(self.text("常に保護", "Always protected")),
+                                )
+                            })
+                            .when(changed, |row| {
+                                row.child(
+                                    Tag::info().small().child(self.text("変更あり", "Changed")),
+                                )
+                            }),
+                    )
+                })
+                .child(results)
+                .child(choices),
         );
+        if self.protection.presentation.details || self.screen == Screen::Targets {
+            area = area.child(saved);
+        }
         if source.needs_review {
             area = area.child(div().text_sm().text_color(colors.warning_foreground).child(
                 self.text(
@@ -707,20 +806,25 @@ impl Manager {
                 ),
             ));
         }
+        if source.always_protected {
+            area = area.child(div().text_sm().text_color(colors.muted_foreground).child(
+                self.text(
+                    "常に保護する種類と関連付けを共有しているため、元のアイコンを維持します。",
+                    "This type shares a protected association, so its original icon is kept.",
+                ),
+            ));
+        }
         area
     }
-    fn protection_preview(
+    fn protection_choice(
         &self,
         source: &ExistingIcon,
         kind: &str,
-        path: Option<std::path::PathBuf>,
-        copy: (&'static str, &'static str, &'static str),
+        copy: (&'static str, &'static str),
         cx: &mut Context<Self>,
     ) -> AnyElement {
         use gpui_kit::assets::IconName;
-        use gpui_kit::component::Icon;
-        let colors = cx.theme().colors;
-        let (title, outcome, fallback) = copy;
+        let (title, outcome) = copy;
         let provider_scope = kind.starts_with("provider-");
         let kind = kind.strip_prefix("provider-").unwrap_or(kind);
         let extension = &source.registration.extension;
@@ -754,7 +858,8 @@ impl Manager {
                     }),
             }
         } else {
-            self.protection
+            let rule = self
+                .protection
                 .draft
                 .rules
                 .extensions
@@ -772,42 +877,18 @@ impl Manager {
                                 .and_then(|rules| rules.get(extension))
                         })
                         .flatten()
-                })
-                .filter(|rule| rule.fingerprint == source.fingerprint)
-                .map(|rule| rule.protect)
-                == choice
+                });
+            match rule {
+                Some(rule) if rule.fingerprint != source.fingerprint => false,
+                Some(rule) => choice == Some(rule.protect),
+                None => choice.is_none(),
+            }
         };
         let blocked = self.operation.busy()
             || self.protection.inspection.loading
             || self.protection.inspection.error.is_some()
             || (!provider_scope && source.always_protected);
-        let description = outcome;
-        let tip = if path.is_none() && self.protection.inspection.previews_loading {
-            format!(
-                "{description}\n{}",
-                self.text("アイコンの見本を読み込み中…", "Loading icon previews…")
-            )
-        } else if path.is_some() {
-            description.to_owned()
-        } else {
-            format!("{description}\n{fallback}")
-        };
-        let mut image = div().size_8().opacity(if selected { 1. } else { 0.35 });
-        if let Some(path) = path {
-            image = image.child(crate::icon_preview::preview(path, rems(2.)));
-        } else if self.protection.inspection.previews_loading {
-            image = image.child(super::Spinner::new().small());
-        } else {
-            image = image.child(
-                Icon::new(if provider_scope && kind == "pack" {
-                    IconName::Package
-                } else {
-                    IconName::TriangleAlert
-                })
-                .size_8()
-                .text_color(colors.muted_foreground),
-            );
-        }
+        let tip = outcome;
         let row = source.clone();
         let id = if provider_scope {
             format!("provider-{kind}-{}", display_group(source))
@@ -815,53 +896,15 @@ impl Manager {
             format!("{kind}-icon-{extension}")
         };
         let preview = theme::button(SharedString::from(id), cx)
-            .h_auto()
+            .small()
+            .w(rems(10.))
+            .min_w(rems(10.))
             .toggled(selected)
             .selected(selected)
             .disabled_elevated(blocked)
             .accessibility_label(format!("{title}: {tip}"))
-            .w_40()
-            .min_w_40()
-            .flex_shrink_0()
-            .p_3()
-            .rounded_md()
-            .border_1()
-            .border_color(if selected {
-                colors.primary
-            } else {
-                colors.border
-            })
-            .flex()
-            .flex_col()
-            .gap_2()
-            .child(
-                div()
-                    .w_full()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(colors.muted_foreground)
-                            .child(title),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_between()
-                            .h_8()
-                            .child(image)
-                            .child(div().size_4().when(selected, |v| {
-                                v.child(
-                                    Icon::new(IconName::Check)
-                                        .size_4()
-                                        .text_color(colors.primary),
-                                )
-                            })),
-                    ),
-            )
+            .label(title)
+            .when(selected, |button| button.icon(IconName::Check))
             .tooltip(tip)
             .on_click(cx.listener(move |this, _, _, cx| {
                 if this.operation.busy()
@@ -955,7 +998,7 @@ impl Manager {
                 .confirm()
                 .cancel_text(cancel)
                 .ok_text(reset)
-                .ok_variant(ButtonVariant::Danger)
+                .ok_variant(ButtonVariant::Primary)
                 .on_ok(move |_, _, cx| {
                     let _ = owner.update(cx, |this, cx| {
                         if !this.operation.busy()

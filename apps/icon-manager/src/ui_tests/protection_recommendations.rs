@@ -39,15 +39,11 @@ fn recommended_in_child(cx: &mut TestAppContext) {
     .unwrap();
     cx.run_until_parked();
     let inspection = cx.read(|cx| manager.read(cx).protection.inspection.revision);
-    // 狭幅でも六つの表示を一つの選択欄から選べ、保存帯を見失わない。
+    // 狭幅でも変更内容へ切り替えられ、保存帯を見失わない。
     cx.simulate_window_resize(window, size(px(640.), px(640.)));
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        w.click("protection-view-select", cx);
-        for _ in 0..5 {
-            w.press("down", cx);
-        }
-        w.press("enter", cx);
+        w.click("protection-view-changes", cx);
     })
     .unwrap();
     cx.run_until_parked();
@@ -58,30 +54,21 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         assert!(save.visible() && save.bounds().bottom() <= w.viewport_size().height);
         w.click("protection-save", cx);
         assert!(!manager.read(cx).operation.busy());
-        w.click("protection-view-select", cx);
-        for _ in 0..5 {
-            w.press("up", cx);
-        }
-        w.press("enter", cx);
+        w.click("protection-edit", cx);
     })
     .unwrap();
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        w.click("protection-view-select", cx);
-        for _ in 0..3 {
-            w.press("down", cx);
-        }
-        w.press("enter", cx);
+        super::protection_filter(w, 3, cx);
     })
     .unwrap();
     cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);
-        assert_eq!(w.find("protection-view-select").value(), Some("要確認"));
+        assert!(w.find("protection-show-all").visible());
         w.click("protection-show-all", cx);
         w.render_frame(cx);
-        assert_eq!(w.find("protection-view-select").value(), Some("すべて"));
         assert!(w.find("protection-row-").visible());
     })
     .unwrap();
@@ -134,6 +121,11 @@ fn recommended_in_child(cx: &mut TestAppContext) {
         cx.read(|cx| manager.read(cx).protection.draft.rules.clone()),
         rules
     );
+    cx.update_window(window, |_, w, cx| {
+        super::protection_menu(w, "protection-more", 0, cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
     cx.update_window(window, |_, w, cx| {
         super::protection_sources::reveal(w, "original-icon-mts", cx);
         w.click("original-icon-mts", cx);
@@ -414,7 +406,7 @@ fn recommended_in_child(cx: &mut TestAppContext) {
             cx.notify();
         });
         w.render_frame(cx);
-        w.click("protection-planned", cx);
+        super::protection_filter(w, 0, cx);
         w.render_frame(cx);
         w.click("protection-toggle", cx);
         w.render_frame(cx);

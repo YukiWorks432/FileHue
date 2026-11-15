@@ -18,6 +18,27 @@ use gpui_kit::component::theme::{ActiveTheme, ThemeMode};
 use gpui_kit::test::TestWindowExt;
 use gpui_kit::{AppContext, Bounds, TestAppContext, WindowBounds, WindowOptions, px, size};
 
+fn protection_menu(
+    window: &mut gpui_kit::Window,
+    button: &'static str,
+    index: usize,
+    cx: &mut gpui_kit::App,
+) {
+    window.render_frame(cx);
+    window.click(button, cx);
+    window.render_frame(cx);
+    window.within("popup-menu").click(index, cx);
+    window.render_frame(cx);
+}
+
+fn protection_filter(window: &mut gpui_kit::Window, index: usize, cx: &mut gpui_kit::App) {
+    if window.try_find("protection-filter").is_none() {
+        window.click("protection-edit", cx);
+        window.render_frame(cx);
+    }
+    protection_menu(window, "protection-filter", index, cx);
+}
+
 fn select_target_filter(window: gpui_kit::AnyWindowHandle, index: usize, cx: &mut TestAppContext) {
     cx.update_window(window, |_, w, cx| {
         w.render_frame(cx);

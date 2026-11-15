@@ -482,15 +482,7 @@ fn provider_reset_visual_probe() {
                             });
                             w.resize(size(px(width), px(height)));
                             w.render_frame(cx);
-                            if w.try_find("protection-planned").is_some() {
-                                w.click("protection-planned", cx);
-                            } else {
-                                w.click("protection-view-select", cx);
-                                for _ in 0..5 {
-                                    w.press("up", cx);
-                                }
-                                w.press("enter", cx);
-                            }
+                            super::protection_filter(w, 0, cx);
                             w.render_frame(cx);
                             w.scroll(
                                 "protection-rows",
@@ -551,16 +543,7 @@ fn provider_reset_visual_probe() {
                                     }
                                     "reset" => w.within("dialog").click("ok", cx),
                                     "filtered" => {
-                                        if w.try_find("protection-protected").is_some() {
-                                            w.click("protection-protected", cx);
-                                        } else {
-                                            w.click("protection-view-select", cx);
-                                            for _ in 0..5 {
-                                                w.press("up", cx);
-                                            }
-                                            w.press("down", cx);
-                                            w.press("enter", cx);
-                                        }
+                                        super::protection_filter(w, 1, cx);
                                         w.scroll(
                                             "protection-rows",
                                             gpui_kit::ScrollDelta::Pixels(gpui_kit::point(
@@ -1346,30 +1329,48 @@ fn extensionless_protection_visual_probe() {
                     window
                         .update(cx, |_, w, cx| {
                             w.render_frame(cx);
+                            w.click("provider-toggle-extensionless", cx);
+                            w.render_frame(cx);
                             w.press("home", cx);
                             w.render_frame(cx);
                             w.render_to_image()
                                 .unwrap()
                                 .save(output.join(format!("{name}-protected.png")))
                                 .unwrap();
-                            w.click("protection-collapse-all", cx);
+                            w.click("provider-toggle-extensionless", cx);
                             w.render_frame(cx);
                             assert!(w.try_find("protection-extensionless-scope").is_none());
                             w.render_to_image()
                                 .unwrap()
                                 .save(output.join(format!("{name}-collapsed.png")))
                                 .unwrap();
-                            w.click("protection-expand-all", cx);
+                            w.click("provider-toggle-extensionless", cx);
                             w.render_frame(cx);
                             super::protection_sources::reveal(w, "pack-icon-", cx);
                             w.click("pack-icon-", cx);
                             w.render_frame(cx);
                             assert!(w.find("protection-back").visible());
+                        })
+                        .unwrap();
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(400))
+                        .await;
+                    window
+                        .update(cx, |_, w, cx| {
+                            w.render_frame(cx);
                             w.render_to_image()
                                 .unwrap()
                                 .save(output.join(format!("{name}-allowed.png")))
                                 .unwrap();
-                            w.click("protection-details", cx);
+                            super::protection_menu(w, "protection-more", 2, cx);
+                            w.render_frame(cx);
+                        })
+                        .unwrap();
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(150))
+                        .await;
+                    window
+                        .update(cx, |_, w, cx| {
                             w.render_frame(cx);
                             super::protection_sources::reveal(
                                 w,
@@ -1458,11 +1459,14 @@ fn protection_visual_probe() {
                 cx.background_executor().timer(std::time::Duration::from_millis(400)).await;
                 window.update(cx, |_, w, cx| {
                     w.render_frame(cx);
-                    if details { w.click("protection-details", cx); w.render_frame(cx); }
+                    if details { super::protection_menu(w, "protection-more", 2, cx); w.render_frame(cx); }
                     w.render_to_image().unwrap().save(output.join(format!("{name}.png"))).unwrap();
                     let original = w.find("original-icon-document-0").bounds();
                     let pack = w.find("pack-icon-document-0").bounds();
                     assert_eq!(original.size.width, pack.size.width, "代替画像とパック画像の列幅を揃えること");
+                    let before = w.find("protection-preview-image-current-document-0").bounds();
+                    let after = w.find("protection-preview-image-after-document-0").bounds();
+                    assert_eq!(before.top(), after.top(), "見本画像の高さを揃えること");
                     // 狭い画面では欄が画面外になるため、通常幅でツールチップを確認する。
                     if width >= 1000. { w.hover("original-icon-document-0", cx); }
                 }).unwrap();
@@ -1474,11 +1478,11 @@ fn protection_visual_probe() {
                         w.hover("protection-back", cx);
                         w.render_frame(cx);
                     }
-                    w.click("protection-collapse-all", cx);
+                    w.click("provider-toggle-module:windows-shell", cx);
                     w.render_frame(cx);
                     assert!(w.try_find("original-icon-document-0").is_none());
                     w.render_to_image().unwrap().save(output.join(format!("{name}-collapsed.png"))).unwrap();
-                    w.click("protection-expand-all", cx);
+                    w.click("provider-toggle-module:windows-shell", cx);
                     w.render_frame(cx);
                     for _ in 0..100 {
                         if w.try_find("protection-row-document-135").is_some_and(|row| row.visible() && row.bounds().bottom() <= w.find("protection-rows").bounds().bottom()) { break; }
@@ -1490,7 +1494,7 @@ fn protection_visual_probe() {
                     w.render_to_image().unwrap().save(output.join(format!("{name}-bottom.png"))).unwrap();
                     w.press("home", cx);
                     w.render_frame(cx);
-                    if details { w.click("protection-details", cx); }
+                    if details { super::protection_menu(w, "protection-more", 2, cx); }
                 }).unwrap();
             }
             for (lang, mode, width, height, font) in [
@@ -1520,4 +1524,327 @@ fn protection_visual_probe() {
             cx.update(|cx| cx.quit());
         }).detach();
     });
+}
+
+#[test]
+fn protection_search_and_discard_in_isolated_profile() {
+    let profile = tempfile::tempdir().unwrap();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--ignored",
+            "--exact",
+            "ui_tests::target_visual::protection_redesign_visual_probe",
+            "--nocapture",
+        ])
+        .env("LOCALAPPDATA", profile.path())
+        .env("WFI_GUI_PROBE", "1")
+        .env("WFI_VISUAL_OUTPUT", profile.path().join("screenshots"))
+        .test_output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+#[ignore = "隔離プロファイルで保護画面の各状態を描画する"]
+fn protection_redesign_visual_probe() {
+    assert_eq!(std::env::var("WFI_GUI_PROBE").as_deref(), Ok("1"));
+    let output = std::path::PathBuf::from(std::env::var("WFI_VISUAL_OUTPUT").unwrap());
+    assert!(output.is_absolute() && home().unwrap().starts_with(output.parent().unwrap()));
+    std::fs::create_dir_all(&output).unwrap();
+    let registry = super::target_protection::fixture();
+    let settings = load().unwrap();
+    let stored_before = serde_json::to_value(&settings).unwrap();
+    let mut sources = file_icons_windows::inspect_existing_icons(&settings.packs[0], &settings)
+        .unwrap()
+        .into_iter()
+        .filter(|row| matches!(row.registration.extension.as_str(), "mts" | "ts" | "m2ts"))
+        .collect::<Vec<_>>();
+    for source in &mut sources {
+        source.provider_id = Some("visual:media".into());
+        source.provider_name = Some("Example Media Player / 日本語の長いソフト名".into());
+    }
+    assert_eq!(sources.len(), 3);
+    drop(registry);
+    application()
+        .with_assets(crate::ui_assets::Assets)
+        .run(move |cx| {
+            gpui_kit::init(cx);
+            let (window, manager) =
+                gpui_kit::open_window(WindowOptions::default(), cx, Manager::open).unwrap();
+            window
+                .update(cx, |_, w, cx| {
+                    manager.update(cx, |this, cx| {
+                        let guard = this._guard.take();
+                        this.settings.active = Some(this.settings.packs[0].id.clone());
+                        this.open_protection(w, cx);
+                        this._guard = guard;
+                        this.protection.visual_applied(&sources);
+                        this.protection.visual_sources(sources.clone());
+                        this.accept_protection_sources(sources.clone());
+                        this.refresh_protection_policy(cx);
+                    });
+                    theme::apply(ThemeMode::Dark, cx);
+                    w.resize(size(px(1120.), px(780.)));
+                    w.render_frame(cx);
+                })
+                .unwrap();
+            cx.spawn(async move |cx| {
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(800))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        w.render_frame(cx);
+                        assert!(w.find("provider-toggle-visual:media").visible());
+                        assert!(w.try_find("pack-icon-mts").is_none());
+                        w.render_to_image()
+                            .unwrap()
+                            .save(output.join("overview-ja-dark.png"))
+                            .unwrap();
+                        w.click("provider-toggle-visual:media", cx);
+                        w.render_frame(cx);
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(400))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        w.render_frame(cx);
+                        w.render_to_image()
+                            .unwrap()
+                            .save(output.join("expanded-ja-dark.png"))
+                            .unwrap();
+                        super::protection_sources::reveal(w, "pack-icon-mts", cx);
+                        w.click("pack-icon-mts", cx);
+                        w.render_frame(cx);
+                        assert!(
+                            manager
+                                .read(cx)
+                                .protection
+                                .draft
+                                .rules
+                                .extensions
+                                .contains_key("mts")
+                        );
+                        w.render_to_image()
+                            .unwrap()
+                            .save(output.join("changed-ja-dark.png"))
+                            .unwrap();
+                        w.click("protection-view-changes", cx);
+                        w.render_frame(cx);
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(400))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        w.render_frame(cx);
+                        w.render_to_image()
+                            .unwrap()
+                            .save(output.join("changes-ja-dark.png"))
+                            .unwrap();
+                    })
+                    .unwrap();
+                for (name, language, mode, width, height, font) in [
+                    ("ja-narrow", "ja", ThemeMode::Dark, 640., 640., 18.),
+                    ("en-narrow-light", "en", ThemeMode::Light, 640., 640., 18.),
+                    (
+                        "en-standard-light",
+                        "en",
+                        ThemeMode::Light,
+                        1120.,
+                        780.,
+                        16.,
+                    ),
+                    ("ja-standard-large", "ja", ThemeMode::Dark, 1120., 780., 18.),
+                ] {
+                    window
+                        .update(cx, |_, w, cx| {
+                            theme::apply(mode, cx);
+                            gpui_kit::component::theme::Theme::update(cx, |theme| {
+                                theme.font_size = px(font)
+                            });
+                            manager.update(cx, |this, cx| {
+                                this.settings.language = language.into();
+                                cx.notify();
+                            });
+                            w.resize(size(px(width), px(height)));
+                            w.render_frame(cx);
+                            if w.try_find("protection-edit").is_some() {
+                                w.click("protection-edit", cx);
+                            }
+                            w.render_frame(cx);
+                        })
+                        .unwrap();
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(500))
+                        .await;
+                    window
+                        .update(cx, |_, w, cx| {
+                            w.render_frame(cx);
+                            w.render_to_image()
+                                .unwrap()
+                                .save(output.join(format!("{name}.png")))
+                                .unwrap();
+                        })
+                        .unwrap();
+                }
+                window
+                    .update(cx, |_, w, cx| {
+                        w.render_frame(cx);
+                        super::protection_menu(w, "protection-more", 1, cx);
+                        assert!(w.try_find("pack-icon-mts").is_none());
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(100))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        super::protection_menu(w, "protection-more", 0, cx);
+                        w.render_frame(cx);
+                        assert!(w.find("pack-icon-mts").visible());
+                        w.click("protection-search", cx);
+                        w.input(".mts", cx);
+                        w.render_frame(cx);
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(100))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        w.render_frame(cx);
+                        assert!(w.try_find("protection-row-mts").is_some());
+                        assert!(w.try_find("protection-row-ts").is_none());
+                        w.click("provider-toggle-visual:media", cx);
+                        w.render_frame(cx);
+                        assert!(w.try_find("pack-icon-mts").is_none());
+                        manager.update(cx, |this, cx| {
+                            let refreshed = this.protection.inspection.sources.clone();
+                            this.accept_protection_sources(refreshed);
+                            this.refresh_protection_policy(cx);
+                        });
+                        w.render_frame(cx);
+                        assert!(w.find("pack-icon-mts").visible());
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(100))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        super::protection_menu(w, "protection-filter", 3, cx);
+                        assert!(w.find("protection-show-all").visible());
+                        w.click("protection-show-all", cx);
+                        w.render_frame(cx);
+                        assert!(w.try_find("protection-row-ts").is_some());
+                        w.click("protection-discard", cx);
+                        w.render_frame(cx);
+                        assert!(
+                            !manager
+                                .read(cx)
+                                .protection
+                                .draft
+                                .rules
+                                .extensions
+                                .contains_key("mts")
+                        );
+                        manager.update(cx, |this, cx| {
+                            let original =
+                                this.protection.inspection.source("mts").unwrap().clone();
+                            this.protection
+                                .draft
+                                .rules
+                                .set_extension(&original, Some(false));
+                            this.settings.icon_protection_rules =
+                                this.protection.draft.rules.clone();
+                            let mut changed = this.protection.inspection.sources.clone();
+                            changed
+                                .iter_mut()
+                                .find(|row| row.registration.extension == "mts")
+                                .unwrap()
+                                .fingerprint
+                                .push_str("-changed");
+                            this.accept_protection_sources(changed);
+                            this.refresh_protection_policy(cx);
+                            let row = this.protection.inspection.source("mts").unwrap();
+                            assert!(row.needs_review && row.protect);
+                        });
+                        w.render_frame(cx);
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(150))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        super::protection_menu(w, "protection-filter", 3, cx);
+                        w.render_frame(cx);
+                        for id in ["original-icon-mts", "pack-icon-mts", "default-icon-mts"] {
+                            assert_eq!(w.find(id).checked(), Some(false));
+                        }
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(150))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        w.render_frame(cx);
+                        w.render_to_image()
+                            .unwrap()
+                            .save(output.join("review-ja-dark.png"))
+                            .unwrap();
+                    })
+                    .unwrap();
+                window
+                    .update(cx, |_, w, cx| {
+                        w.resize(size(px(1120.), px(780.)));
+                        manager.update(cx, |this, cx| {
+                            this.settings.language = "ja".into();
+                            this.protection.inspection.loading = true;
+                            cx.notify();
+                        });
+                        w.render_frame(cx);
+                        assert!(w.find("protection-back").visible());
+                        w.render_to_image()
+                            .unwrap()
+                            .save(output.join("loading-ja-dark.png"))
+                            .unwrap();
+                        manager.update(cx, |this, cx| {
+                            this.protection.inspection.loading = false;
+                            this.protection.inspection.error = Some("隔離試験のエラー".into());
+                            cx.notify();
+                        });
+                        w.render_frame(cx);
+                        assert!(w.find("protection-error-detail").visible());
+                        w.render_to_image()
+                            .unwrap()
+                            .save(output.join("error-ja-dark.png"))
+                            .unwrap();
+                        manager.update(cx, |this, cx| {
+                            this.protection.inspection.loading = true;
+                            cx.notify();
+                        });
+                        w.render_frame(cx);
+                        w.click("protection-back", cx);
+                        assert!(manager.read(cx).screen != crate::Screen::Protection);
+                    })
+                    .unwrap();
+                assert_eq!(
+                    serde_json::to_value(load().unwrap()).unwrap(),
+                    stored_before
+                );
+                cx.update(|cx| cx.quit());
+            })
+            .detach();
+        });
 }
