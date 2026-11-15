@@ -17,6 +17,34 @@ fn fixture() -> tempfile::TempDir {
 }
 
 #[test]
+fn imports_clipped_filter_as_icon() {
+    let root = fixture();
+    let cache = tempfile::tempdir().unwrap();
+    fs::write(
+        root.path().join("generic.svg"),
+        include_bytes!("../../../test-support/fixtures/clipped-offset.svg"),
+    )
+    .unwrap();
+    let pack = import(root.path(), "test", cache.path()).unwrap();
+    let icon = ico::IconDir::read(fs::File::open(pack.theme.resolve("code.rs").unwrap()).unwrap())
+        .unwrap();
+    let image = icon
+        .entries()
+        .iter()
+        .find(|entry| entry.width() == 16)
+        .unwrap()
+        .decode()
+        .unwrap();
+    let pixels = image.rgba_data();
+    assert_eq!(
+        &pixels[(8 * 16 + 9) * 4..(8 * 16 + 10) * 4],
+        &[255, 0, 0, 255]
+    );
+    assert_eq!(&pixels[(8 * 16 + 5) * 4..(8 * 16 + 6) * 4], &[0, 0, 0, 0]);
+    assert_eq!(&pixels[(8 * 16 + 13) * 4..(8 * 16 + 14) * 4], &[0, 0, 0, 0]);
+}
+
+#[test]
 fn deeply_nested_json5_is_rejected_for_packages_and_themes() {
     for separator in ["\n", "\r", "\u{2028}", "\u{2029}"] {
         let root = fixture();

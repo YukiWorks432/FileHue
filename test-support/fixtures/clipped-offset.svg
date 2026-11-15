@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+  <defs>
+    <clipPath id="clip"><rect x="8" y="0" width="4" height="16"/></clipPath>
+    <filter id="shift" filterUnits="userSpaceOnUse" x="0" y="0" width="16" height="16">
+      <feOffset dx="4" dy="0"/>
+    </filter>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect x="4" y="4" width="8" height="8" fill="#ff0000" filter="url(#shift)"/>
+  </g>
+</svg>
