@@ -108,7 +108,13 @@ impl Manager {
             .flex_col()
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                 if event.keystroke.key == "escape" {
-                    this.navigate_back(window, cx);
+                    if this.screen == Screen::Packs && !this.browsing && this.dll_update_details {
+                        this.dll_update_details = false;
+                        cx.notify();
+                        cx.stop_propagation();
+                    } else {
+                        this.navigate_back(window, cx);
+                    }
                 }
             }))
     }
@@ -125,11 +131,17 @@ impl Manager {
         self.operation.clear_result();
         if self.screen == Screen::Thumbnails {
             self.screen = self.thumbnails.return_to.take().unwrap_or(Screen::Packs);
+            if self.screen == Screen::Packs && !self.browsing {
+                self.refresh_dll_update(cx);
+            }
             self.focus.focus(window, cx);
             cx.notify();
         } else if self.screen == Screen::About {
             if self.about.license_text.take().is_none() {
                 self.screen = self.about.return_to.take().unwrap_or(Screen::Packs);
+                if self.screen == Screen::Packs && !self.browsing {
+                    self.refresh_dll_update(cx);
+                }
             }
             self.about.scroll.set_offset(point(px(0.), px(0.)));
             self.focus.focus(window, cx);
@@ -395,7 +407,11 @@ impl Manager {
                 theme::button("protection-open", cx)
                     .small()
                     .icon(IconName::ShieldCheck)
-                    .label(self.text("アイコンの保護", "Icon protection"))
+                    .when(!compact, |b| {
+                        b.label(self.text("アイコンの保護", "Icon protection"))
+                    })
+                    .accessibility_label(self.text("アイコンの保護", "Icon protection"))
+                    .tooltip(self.text("アイコンの保護", "Icon protection"))
                     .selected(self.screen == Screen::Protection)
                     .when(self.screen == Screen::Protection, |b| b.primary())
                     .disabled_elevated(self.operation.busy() || !self.valid)
@@ -413,7 +429,19 @@ impl Manager {
                     .small()
                     .icon(IconName::TriangleAlert)
                     .when(self.conflict_attention, |b| b.warning())
-                    .label(if self.conflict_attention {
+                    .when(!compact, |b| {
+                        b.label(if self.conflict_attention {
+                            self.text("競合あり・確認", "Conflicts detected · Review")
+                        } else {
+                            self.text("競合を確認", "Review conflicts")
+                        })
+                    })
+                    .accessibility_label(if self.conflict_attention {
+                        self.text("競合あり・確認", "Conflicts detected · Review")
+                    } else {
+                        self.text("競合を確認", "Review conflicts")
+                    })
+                    .tooltip(if self.conflict_attention {
                         self.text("競合あり・確認", "Conflicts detected · Review")
                     } else {
                         self.text("競合を確認", "Review conflicts")
@@ -435,9 +463,12 @@ impl Manager {
             .child(
                 theme::button("thumbnails-open", cx)
                     .small()
-                    .ml_4()
+                    .when(!compact, |b| b.ml_4())
                     .icon(IconName::FileImage)
-                    .label(self.text("ファイルのプレビュー", "File previews"))
+                    .when(!compact, |b| {
+                        b.label(self.text("ファイルのプレビュー", "File previews"))
+                    })
+                    .accessibility_label(self.text("ファイルのプレビュー", "File previews"))
                     .tooltip(self.text(
                         "エクスプローラーで内容を表示するファイル形式を選びます。",
                         "Choose file types to preview in Explorer.",
@@ -453,15 +484,27 @@ impl Manager {
             )
     }
 
-    fn registration(&self, cx: &mut Context<Self>) -> Div {
+    fn registration(&self, compact: bool, cx: &mut Context<Self>) -> Div {
         let colors = cx.theme().colors;
+        let review = self.dll_update.requires_recovery();
         let active = self
             .settings
             .active
             .as_ref()
             .and_then(|id| self.settings.packs.iter().find(|p| &p.id == id));
-        let label = if let Some(pack) = active {
+        let label = if let Some(pack) = active
+            && review
+        {
+            format!(
+                "{} · {}",
+                self.text("登録を要確認", "Registration needs review"),
+                pack.label
+            )
+        } else if let Some(pack) = active {
             format!("{} · {}", self.text("適用中", "Applied"), pack.label)
+        } else if review {
+            self.text("登録を要確認", "Registration needs review")
+                .to_owned()
         } else if !self.settings.journal.is_empty() {
             self.text("復元が必要です", "Recovery needed").to_owned()
         } else {
@@ -480,7 +523,9 @@ impl Manager {
             .border_b_1()
             .border_color(colors.border)
             .child(
-                Icon::new(if active.is_some() {
+                Icon::new(if review {
+                    IconName::TriangleAlert
+                } else if active.is_some() {
                     IconName::Check
                 } else {
                     IconName::Monitor
@@ -492,7 +537,12 @@ impl Manager {
                 theme::button("restore", cx)
                     .small()
                     .icon(IconName::RotateCcw)
-                    .label(if self.valid {
+                    .when(!compact, |b| b.label(if self.valid {
+                        self.text("Windows標準に戻す", "Restore Windows defaults")
+                    } else {
+                        self.text("設定を退避して元に戻す", "Back up settings and restore")
+                    }))
+                    .accessibility_label(if self.valid {
                         self.text("Windows標準に戻す", "Restore Windows defaults")
                     } else {
                         self.text("設定を退避して元に戻す", "Back up settings and restore")
@@ -517,7 +567,15 @@ impl Manager {
 
     fn footer(&self, cx: &mut Context<Self>) -> Div {
         let colors = cx.theme().colors;
-        let message = self.operation.message(self.settings.language == "en");
+        let message = if self.screen == Screen::Packs
+            && !self.browsing
+            && self.operation.is_kind(Kind::UpdateIconDll)
+            && self.operation.failed()
+        {
+            String::new()
+        } else {
+            self.operation.message(self.settings.language == "en")
+        };
         let status = div()
             .id("status")
             .role(Role::Status)
@@ -727,7 +785,10 @@ impl Render for Manager {
         self.standard_root(cx)
             .child(self.header(cx))
             .child(self.toolbar(compact, cx))
-            .child(self.registration(cx))
+            .child(self.registration(compact, cx))
+            .when(!self.browsing, |root| {
+                root.child(self.dll_update_panel(compact, cx))
+            })
             .child(self.pack_heading(cx))
             .child(scroll)
             .child(self.footer(cx))

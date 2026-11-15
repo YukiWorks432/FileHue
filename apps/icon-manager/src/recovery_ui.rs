@@ -175,6 +175,9 @@ impl Manager {
             }
         } else {
             self.screen = self.recovery_return;
+            if self.screen == Screen::Packs && !self.browsing {
+                self.refresh_dll_update(cx);
+            }
             if let Some(focus) = self.recovery.previous_focus.take() {
                 focus.focus(window, cx);
             }

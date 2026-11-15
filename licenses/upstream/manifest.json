@@ -22,16 +22,16 @@
   },
   {
     "package": "gpui-kit",
-    "version": "0.7.3",
-    "file": "gpui-kit-0.7.3.txt",
-    "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/67265a36e260ffe03c5aaebdcd8d654dbf892eab/LICENSE-APACHE",
+    "version": "0.9.0",
+    "file": "gpui-kit-0.9.0.txt",
+    "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/7591a35eced761e3613c01e71ff04c10129dae1a/LICENSE-APACHE",
     "sha256": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811"
   },
   {
     "package": "gpui-kit-assets",
-    "version": "0.7.3",
-    "file": "gpui-kit-assets-0.7.3.txt",
-    "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/67265a36e260ffe03c5aaebdcd8d654dbf892eab/LICENSE-APACHE",
+    "version": "0.9.0",
+    "file": "gpui-kit-assets-0.9.0.txt",
+    "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/7591a35eced761e3613c01e71ff04c10129dae1a/LICENSE-APACHE",
     "sha256": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811"
   },
   {

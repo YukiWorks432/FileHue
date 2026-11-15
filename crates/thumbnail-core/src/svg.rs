@@ -177,6 +177,25 @@ mod tests {
     }
 
     #[test]
+    fn renders_clipped_filter_in_thumbnail() {
+        let svg = include_bytes!("../../../test-support/fixtures/clipped-offset.svg");
+        let image = render(&mut svg.as_slice(), 16).unwrap();
+        assert_eq!((image.width, image.height), (16, 16));
+        assert_eq!(
+            &image.rgba[(8 * 16 + 9) * 4..(8 * 16 + 10) * 4],
+            &[255, 0, 0, 255]
+        );
+        assert_eq!(
+            &image.rgba[(8 * 16 + 5) * 4..(8 * 16 + 6) * 4],
+            &[0, 0, 0, 0]
+        );
+        assert_eq!(
+            &image.rgba[(8 * 16 + 13) * 4..(8 * 16 + 14) * 4],
+            &[0, 0, 0, 0]
+        );
+    }
+
+    #[test]
     fn rejects_external_images_and_entities() {
         let external = br#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><image href="file:///does-not-exist.png" width="1" height="1"/></svg>"#;
         assert!(render(&mut external.as_slice(), 10).is_err());

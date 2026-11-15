@@ -34,7 +34,9 @@ mod shell_cleanup;
 pub use shell_cleanup::{ShellCleanupPending, cleanup_staged_shell};
 
 mod deployment;
-pub use deployment::{planned_thumbnail_shell, stage_shell, stage_thumbnail_shell};
+pub use deployment::{
+    planned_thumbnail_shell, shell_contents_equal, stage_shell, stage_thumbnail_shell,
+};
 
 pub mod conflict;
 mod icon_policy;

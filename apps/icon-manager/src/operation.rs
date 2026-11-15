@@ -12,6 +12,7 @@ pub enum Kind {
     Import,
     Download(&'static str),
     Apply,
+    UpdateIconDll,
     SaveTargets,
     SaveProtection,
     Restore,
@@ -50,6 +51,9 @@ impl Operation {
     pub fn running(&self, kind: Kind) -> bool {
         self.busy() && self.kind == kind
     }
+    pub fn is_kind(&self, kind: Kind) -> bool {
+        self.kind == kind
+    }
     pub fn failed(&self) -> bool {
         matches!(self.status(), Status::Error(..))
     }
@@ -72,6 +76,7 @@ impl Operation {
             Kind::Import => ("パックを取り込みました。", "Pack imported."),
             Kind::Download(_) => ("パックを取得しました。", "Pack downloaded."),
             Kind::Apply => ("アイコンパックを適用しました。", "Icon pack applied."),
+            Kind::UpdateIconDll => ("", ""),
             Kind::SaveTargets => ("適用対象の変更を保存しました。", "Target selection saved."),
             Kind::SaveProtection => (
                 "アイコンの保護設定を保存しました。",
@@ -150,6 +155,7 @@ impl Manager {
         if self.operation.busy() || (!self.valid && !can_recover) {
             return;
         }
+        self.dll_update_revision = self.dll_update_revision.wrapping_add(1);
         self.operation.begin(kind, progress);
         self.progress_refresh = self.operation.progress().map(|_| {
             // 画面更新だけを共有する。完了・画面破棄でTaskを落としてタイマーも止める。
@@ -200,6 +206,34 @@ impl Manager {
         cx: &mut Context<Self>,
     ) {
         let operation_error = result.as_ref().err().map(|error| format!("{error:#}"));
+        if kind == Kind::UpdateIconDll {
+            self.dll_update = match &result {
+                Ok(()) => crate::dll_update_ui::UpdateNotice::Complete,
+                Err(error) if error.is::<file_icons_windows::PreviousPackRestored>() => {
+                    crate::dll_update_ui::UpdateNotice::Restored(format!("{error:#}"))
+                }
+                Err(error)
+                    if matches!(
+                        error.downcast_ref::<file_icons_manager_service::IconDllFileMissing>(),
+                        Some(file_icons_manager_service::IconDllFileMissing::Bundled)
+                    ) =>
+                {
+                    crate::dll_update_ui::UpdateNotice::MissingSource(format!("{error:#}"))
+                }
+                Err(error)
+                    if matches!(
+                        error.downcast_ref::<file_icons_manager_service::IconDllFileMissing>(),
+                        Some(file_icons_manager_service::IconDllFileMissing::Registered)
+                    ) =>
+                {
+                    crate::dll_update_ui::UpdateNotice::MissingRegistered(format!("{error:#}"))
+                }
+                Err(error) => crate::dll_update_ui::UpdateNotice::NeedsReview {
+                    detail: format!("{error:#}"),
+                    recovery: true,
+                },
+            };
+        }
         let status = match result {
             Ok(()) => {
                 if kind == Kind::ResolveConflicts {
@@ -242,12 +276,21 @@ impl Manager {
                 };
                 self.operation
                     .finish(Status::Error(Failure::ReloadSettings, detail));
+                if kind == Kind::UpdateIconDll {
+                    self.dll_update = crate::dll_update_ui::UpdateNotice::NeedsReview {
+                        detail: format!("{error:#}"),
+                        recovery: true,
+                    };
+                }
             }
         }
         if kind == Kind::SaveProtection && !self.operation.failed() {
             self.protection.draft.enabled = self.settings.preserve_existing_icons;
             self.protection.draft.rules = self.settings.icon_protection_rules.clone();
             self.inspect_protection(cx);
+        }
+        if kind != Kind::UpdateIconDll && self.valid {
+            self.refresh_dll_update(cx);
         }
         cx.notify();
     }

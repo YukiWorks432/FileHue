@@ -67,7 +67,7 @@ fn valid(name: &str, bytes: &[u8]) {
     }
     let record: serde_json::Value =
         serde_json::from_slice(&fs::read(&pack.provenance).unwrap()).unwrap();
-    assert_eq!(record["conversion_revision"], 3);
+    assert_eq!(record["conversion_revision"], 4);
     // 再取得も同じ検証済みの出力を使い、キャッシュで不正な寸法を素通りさせない。
     assert_eq!(
         import(root.path(), "test", cache.path())

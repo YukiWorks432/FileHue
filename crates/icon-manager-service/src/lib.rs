@@ -100,6 +100,27 @@ pub struct ThumbnailStatus {
     pub group_errors: Vec<Option<String>>,
 }
 
+/// 保存済みのアイコン登録と、起動中のアプリに同梱されたDLLの照合結果。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IconDllUpdateStatus {
+    Inactive,
+    Current,
+    Available { pack_id: String, pack_label: String },
+}
+
+/// 更新に必要な配布物または登録先のDLLが見つからない。
+#[derive(Debug)]
+pub enum IconDllFileMissing {
+    Bundled,
+    Registered,
+}
+impl std::fmt::Display for IconDllFileMissing {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "icon Shell DLL is missing: {self:?}")
+    }
+}
+impl std::error::Error for IconDllFileMissing {}
+
 /// 適用前に確認する選択差分と、影響する登録の調査結果。
 #[derive(Debug, PartialEq, Eq, serde::Serialize)]
 pub struct ThumbnailSelectionPlan {
@@ -437,6 +458,97 @@ impl Manager {
             .parent()
             .context("executable parent missing")?
             .join("file_icons_shell.dll"))
+    }
+
+    /// 登録と保存記録を照合し、DLLの配置や登録変更をせずに更新要否を調べる。
+    pub fn icon_dll_update_status(&self) -> Result<IconDllUpdateStatus> {
+        self.icon_dll_update_status_for(&self.shell_source()?)
+    }
+
+    fn icon_dll_update_status_for(&self, source: &Path) -> Result<IconDllUpdateStatus> {
+        let settings = self.settings()?;
+        self.check_registration(&settings, false)?;
+        let key = format!(
+            "Software\\Classes\\CLSID\\{}\\InprocServer32",
+            file_icons_windows::CLSID_TEXT
+        );
+        if settings.journal.is_empty() {
+            ensure!(
+                file_icons_windows::UserRegistry.read(&key, "")?.is_none(),
+                Failure::Recovery
+            );
+            return Ok(IconDllUpdateStatus::Inactive);
+        }
+        let pack_id = settings.active.as_ref().context(Failure::Recovery)?;
+        let pack = settings
+            .packs
+            .iter()
+            .find(|pack| &pack.id == pack_id)
+            .context(Failure::NotFound)?;
+        ensure!(
+            settings
+                .selections
+                .get(pack_id)
+                .cloned()
+                .unwrap_or_default()
+                .any_enabled(&pack.theme),
+            "active icon pack has no enabled targets"
+        );
+        let change = settings
+            .journal
+            .iter()
+            .find(|change| change.key == key && change.name.is_empty())
+            .context("icon Shell registration missing from recovery record")?;
+        let value = &change.after;
+        ensure!(
+            value.kind == 1 && value.bytes.len() >= 2 && value.bytes.len() % 2 == 0,
+            "invalid icon Shell registration"
+        );
+        let words = value
+            .bytes
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+            .collect::<Vec<_>>();
+        ensure!(
+            words.last() == Some(&0) && !words[..words.len() - 1].contains(&0),
+            "invalid icon Shell registration"
+        );
+        let registered = String::from_utf16(&words[..words.len() - 1])?;
+        ensure!(
+            Path::new(&registered).is_absolute(),
+            "invalid icon Shell path"
+        );
+        ensure!(source.try_exists()?, IconDllFileMissing::Bundled);
+        ensure!(
+            Path::new(&registered).try_exists()?,
+            IconDllFileMissing::Registered
+        );
+        if file_icons_windows::shell_contents_equal(Path::new(&registered), source)? {
+            Ok(IconDllUpdateStatus::Current)
+        } else {
+            Ok(IconDllUpdateStatus::Available {
+                pack_id: pack_id.clone(),
+                pack_label: pack.label.clone(),
+            })
+        }
+    }
+
+    /// 保存済み設定と登録を再照合した後、同じパックを同梱DLLで再適用する。
+    pub fn update_icon_dll(&self) -> Result<()> {
+        let source = self.shell_source()?;
+        let IconDllUpdateStatus::Available { pack_id, .. } =
+            self.icon_dll_update_status_for(&source)?
+        else {
+            anyhow::bail!("icon Shell update is not available");
+        };
+        self.apply(&pack_id, &source)?;
+        ensure!(
+            self.icon_dll_update_status_for(&source)? == IconDllUpdateStatus::Current,
+            "icon Shell registration could not be verified after update"
+        );
+        Ok(())
     }
     pub fn language(&self, language: String) -> Result<()> {
         let mut settings = self.settings()?;

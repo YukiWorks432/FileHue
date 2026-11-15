@@ -17,6 +17,7 @@ use gpui_kit::{
 use std::path::PathBuf;
 mod about_ui;
 mod catalog_ui;
+mod dll_update_ui;
 mod icon_preview;
 mod library_ui;
 mod operation;
@@ -68,6 +69,9 @@ struct Manager {
     settings: Settings,
     pending: Option<(PathBuf, Vec<ThemeChoice>)>,
     operation: Operation,
+    dll_update: dll_update_ui::UpdateNotice,
+    dll_update_revision: u64,
+    dll_update_details: bool,
     progress_refresh: Option<Task<()>>,
     valid: bool,
     // 管理画面の同時起動による設定・復元記録の上書きを防ぐ。
@@ -145,6 +149,9 @@ impl Manager {
                     },
                     valid: true,
                     progress_refresh: None,
+                    dll_update: Default::default(),
+                    dll_update_revision: 0,
+                    dll_update_details: false,
                     _guard: guard,
                 }
             }
@@ -186,6 +193,9 @@ impl Manager {
                     )),
                     valid: false,
                     progress_refresh: None,
+                    dll_update: Default::default(),
+                    dll_update_revision: 0,
+                    dll_update_details: false,
                     _guard: guard,
                 }
             }
@@ -203,7 +213,8 @@ impl Manager {
         initial: InitialSettings,
     ) -> Entity<Self> {
         cx.new(|cx| {
-            let manager = Self::new(window, cx, initial);
+            let mut manager = Self::new(window, cx, initial);
+            manager.refresh_dll_update(cx);
             window.focus(&manager.focus, cx);
             manager
         })
