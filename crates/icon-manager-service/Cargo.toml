@@ -16,4 +16,4 @@ file-icons-catalog = { path = "../icon-catalog" }
 [dev-dependencies]
 file-icons-thumbnail-core = { path = "../thumbnail-core", default-features = false }
 tempfile = "3"
-windows-core = "0.62.2"
+windows-core = "0.100.0"
