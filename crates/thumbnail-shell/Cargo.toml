@@ -15,7 +15,7 @@ windows-future = "0.3.2"
 windows = { version = "0.62.2", features = ["Data_Pdf", "Foundation", "Storage_Streams", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Imaging", "Win32_Security", "Win32_System_Com", "Win32_System_LibraryLoader", "Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_System_WinRT", "Win32_UI_Shell", "Win32_UI_Shell_PropertiesSystem"] }
 
 [dev-dependencies]
-base64 = "0.22"
+base64 = "0.23"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 tempfile = "3"
 xtask = { path = "../../xtask" }
