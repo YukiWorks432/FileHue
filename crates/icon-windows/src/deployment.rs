@@ -36,6 +36,11 @@ pub fn planned_thumbnail_shell(source: &Path) -> Result<PathBuf> {
     planned_in_store(source, "thumbnail-shell", "file_icons_thumbnail_shell.dll")
 }
 
+/// 配置や登録を変更せず、二つのアイコン用DLLを内容で照合する。
+pub fn shell_contents_equal(left: &Path, right: &Path) -> Result<bool> {
+    Ok(hash_file(left)? == hash_file(right)?)
+}
+
 fn planned_in_store(source: &Path, store_name: &str, filename: &str) -> Result<PathBuf> {
     let length = fs::metadata(source)?.len();
     ensure!(
@@ -68,7 +73,15 @@ fn existing_directory(path: &Path) -> Result<PathBuf> {
 }
 
 fn hash_file(path: &Path) -> Result<Vec<u8>> {
-    let mut file = fs::File::open(path)?;
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ.0)
+        .open(path)?;
+    let metadata = file.metadata()?;
+    ensure!(
+        metadata.is_file() && metadata.len() > 0 && metadata.len() <= 512 * 1024 * 1024,
+        "invalid Shell DLL source"
+    );
     let mut hash = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];
     let mut length = 0u64;
@@ -159,6 +172,24 @@ mod tests {
             stage_in(&source, &store, "file_icons_thumbnail_shell.dll").unwrap(),
             thumbnail
         );
+    }
+
+    #[test]
+    fn comparing_shell_contents_does_not_deploy_or_modify_files() {
+        let root = tempfile::tempdir().unwrap();
+        let first = root.path().join("first.dll");
+        let second = root.path().join("second.dll");
+        fs::write(&first, b"same module").unwrap();
+        fs::write(&second, b"same module").unwrap();
+        assert!(shell_contents_equal(&first, &second).unwrap());
+        fs::write(&second, b"other module").unwrap();
+        assert!(!shell_contents_equal(&first, &second).unwrap());
+        assert_eq!(fs::read(&first).unwrap(), b"same module");
+        assert_eq!(fs::read(&second).unwrap(), b"other module");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 2);
+        fs::write(&second, []).unwrap();
+        assert!(shell_contents_equal(&first, &second).is_err());
+        assert!(shell_contents_equal(&first, &root.path().join("missing.dll")).is_err());
     }
 
     #[test]

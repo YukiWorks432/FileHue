@@ -1,5 +1,6 @@
 use super::{Manager, theme};
 mod about;
+mod dll_update;
 mod imports;
 mod pack_guidance;
 mod thumbnails;
@@ -676,6 +677,7 @@ fn download_gui_in_isolated_profile() {
 #[ignore = "専用プロファイルを持つ親試験からのみ起動する"]
 fn download_gui_in_child(cx: &mut TestAppContext) {
     assert_eq!(std::env::var("WFI_GUI_PROBE").as_deref(), Ok("1"));
+    let _registry = IsolatedRegistryProfile::new();
     let (window, manager) = cx.update(|cx| {
         gpui_kit::init(cx);
         theme::apply(ThemeMode::Dark, cx);
