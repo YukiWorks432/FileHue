@@ -1746,7 +1746,8 @@ fn protection_redesign_visual_probe() {
                         assert!(w.find("protection-show-all").visible());
                         w.click("protection-show-all", cx);
                         w.render_frame(cx);
-                        assert!(w.try_find("protection-row-ts").is_some());
+                        super::protection_sources::reveal(w, "protection-row-ts", cx);
+                        assert!(w.find("protection-row-ts").visible());
                         w.click("protection-discard", cx);
                         w.render_frame(cx);
                         assert!(
