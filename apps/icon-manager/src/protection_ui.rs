@@ -309,9 +309,17 @@ impl Manager {
             InputState::new(window, cx)
                 .placeholder(self.text("ソフト名・拡張子で検索", "Search apps or extensions"))
         });
-        self.protection.presentation.search_subscription =
-            Some(cx.subscribe(&search, |this, input, _: &InputEvent, cx| {
-                this.protection.presentation.query = input.read(cx).value().to_lowercase();
+        self.protection.presentation.search_subscription = Some(cx.subscribe(
+            &search,
+            |this, input, event: &InputEvent, cx| {
+                if !matches!(event, InputEvent::Change) {
+                    return;
+                }
+                let next_query = input.read(cx).value().to_lowercase();
+                if this.protection.presentation.query == next_query {
+                    return;
+                }
+                this.protection.presentation.query = next_query;
                 let query = this.protection.presentation.query.trim();
                 if !query.is_empty() {
                     let groups: Vec<_> = this
@@ -329,7 +337,8 @@ impl Manager {
                 this.protection.presentation.pinned.clear();
                 this.reset_protection_list();
                 cx.notify();
-            }));
+            },
+        ));
         self.protection.presentation.search = Some(search);
         // 未表示行も測定し、ホイールとスクロールバーが全件の高さを参照できるようにする。
         self.protection.presentation.list =

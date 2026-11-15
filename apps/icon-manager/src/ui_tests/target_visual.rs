@@ -1710,6 +1710,7 @@ fn protection_redesign_visual_probe() {
                     .update(cx, |_, w, cx| {
                         super::protection_menu(w, "protection-more", 0, cx);
                         w.render_frame(cx);
+                        super::protection_sources::reveal(w, "pack-icon-mts", cx);
                         assert!(w.find("pack-icon-mts").visible());
                         w.click("protection-search", cx);
                         w.input(".mts", cx);
@@ -1757,6 +1758,41 @@ fn protection_redesign_visual_probe() {
                                 .extensions
                                 .contains_key("mts")
                         );
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(150))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        super::protection_menu(w, "protection-filter", 1, cx);
+                        super::protection_sources::reveal(w, "pack-icon-mts", cx);
+                        w.click("pack-icon-mts", cx);
+                        w.render_frame(cx);
+                        assert!(w.find("protection-row-mts").visible());
+                        w.click("protection-search", cx);
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(150))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        w.render_frame(cx);
+                        assert!(w.find("protection-row-mts").visible());
+                        w.press("enter", cx);
+                        w.press("tab", cx);
+                    })
+                    .unwrap();
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(150))
+                    .await;
+                window
+                    .update(cx, |_, w, cx| {
+                        w.render_frame(cx);
+                        assert!(w.find("protection-row-mts").visible());
+                        w.click("protection-discard", cx);
+                        w.render_frame(cx);
                         manager.update(cx, |this, cx| {
                             let original =
                                 this.protection.inspection.source("mts").unwrap().clone();
