@@ -84,14 +84,11 @@ struct LicenseFile {
 }
 pub const PAYLOAD: &[&str] = &[
     "LICENSE",
+    "CHANGELOG.md",
     "THIRD_PARTY_NOTICES.md",
     "THIRD_PARTY_NOTICES.en.md",
     "docs/usage.ja.md",
     "docs/usage.en.md",
-    "docs/releases/0.1.0.ja.md",
-    "docs/releases/0.1.0.en.md",
-    "docs/releases/0.2.0.ja.md",
-    "docs/releases/0.2.0.en.md",
     "docs/cli.ja.md",
     "docs/cli.en.md",
     "docs/thumbnails.ja.md",

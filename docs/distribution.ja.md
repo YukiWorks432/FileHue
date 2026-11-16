@@ -1,10 +1,10 @@
 # 配布物の作成と検証
 
-FileHueのWindows x64向け配布物を作る。検証用と公開候補を明示的に分け、作成成功を実Explorerの受け入れや公開許可と混同しない。公開先は `https://github.com/YukiWorks432/FileHue` とする。[0.1.0](https://github.com/YukiWorks432/FileHue/releases/tag/v0.1.0)は公開済みで、GUI・CLI・Shell DLLを未署名で配布している。自己署名・仮署名も付けない。
+FileHueのWindows x64向け配布物を作る。検証用と公開候補を明示的に分け、作成成功を実Explorerの受け入れや公開許可と混同しない。公開先は `https://github.com/YukiWorks432/FileHue` とし、公開済みの配布物は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)で確認する。GUI・CLI・アイコン用とサムネイル用のShell DLLを未署名で配布する。自己署名・仮署名も付けない。
 
 ## 作成と確認
 
-現在のソースは0.2.0の公開準備版である。[日本語の変更案内](releases/0.2.0.ja.md)と[英語の変更案内](releases/0.2.0.en.md)をZIPへ同梱する。公開済みの0.1.0は保持し、0.2.0の候補生成を公開完了として扱わない。
+配布物の版はCargo.tomlの共有版から取得する。版ごとの変更・更新方法・制限は日英併記の[変更履歴](../CHANGELOG.md)へ集約し、`CHANGELOG.md`をZIPの直下へ同梱する。このファイルが欠けていれば配布物の検証を失敗させる。公開済みのタグと添付物は差し替えず、公開後の文書更新は次回の配布物へ反映する。
 
 配布候補を作る前に、[依存の更新と監査](dependency-security.ja.md)に従って`just audit`を実行する。監査の成功と権利表示の最終確認は別々に判断する。
 
@@ -48,7 +48,7 @@ Windows 11での`verify-release`は隣接する`SHA256SUMS.txt`でZIPと外部�
 
 ## 未署名の案内
 
-SmartScreenの警告や、Smart App Control・組織の実行制御による起動制限があり得る。日英の[0.2.0の案内](releases/0.2.0.ja.md)で未署名を明示する。利用者へ自己署名証明書の信頼登録や保護機能の広範な無効化を求めない。SHA-256と、GitHubの配布ワークフローが付与するビルド来歴証明はWindowsのコード署名とは別の確認手段である。署名サービスや署名鍵を用意しない。
+SmartScreenの警告や、Smart App Control・組織の実行制御による起動制限があり得る。対象版の日英リリースノートで未署名を明示する。利用者へ自己署名証明書の信頼登録や保護機能の広範な無効化を求めない。SHA-256と、GitHubの配布ワークフローが付与するビルド来歴証明はWindowsのコード署名とは別の確認手段である。署名サービスや署名鍵を用意しない。
 
 配布物には競合復旧と対象選択の案内を含める。分類表と言語定義はアプリへ組み込み、VS Code由来の言語定義の利用条件の原文を同梱する。開発用文書一式は収録しない。
 

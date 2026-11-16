@@ -1,6 +1,6 @@
 # 使い方
 
-Windows 11 x64向けのGUIと補助CLIを提供します。この文書は0.2.0の公開準備版を対象とし、変更と対応範囲は[0.2.0の案内](releases/0.2.0.ja.md)を参照します。実行ファイルと `file_icons_shell.dll`、`file_icons_thumbnail_shell.dll` を同じフォルダーに置いてGUIを起動します。取得とプレビューだけではShell登録を変更しません。適用は現在のユーザーのファイル表示全般へ影響するため、復元方法も確認してから行います。
+Windows 11 x64向けのGUIと補助CLIを提供します。この文書は同梱した版の操作を説明します。版ごとの変更と対応範囲は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)の案内を参照してください。実行ファイルと `file_icons_shell.dll`、`file_icons_thumbnail_shell.dll` を同じフォルダーに置いてGUIを起動します。取得とプレビューだけではShell登録を変更しません。適用は現在のユーザーのファイル表示全般へ影響するため、復元方法も確認してから行います。
 
 [ファイルのプレビュー](thumbnails.ja.md)では、6種類の拡張子を選択し、アイコンとは別に内容の表示を適用・復元できます。
 
@@ -8,7 +8,7 @@ Windows 11 x64向けのGUIと補助CLIを提供します。この文書は0.2.0�
 
 「アプリ情報」では製品の版と本体・第三者のライセンスを確認できます。「配布ページを開く」でGitHub Releasesへ移動し、公開済みの版と配布物を確認できます。各アイコンパックの利用条件は、パックの詳細で確認してください。
 
-公開済みのWindows x64向けZIPと`SHA256SUMS.txt`は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)から取得します。0.2.0は現在公開準備中です。
+Windows x64向けZIPと`SHA256SUMS.txt`は[最新版のリリースページ](https://github.com/YukiWorks432/FileHue/releases/latest)から取得します。過去の版は[GitHub Releases](https://github.com/YukiWorks432/FileHue/releases)を参照してください。
 
 ## 起動前の準備
 

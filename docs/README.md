@@ -1,14 +1,12 @@
 # 文書一覧
 
-現在の仕様と再現可能な手順を収録します。利用者向けの使い方、CLI、初回リリースの案内は日本語と英語を用意し、開発・設計文書は日本語で管理します。
+現在の仕様と再現可能な手順を収録します。利用者向けの使い方、CLI、版ごとの変更案内は日本語と英語を用意し、開発・設計文書は日本語で管理します。
 
 | 読みたい内容 | 文書 |
 | --- | --- |
 | 起動、取得、適用、復元、削除 | [使い方](usage.ja.md) / [English](usage.en.md) |
 | コマンドとJSON出力 | [CLI](cli.ja.md) / [English](cli.en.md) |
-| 初回版の機能と制限 | [0.1.0](releases/0.1.0.ja.md) / [English](releases/0.1.0.en.md) |
-| 0.2.0の変更と更新方法（公開準備中） | [0.2.0](releases/0.2.0.ja.md) / [English](releases/0.2.0.en.md) |
-| 公開後の変更 | [変更履歴](../CHANGELOG.md) |
+| 版ごとの変更、更新方法、公開日 | [変更履歴](../CHANGELOG.md) |
 | 要求と受け入れ基準 | [要求仕様](requirements.ja.md) |
 | 動作の全体像 | [現行仕様](current-specification.ja.md) |
 | 拡張子・名前の選択、既存アイコンの保護 | [適用対象と保護設定](target-selection.ja.md) |

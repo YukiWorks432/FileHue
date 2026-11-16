@@ -68,6 +68,22 @@ fn public_payload_requires_complete_clean_unsigned_files_and_no_unresolved_right
 }
 
 #[test]
+fn manifest_cannot_silently_omit_the_bundled_changelog() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("payload");
+    let mut manifest = support::payload(&root, Purpose::Validation);
+    package::verify(&root, temp.path(), Purpose::Validation).unwrap();
+    fs::remove_file(root.join("CHANGELOG.md")).unwrap();
+    manifest["files"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["path"] != "CHANGELOG.md");
+    fs::write(temp.path().join("manifest.json"), manifest.to_string()).unwrap();
+    let error = package::verify(&root, temp.path(), Purpose::Validation).unwrap_err();
+    assert!(error.to_string().contains("CHANGELOG.md"));
+}
+
+#[test]
 fn unsigned_policy_checks_the_pe_even_when_the_manifest_hash_was_updated() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("payload");

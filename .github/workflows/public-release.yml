@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 作成済みの版タグ（例 v0.1.0）
+        description: 作成済みの版タグ（例 v1.2.3）
         required: true
         type: string
 
@@ -113,7 +113,7 @@ jobs:
           "CANDIDATE_ZIP=$zip" >> $env:GITHUB_ENV
 
       - name: 完成ZIPのビルド来歴を証明する
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ${{ env.CANDIDATE_ZIP }}
 
@@ -176,5 +176,5 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $remote.sha -cne $env:GITHUB_SHA) { throw '公開先のタグが変更されています' }
           $assets = @($zip, "$folder/SHA256SUMS.txt", "$folder/manifest.json", $reportFile[0].FullName)
           $assets += @($sources | ForEach-Object { Join-Path $folder $_.source_archive.path })
-          gh release create $env:RELEASE_TAG @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title $env:RELEASE_TAG --notes 'FileHue Windows x64: unsigned candidate. Windows 11 Shell and Explorer validation is required before publication.'
+          gh release create $env:RELEASE_TAG @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title $env:RELEASE_TAG --notes=''
           exit $LASTEXITCODE
